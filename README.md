@@ -50,7 +50,7 @@ pip install numpy sympy
 
 - [Tristan Endo](https://github.com/Tristane028)
 - [Alexander Ryan](https://github.com/Wave449)
-- [Raymond Chou](https://github.com/raymondchou420)]
+- [Raymond Chou](https://github.com/raymondchou420)
 
 ## References
 
