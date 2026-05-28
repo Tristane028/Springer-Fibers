@@ -85,9 +85,9 @@ python "Plucker Relations.py"
 
 <h2>Collaborators</h2>
 <ul>
+  <li><a href="https://github.com/raymondchou420">Raymond Chou</a></li>
   <li><a href="https://github.com/Tristane028">Tristan Endo</a></li>
   <li><a href="https://github.com/Wave449">Alexander Ryan</a></li>
-  <li><a href="https://github.com/raymondchou420">Raymond Chou</a></li>
 </ul>
 
 <h2>References</h2>
