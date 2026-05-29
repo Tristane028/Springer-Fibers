@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Springer Fiber (2,2) — Interactive Cell Explorer</title>
+<style>
+  :root {
+    --bg-primary:   #ffffff;
+    --bg-secondary: #f6f5f0;
+    --bg-tertiary:  #f1efe8;
+    --text-primary: #1a1a1a;
+    --text-secondary: #5f5e5a;
+    --text-tertiary:  #888780;
+    --accent: #D85A30;
+    --border: rgba(0, 0, 0, 0.15);
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --font-mono: "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+    margin: 0;
+    padding: 1.5rem 1rem;
+    line-height: 1.6;
+  }
+  .container { max-width: 820px; margin: 0 auto; }
+
+  /* Header */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 1rem;
+  }
+  .breadcrumb {
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .breadcrumb .crumb {
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: color 0.15s;
+  }
+  .breadcrumb .crumb:hover { color: var(--accent); }
+  .breadcrumb .current {
+    color: var(--text-primary);
+    font-weight: 500;
+    cursor: default;
+  }
+  .breadcrumb .sep { color: var(--text-tertiary); }
+
+  /* Buttons */
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    background: transparent;
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 6px 14px;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: background 0.15s, transform 0.05s;
+  }
+  button:hover  { background: var(--bg-secondary); }
+  button:active { transform: scale(0.97); }
+  button.primary {
+    background: var(--text-primary);
+    color: var(--bg-primary);
+    border-color: var(--text-primary);
+  }
+  button.primary:hover { background: #333; }
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Headings */
+  h1 { font-size: 22px; font-weight: 500; margin: 0; }
+  h2 { font-size: 18px; font-weight: 500; margin: 2rem 0 1rem; }
+  h3 { font-size: 16px; font-weight: 500; margin: 0; }
+  p  { margin: 0.5rem 0; font-size: 14px; }
+  .label-uppercase {
+    font-size: 11px; color: var(--text-tertiary);
+    letter-spacing: 0.05em; text-transform: uppercase;
+    margin: 0 0 6px;
+  }
+
+  /* Scene canvas */
+  .scene-wrap {
+    position: relative;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg);
+    border: 0.5px solid var(--border);
+    overflow: hidden;
+  }
+  canvas { display: block; width: 100%; height: 460px; cursor: grab; }
+  .hint {
+    position: absolute; top: 10px; left: 12px;
+    margin: 0; font-size: 11px; color: var(--text-tertiary);
+    pointer-events: none;
+  }
+  .legend {
+    position: absolute; bottom: 10px; right: 12px;
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: 11px; color: var(--text-secondary);
+  }
+  .legend-dot {
+    display: inline-block;
+    border-radius: 50%;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+
+  /* Info cards */
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 1rem;
+  }
+  .info-card {
+    background: var(--bg-primary);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+  }
+
+  /* Action area */
+  .action-area {
+    margin-top: 1rem;
+    background: var(--bg-primary);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+  }
+  .path-row {
+    display: flex; align-items: center;
+    justify-content: space-between; gap: 12px;
+    padding: 8px 0;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .path-row:last-child { border-bottom: none; }
+  .path-info {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+    flex: 1;
+  }
+  .path-info .target {
+    font-weight: 500; color: var(--text-primary); font-size: 13px;
+  }
+
+  /* Traversal panel */
+  .traversal-panel {
+    background: var(--bg-primary);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin-top: 1rem;
+  }
+  .traversal-step {
+    display: flex; align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 0.5px solid var(--border);
+    opacity: 0.4;
+    transition: opacity 0.4s;
+  }
+  .traversal-step:last-child { border-bottom: none; }
+  .traversal-step.active  { opacity: 1; }
+  .traversal-step.done    { opacity: 0.6; }
+  .step-num {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 500;
+    flex-shrink: 0;
+    transition: background 0.3s, color 0.3s;
+  }
+  .traversal-step.active .step-num {
+    background: var(--accent);
+    color: white;
+  }
+  .traversal-step.done .step-num {
+    background: var(--text-primary);
+    color: white;
+  }
+  .step-body { flex: 1; }
+  .step-title {
+    font-size: 14px; font-weight: 500;
+    margin: 0 0 2px;
+  }
+  .step-detail {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  /* View transitions */
+  .view { display: none; }
+  .view.active { display: block; animation: fadeIn 0.25s; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="top-bar">
+    <div class="breadcrumb" id="breadcrumb"></div>
+    <button id="home-btn" class="primary">← Big picture</button>
+  </div>
+
+  <!-- ─── View 1: Big Picture ─────────────────────────────────────── -->
+  <div class="view active" id="view-overview">
+    <h1>The (2,2) Springer fiber</h1>
+    <p style="color: var(--text-secondary);">
+      Six Schubert cells, arranged by dimension. Click any sphere to explore that cell.
+    </p>
+    <div class="scene-wrap">
+      <canvas id="scene-overview"></canvas>
+      <p class="hint">drag to rotate · scroll to zoom · click any sphere to enter</p>
+      <div class="legend">
+        <div><span class="legend-dot" style="width: 10px; height: 10px; background: #888780;"></span> dim 0 (closed point)</div>
+        <div><span class="legend-dot" style="width: 12px; height: 12px; background: #1D9E75;"></span> dim 1</div>
+        <div><span class="legend-dot" style="width: 14px; height: 14px; background: #7F77DD;"></span> dim 2 (top cells)</div>
+      </div>
+    </div>
+    <p style="margin-top: 1rem; font-size: 13px; color: var(--text-secondary);">
+      Lines show direct closure relations. <span style="color: var(--accent); font-weight: 500;">C_3412</span>
+      and <span style="font-weight: 500;">C_3142</span> are the two top cells — the irreducible
+      components of the fiber. <span style="font-weight: 500;">C_1234</span> is the unique closed point at the bottom.
+    </p>
+  </div>
+
+  <!-- ─── View 2: Single Cell Explorer ─────────────────────────────── -->
+  <div class="view" id="view-cell">
+    <h1 id="cell-title" style="font-family: var(--font-mono);"></h1>
+    <p id="cell-summary" style="color: var(--text-secondary);"></p>
+
+    <div class="scene-wrap">
+      <canvas id="scene-cell"></canvas>
+      <p class="hint">drag to rotate · scroll to zoom</p>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-card">
+        <p class="label-uppercase">Parameter space</p>
+        <p id="cell-param" style="margin: 0; font-family: var(--font-mono); font-size: 14px;"></p>
+      </div>
+      <div class="info-card">
+        <p class="label-uppercase">Plücker coordinates</p>
+        <p id="cell-plucker" style="margin: 0; font-family: var(--font-mono); font-size: 12px; line-height: 1.7;"></p>
+      </div>
+    </div>
+
+    <div class="action-area">
+      <p class="label-uppercase">Choose a path to another cell</p>
+      <div id="path-list"></div>
+    </div>
+  </div>
+
+  <!-- ─── View 3: Path Traversal ──────────────────────────────────── -->
+  <div class="view" id="view-traverse">
+    <h1>
+      <span id="traverse-from" style="font-family: var(--font-mono);"></span>
+      <span style="color: var(--text-tertiary); margin: 0 12px;">→</span>
+      <span id="traverse-to" style="font-family: var(--font-mono); color: var(--accent);"></span>
+    </h1>
+    <p style="color: var(--text-secondary);">
+      Watch the cell degenerate in real time. Each step shows the operation applied.
+    </p>
+
+    <div class="scene-wrap">
+      <canvas id="scene-traverse"></canvas>
+      <p class="hint" id="traverse-hint">click "Begin traversal" to start</p>
+    </div>
+
+    <div style="display: flex; gap: 8px; margin-top: 1rem;">
+      <button id="traverse-start" class="primary">Begin traversal</button>
+      <button id="traverse-replay">Replay</button>
+      <button id="traverse-back">Back to cell</button>
+    </div>
+
+    <div class="traversal-panel">
+      <p class="label-uppercase">Operations</p>
+      <div id="step-list"></div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-card">
+        <p class="label-uppercase">Starting cell</p>
+        <p id="start-info" style="margin: 0; font-family: var(--font-mono); font-size: 12px; line-height: 1.7;"></p>
+      </div>
+      <div class="info-card">
+        <p class="label-uppercase">Landing cell</p>
+        <p id="land-info" style="margin: 0; font-family: var(--font-mono); font-size: 12px; line-height: 1.7;"></p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────────
+const CELLS = {
+  '1234': { dim: 0, free: [],          color: '#888780',
+            plucker: { lv1: '[1:0:0:0]', lv2: '[1:0:0:0:0:0]', lv3: '[1:0:0:0]' } },
+  '1324': { dim: 1, free: ['a1'],      color: '#1D9E75',
+            plucker: { lv1: '[1:0:0:0]', lv2: '[a1:1:0:0:0:0]', lv3: '[-1:0:0:0]' } },
+  '1342': { dim: 1, free: ['a2'],      color: '#1D9E75',
+            plucker: { lv1: '[1:0:0:0]', lv2: '[0:1:0:0:0:0]', lv3: '[-a2:0:1:0]' } },
+  '3124': { dim: 1, free: ['a1'],      color: '#1D9E75',
+            plucker: { lv1: '[a1:0:1:0]', lv2: '[0:-1:0:0:0:0]', lv3: '[1:0:0:0]' } },
+  '3142': { dim: 2, free: ['a1','a3'], color: '#7F77DD',
+            plucker: { lv1: '[a1:0:1:0]', lv2: '[0:-1:0:0:0:0]', lv3: '[a3:0:-1:0]' } },
+  '3412': { dim: 2, free: ['a2','a4'], color: '#D85A30',
+            plucker: { lv1: '[a4:0:1:0]', lv2: '[a4²:-a2:a4:-a4:0:1]', lv3: '[-a4:0:1:0]' } }
+};
+
+const EDGES = [
+  { src: '1324', tgt: '1234', limit: 'a1', srcSubs: {},          tgtSubs: {} },
+  { src: '1342', tgt: '1324', limit: 'a2', srcSubs: {},          tgtSubs: {a1: '0'} },
+  { src: '3124', tgt: '1324', limit: 'a1', srcSubs: {},          tgtSubs: {a1: '0'} },
+  { src: '3142', tgt: '1324', limit: 'a1', srcSubs: {a3: 'a1'},  tgtSubs: {a1: '0'} },
+  { src: '3142', tgt: '3124', limit: 'a3', srcSubs: {a1: '0'},   tgtSubs: {a1: '0'} },
+  { src: '3142', tgt: '1342', limit: 'a1', srcSubs: {a3: '0'},   tgtSubs: {a2: '0'} },
+  { src: '3412', tgt: '1234', limit: 'a2', srcSubs: {a4: 'a2'},  tgtSubs: {} },
+  { src: '3412', tgt: '1324', limit: 'a4', srcSubs: {a2: 'a4²'}, tgtSubs: {a1: '-1'} },
+  { src: '3412', tgt: '3142', limit: 'a2', srcSubs: {a4: '0'},   tgtSubs: {a1: '0', a3: '0'} }
+];
+
+const POSITIONS = {
+  '3412': { x:  1.6, y:  1.6, z:  0.2 },
+  '3142': { x: -1.6, y:  1.0, z: -0.2 },
+  '1342': { x: -1.2, y: -0.2, z:  1.0 },
+  '3124': { x:  0.0, y: -0.2, z: -1.2 },
+  '1324': { x:  1.4, y: -0.2, z:  0.6 },
+  '1234': { x:  0.0, y: -1.6, z:  0.0 }
+};
+
+const RADIUS = { 0: 0.22, 1: 0.32, 2: 0.46 };
+
+// ── Shared 3D scene module ────────────────────────────────────────────────────
+function makeScene(canvasId, opts) {
+  opts = opts || {};
+  const canvas = document.getElementById(canvasId);
+  const ctx    = canvas.getContext('2d');
+  const DPR    = window.devicePixelRatio || 1;
+  const state  = {
+    yaw: 0.5, pitch: -0.15, zoom: 1.0,
+    dragging: false, lastX: 0, lastY: 0,
+    rotating: !!opts.autoRotate,
+    activeCell: opts.activeCell || null,
+    flowAnim: null,
+    highlight: null,
+    onClickSphere: opts.onClickSphere || null,
+    showAllEdges: opts.showAllEdges !== false,
+    spheres: []
+  };
+
+  function resize() {
+    const r = canvas.getBoundingClientRect();
+    canvas.width  = r.width  * DPR;
+    canvas.height = r.height * DPR;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  resize();
+
+  function project(p) {
+    const cy = Math.cos(state.yaw),   sy = Math.sin(state.yaw);
+    const cp = Math.cos(state.pitch), sp = Math.sin(state.pitch);
+    let x =  p.x*cy + p.z*sy;
+    let z = -p.x*sy + p.z*cy;
+    let y =  p.y*cp - z*sp;
+        z =  p.y*sp + z*cp;
+    const f  = 320 * state.zoom;
+    const dz = 5 - z;
+    return {
+      x: canvas.width/(2*DPR)  + (x*f)/dz,
+      y: canvas.height/(2*DPR) - (y*f)/dz,
+      depth: z, scale: f/dz
+    };
+  }
+
+  function drawEdge(srcPerm, tgtPerm, highlighted) {
+    const p1 = project(POSITIONS[srcPerm]);
+    const p2 = project(POSITIONS[tgtPerm]);
+    ctx.strokeStyle = highlighted ? 'rgba(216, 90, 48, 0.85)' : 'rgba(120,120,120,0.22)';
+    ctx.lineWidth   = highlighted ? 2 : 0.8;
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+  }
+
+  function drawSphere(perm) {
+    const p    = project(POSITIONS[perm]);
+    const cell = CELLS[perm];
+    const r    = Math.max(8, RADIUS[cell.dim] * 110 * p.scale * 0.012);
+    const isActive = perm === state.activeCell;
+    const isHover  = perm === state.highlight;
+    ctx.fillStyle   = cell.color;
+    ctx.globalAlpha = isActive ? 1.0 : (isHover ? 0.92 : 0.7);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+    ctx.fill();
+    if (isActive) {
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#26215C';
+      ctx.lineWidth   = 2.5;
+      ctx.stroke();
+    } else if (isHover) {
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      ctx.lineWidth   = 1;
+      ctx.stroke();
+    }
+    ctx.globalAlpha  = 1;
+    ctx.fillStyle    = 'rgba(0,0,0,0.85)';
+    ctx.font         = '500 12px sans-serif';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('C_' + perm, p.x, p.y + r + 4);
+    return { perm, x: p.x, y: p.y, r };
+  }
+
+  function drawFlow() {
+    if (!state.flowAnim) return;
+    const a = project(POSITIONS[state.flowAnim.src]);
+    const b = project(POSITIONS[state.flowAnim.tgt]);
+    const t = state.flowAnim.t;
+    const x = a.x + (b.x - a.x) * t;
+    const y = a.y + (b.y - a.y) * t;
+    ctx.fillStyle = '#D85A30';
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(216,90,48,0.55)';
+    ctx.lineWidth   = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (state.showAllEdges) {
+      EDGES.forEach(e => { if (e.src !== state.activeCell) drawEdge(e.src, e.tgt, false); });
+      EDGES.forEach(e => { if (e.src === state.activeCell) drawEdge(e.src, e.tgt, true);  });
+    } else if (state.flowAnim) {
+      drawEdge(state.flowAnim.src, state.flowAnim.tgt, true);
+    }
+    const order = Object.keys(POSITIONS)
+      .map(p => ({ perm: p, depth: project(POSITIONS[p]).depth }))
+      .sort((a, b) => a.depth - b.depth);
+    state.spheres = order.map(o => drawSphere(o.perm));
+    drawFlow();
+  }
+
+  canvas.addEventListener('mousedown', e => {
+    state.dragging = true;
+    state.lastX = e.clientX; state.lastY = e.clientY;
+    canvas.style.cursor = 'grabbing';
+  });
+  window.addEventListener('mouseup', () => {
+    state.dragging = false; canvas.style.cursor = 'grab';
+  });
+  canvas.addEventListener('mousemove', e => {
+    if (!state.dragging) {
+      const r = canvas.getBoundingClientRect();
+      const mx = e.clientX - r.left, my = e.clientY - r.top;
+      let hit = null;
+      for (const s of state.spheres) {
+        if (Math.hypot(mx - s.x, my - s.y) <= s.r + 4) { hit = s.perm; break; }
+      }
+      if (hit !== state.highlight) {
+        state.highlight = hit;
+        canvas.style.cursor = hit && state.onClickSphere ? 'pointer' : 'grab';
+        render();
+      }
+      return;
+    }
+    state.yaw   += (e.clientX - state.lastX) * 0.01;
+    state.pitch += (e.clientY - state.lastY) * 0.01;
+    state.pitch  = Math.max(-1.2, Math.min(1.2, state.pitch));
+    state.lastX  = e.clientX; state.lastY = e.clientY;
+    render();
+  });
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    state.zoom *= e.deltaY > 0 ? 0.92 : 1.08;
+    state.zoom  = Math.max(0.4, Math.min(2.5, state.zoom));
+    render();
+  }, { passive: false });
+  canvas.addEventListener('click', e => {
+    if (!state.onClickSphere) return;
+    const r = canvas.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    for (const s of state.spheres) {
+      if (Math.hypot(mx - s.x, my - s.y) <= s.r + 4) {
+        state.onClickSphere(s.perm);
+        return;
+      }
+    }
+  });
+  window.addEventListener('resize', () => { resize(); render(); });
+
+  function loop() {
+    if (state.rotating && !state.dragging) {
+      state.yaw += 0.004;
+      render();
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  return { state, render, project };
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+const VIEWS = ['overview', 'cell', 'traverse'];
+let currentView    = 'overview';
+let currentCell    = null;
+let currentEdge    = null;
+const sceneOverview = makeScene('scene-overview', {
+  autoRotate: true,
+  onClickSphere: perm => goToCell(perm)
+});
+
+const sceneCell = makeScene('scene-cell', {
+  autoRotate: true,
+  onClickSphere: perm => goToCell(perm)
+});
+
+const sceneTraverse = makeScene('scene-traverse', {
+  autoRotate: false,
+  showAllEdges: false
+});
+
+function setView(name) {
+  currentView = name;
+  VIEWS.forEach(v => {
+    document.getElementById('view-' + v).classList.toggle('active', v === name);
+  });
+  if (name === 'overview') {
+    sceneOverview.state.activeCell = null;
+    sceneOverview.render();
+  } else if (name === 'cell') {
+    sceneCell.state.activeCell = currentCell;
+    sceneCell.render();
+  } else if (name === 'traverse') {
+    sceneTraverse.state.activeCell = currentEdge.src;
+    sceneTraverse.state.flowAnim   = null;
+    sceneTraverse.render();
+  }
+  renderBreadcrumb();
+}
+
+function renderBreadcrumb() {
+  const bc = document.getElementById('breadcrumb');
+  let html = '<span class="crumb' + (currentView === 'overview' ? ' current' : '') +
+             '" data-go="overview">All cells</span>';
+  if (currentCell && currentView !== 'overview') {
+    html += '<span class="sep">›</span>';
+    html += '<span class="crumb' + (currentView === 'cell' ? ' current' : '') +
+            '" data-go="cell">C_' + currentCell + '</span>';
+  }
+  if (currentEdge && currentView === 'traverse') {
+    html += '<span class="sep">›</span>';
+    html += '<span class="current">→ C_' + currentEdge.tgt + '</span>';
+  }
+  bc.innerHTML = html;
+  bc.querySelectorAll('.crumb[data-go]').forEach(el => {
+    el.addEventListener('click', () => {
+      const target = el.getAttribute('data-go');
+      if (target === 'overview') goHome();
+      else if (target === 'cell' && currentCell) goToCell(currentCell);
+    });
+  });
+}
+
+function goHome() {
+  currentCell = null;
+  currentEdge = null;
+  setView('overview');
+}
+
+function goToCell(perm) {
+  currentCell = perm;
+  currentEdge = null;
+  fillCellView(perm);
+  setView('cell');
+}
+
+function goToTraverse(edge) {
+  currentEdge = edge;
+  fillTraverseView(edge);
+  setView('traverse');
+}
+
+document.getElementById('home-btn').addEventListener('click', goHome);
+
+// ── Cell view ─────────────────────────────────────────────────────────────────
+function fillCellView(perm) {
+  const cell = CELLS[perm];
+  document.getElementById('cell-title').textContent = 'C_' + perm;
+  const freeStr = cell.free.length ? cell.free.join(', ') : 'none';
+  document.getElementById('cell-summary').textContent =
+    `Dimension ${cell.dim} · ${cell.free.length} free parameter${cell.free.length === 1 ? '' : 's'}: ${freeStr}`;
+  document.getElementById('cell-param').textContent =
+    cell.free.length ? `A^${cell.dim} with coordinates (${cell.free.join(', ')})` : 'A^0 (single point)';
+  document.getElementById('cell-plucker').innerHTML =
+    `lv1: ${cell.plucker.lv1}<br>lv2: ${cell.plucker.lv2}<br>lv3: ${cell.plucker.lv3}`;
+
+  const outgoing = EDGES.filter(e => e.src === perm);
+  const list = document.getElementById('path-list');
+  list.innerHTML = '';
+  if (outgoing.length === 0) {
+    list.innerHTML = '<p style="margin: 8px 0; font-size: 13px; color: var(--text-tertiary);">' +
+                     'This cell has no outgoing paths — it is the minimum of the closure poset.</p>';
+    return;
+  }
+  outgoing.forEach(edge => {
+    const row = document.createElement('div');
+    row.className = 'path-row';
+    const parts = [];
+    if (Object.keys(edge.srcSubs).length)
+      parts.push('src: ' + Object.entries(edge.srcSubs).map(([k,v]) => `${k}=${v}`).join(', '));
+    if (Object.keys(edge.tgtSubs).length)
+      parts.push('tgt: ' + Object.entries(edge.tgtSubs).map(([k,v]) => `${k}=${v}`).join(', '));
+    parts.push(edge.limit + '→∞');
+    row.innerHTML = `
+      <div class="path-info">
+        <div class="target">→ C_${edge.tgt}</div>
+        <div>${parts.join('  ·  ')}</div>
+      </div>
+      <button class="primary">Take this path →</button>
+    `;
+    row.querySelector('button').addEventListener('click', () => goToTraverse(edge));
+    list.appendChild(row);
+  });
+}
+
+// ── Traverse view ─────────────────────────────────────────────────────────────
+function buildSteps(edge) {
+  const steps = [];
+  if (Object.keys(edge.srcSubs).length) {
+    steps.push({
+      title: 'Apply source substitutions',
+      detail: Object.entries(edge.srcSubs).map(([k,v]) => `${k} = ${v}`).join(', ')
+    });
+  }
+  if (Object.keys(edge.tgtSubs).length) {
+    steps.push({
+      title: 'Fix the target parameters',
+      detail: Object.entries(edge.tgtSubs).map(([k,v]) => `${k} = ${v}`).join(', ')
+    });
+  }
+  steps.push({
+    title: `Send ${edge.limit} → ∞`,
+    detail: 'The scaled source vectors converge to the target.'
+  });
+  steps.push({
+    title: `Land in C_${edge.tgt}`,
+    detail: 'Traversal complete.'
+  });
+  return steps;
+}
+
+function fillTraverseView(edge) {
+  document.getElementById('traverse-from').textContent = 'C_' + edge.src;
+  document.getElementById('traverse-to').textContent   = 'C_' + edge.tgt;
+
+  const srcCell = CELLS[edge.src];
+  const tgtCell = CELLS[edge.tgt];
+  document.getElementById('start-info').innerHTML =
+    `<span style="color: var(--text-primary); font-weight: 500;">C_${edge.src}</span> · dim ${srcCell.dim}<br>` +
+    `free: ${srcCell.free.length ? srcCell.free.join(', ') : 'none'}<br>` +
+    `lv1: ${srcCell.plucker.lv1}`;
+  document.getElementById('land-info').innerHTML =
+    `<span style="color: var(--text-primary); font-weight: 500;">C_${edge.tgt}</span> · dim ${tgtCell.dim}<br>` +
+    `free: ${tgtCell.free.length ? tgtCell.free.join(', ') : 'none'}<br>` +
+    `lv1: ${tgtCell.plucker.lv1}`;
+
+  const steps = buildSteps(edge);
+  const list  = document.getElementById('step-list');
+  list.innerHTML = '';
+  steps.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'traversal-step';
+    el.innerHTML = `
+      <div class="step-num">${i + 1}</div>
+      <div class="step-body">
+        <p class="step-title">${s.title}</p>
+        <p class="step-detail">${s.detail}</p>
+      </div>
+    `;
+    list.appendChild(el);
+  });
+  document.getElementById('traverse-hint').textContent = 'click "Begin traversal" to start';
+  sceneTraverse.state.activeCell = edge.src;
+  sceneTraverse.state.flowAnim   = null;
+  sceneTraverse.render();
+}
+
+let traverseTimer = null;
+function startTraversal() {
+  if (!currentEdge) return;
+  const edge  = currentEdge;
+  const steps = document.querySelectorAll('#step-list .traversal-step');
+  steps.forEach(s => s.classList.remove('active', 'done'));
+  document.getElementById('traverse-hint').textContent = 'traversing...';
+
+  // Time the step highlights to overlap with the flow animation
+  const stepDuration = 1000;
+  let stepIdx = 0;
+  function nextStep() {
+    if (stepIdx > 0) steps[stepIdx - 1].classList.replace('active', 'done');
+    if (stepIdx < steps.length) {
+      steps[stepIdx].classList.add('active');
+      stepIdx++;
+      traverseTimer = setTimeout(nextStep, stepDuration);
+    }
+  }
+
+  // Start step highlighting in parallel with the flow
+  nextStep();
+
+  // Start the visual flow
+  const startTime = performance.now();
+  const flowDuration = stepDuration * steps.length;
+  function flowStep(now) {
+    const t = Math.min(1, (now - startTime) / flowDuration);
+    sceneTraverse.state.flowAnim = { src: edge.src, tgt: edge.tgt, t };
+    sceneTraverse.render();
+    if (t < 1) {
+      requestAnimationFrame(flowStep);
+    } else {
+      sceneTraverse.state.activeCell = edge.tgt;
+      sceneTraverse.state.flowAnim   = null;
+      sceneTraverse.render();
+      document.getElementById('traverse-hint').textContent =
+        `arrived in C_${edge.tgt}`;
+    }
+  }
+  requestAnimationFrame(flowStep);
+}
+
+document.getElementById('traverse-start').addEventListener('click', startTraversal);
+document.getElementById('traverse-replay').addEventListener('click', () => {
+  clearTimeout(traverseTimer);
+  fillTraverseView(currentEdge);
+  startTraversal();
+});
+document.getElementById('traverse-back').addEventListener('click', () => {
+  clearTimeout(traverseTimer);
+  goToCell(currentEdge.src);
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+setView('overview');
+sceneOverview.render();
+</script>
+</body>
+</html>
