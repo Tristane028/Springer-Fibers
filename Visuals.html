@@ -369,8 +369,13 @@ function makeScene(canvasId, opts) {
     highlight: null,
     onClickSphere: opts.onClickSphere || null,
     showAllEdges: opts.showAllEdges !== false,
-    focusMode: !!opts.focusMode,      // when true, dim cells not connected to active
-    spheres: []
+    focusMode: !!opts.focusMode,
+    spheres: [],
+    // First-person camera: cameraPos is a point in scene-space; when set, the
+    // projection translates the world so this point sits at the camera origin,
+    // simulating "looking through the eyes of" that location.
+    cameraPos: null,
+    firstPerson: false
   };
 
   function resize() {
@@ -382,14 +387,24 @@ function makeScene(canvasId, opts) {
   resize();
 
   function project(p) {
+    // First-person: translate world so the camera is at origin
+    let px = p.x, py = p.y, pz = p.z;
+    if (state.firstPerson && state.cameraPos) {
+      px -= state.cameraPos.x;
+      py -= state.cameraPos.y;
+      pz -= state.cameraPos.z;
+    }
     const cy = Math.cos(state.yaw),   sy = Math.sin(state.yaw);
     const cp = Math.cos(state.pitch), sp = Math.sin(state.pitch);
-    let x =  p.x*cy + p.z*sy;
-    let z = -p.x*sy + p.z*cy;
-    let y =  p.y*cp - z*sp;
-        z =  p.y*sp + z*cp;
+    let x =  px*cy + pz*sy;
+    let z = -px*sy + pz*cy;
+    let y =  py*cp - z*sp;
+        z =  py*sp + z*cp;
+    // In first-person mode pull the "camera distance" closer so nearby cells
+    // fill more of the screen and a sense of presence emerges.
+    const camDist = state.firstPerson ? 1.5 : 5;
     const f  = 320 * state.zoom;
-    const dz = 5 - z;
+    const dz = camDist - z;
     return {
       x: canvas.width/(2*DPR)  + (x*f)/dz,
       y: canvas.height/(2*DPR) - (y*f)/dz,
@@ -400,12 +415,47 @@ function makeScene(canvasId, opts) {
   function drawEdge(srcPerm, tgtPerm, highlighted) {
     const p1 = project(POSITIONS[srcPerm]);
     const p2 = project(POSITIONS[tgtPerm]);
-    ctx.strokeStyle = highlighted ? 'rgba(216, 90, 48, 0.85)' : 'rgba(120,120,120,0.22)';
-    ctx.lineWidth   = highlighted ? 2 : 0.8;
+    const stroke = highlighted ? 'rgba(216, 90, 48, 0.85)' : 'rgba(120,120,120,0.32)';
+    const lw     = highlighted ? 2 : 0.9;
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth   = lw;
+
+    // Shorten endpoints so the arrowhead doesn't overlap the spheres
+    const dx   = p2.x - p1.x;
+    const dy   = p2.y - p1.y;
+    const len  = Math.hypot(dx, dy);
+    if (len < 1) return;
+    const ux   = dx / len, uy = dy / len;
+    const r1   = Math.max(8, RADIUS[CELLS[srcPerm].dim] * 110 * p1.scale * 0.012);
+    const r2   = Math.max(8, RADIUS[CELLS[tgtPerm].dim] * 110 * p2.scale * 0.012);
+    const sx   = p1.x + ux * r1;
+    const sy   = p1.y + uy * r1;
+    const ex   = p2.x - ux * r2;
+    const ey   = p2.y - uy * r2;
+
+    // Shaft
     ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex, ey);
     ctx.stroke();
+
+    // Arrowhead at the target end
+    const headLen   = highlighted ? 12 : 8;
+    const headAngle = 0.45;
+    const ang       = Math.atan2(uy, ux);
+    ctx.fillStyle = stroke;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(
+      ex - headLen * Math.cos(ang - headAngle),
+      ey - headLen * Math.sin(ang - headAngle)
+    );
+    ctx.lineTo(
+      ex - headLen * Math.cos(ang + headAngle),
+      ey - headLen * Math.sin(ang + headAngle)
+    );
+    ctx.closePath();
+    ctx.fill();
   }
 
   function drawSphere(perm) {
@@ -577,7 +627,8 @@ const sceneCell = makeScene('scene-cell', {
 
 const sceneTraverse = makeScene('scene-traverse', {
   autoRotate: false,
-  showAllEdges: false
+  showAllEdges: true,            // show all closure arrows for context
+  firstPerson: true              // first-person camera flies along the edge
 });
 
 function setView(name) {
@@ -749,8 +800,18 @@ function fillTraverseView(edge) {
     list.appendChild(el);
   });
   document.getElementById('traverse-hint').textContent = 'click "Begin traversal" to start';
-  sceneTraverse.state.activeCell = edge.src;
-  sceneTraverse.state.flowAnim   = null;
+  const srcPos = POSITIONS[edge.src];
+  const tgtPos = POSITIONS[edge.tgt];
+  const dx = tgtPos.x - srcPos.x;
+  const dy = tgtPos.y - srcPos.y;
+  const dz = tgtPos.z - srcPos.z;
+  sceneTraverse.state.firstPerson = true;
+  sceneTraverse.state.cameraPos   = { x: srcPos.x, y: srcPos.y, z: srcPos.z };
+  sceneTraverse.state.yaw         = Math.atan2(dx, dz);
+  sceneTraverse.state.pitch       = -Math.atan2(dy, Math.hypot(dx, dz));
+  sceneTraverse.state.zoom        = 1.0;
+  sceneTraverse.state.activeCell  = edge.tgt;  // target highlighted while we look at it
+  sceneTraverse.state.flowAnim    = null;
   sceneTraverse.render();
 }
 
@@ -760,9 +821,9 @@ function startTraversal() {
   const edge  = currentEdge;
   const steps = document.querySelectorAll('#step-list .traversal-step');
   steps.forEach(s => s.classList.remove('active', 'done'));
-  document.getElementById('traverse-hint').textContent = 'traversing...';
+  document.getElementById('traverse-hint').textContent = 'travelling...';
 
-  // Time the step highlights to overlap with the flow animation
+  // Time the step highlights in parallel with the camera flight
   const stepDuration = 1000;
   let stepIdx = 0;
   function nextStep() {
@@ -773,28 +834,47 @@ function startTraversal() {
       traverseTimer = setTimeout(nextStep, stepDuration);
     }
   }
-
-  // Start step highlighting in parallel with the flow
   nextStep();
 
-  // Start the visual flow
-  const startTime = performance.now();
+  const srcPos = POSITIONS[edge.src];
+  const tgtPos = POSITIONS[edge.tgt];
+
+  // First-person flight: camera position interpolates from src to a point just
+  // shy of the target so the target sphere fills the view on arrival.
+  sceneTraverse.state.firstPerson = true;
+  sceneTraverse.state.activeCell  = edge.tgt; // highlight target as we approach
+  sceneTraverse.state.flowAnim    = null;
+
+  // Aim the view roughly toward the target
+  const dx = tgtPos.x - srcPos.x;
+  const dy = tgtPos.y - srcPos.y;
+  const dz = tgtPos.z - srcPos.z;
+  sceneTraverse.state.yaw   = Math.atan2(dx, dz);
+  sceneTraverse.state.pitch = -Math.atan2(dy, Math.hypot(dx, dz));
+  sceneTraverse.state.zoom  = 1.0;
+
+  const startTime    = performance.now();
   const flowDuration = stepDuration * steps.length;
-  function flowStep(now) {
-    const t = Math.min(1, (now - startTime) / flowDuration);
-    sceneTraverse.state.flowAnim = { src: edge.src, tgt: edge.tgt, t };
+  function flightStep(now) {
+    const raw = Math.min(1, (now - startTime) / flowDuration);
+    // ease-in-out for a smoother feel
+    const t = raw < 0.5 ? 2 * raw * raw : 1 - Math.pow(-2 * raw + 2, 2) / 2;
+    // Stop a small fraction shy of the target so we don't pass through it
+    const stop = 0.92;
+    sceneTraverse.state.cameraPos = {
+      x: srcPos.x + (tgtPos.x - srcPos.x) * t * stop,
+      y: srcPos.y + (tgtPos.y - srcPos.y) * t * stop,
+      z: srcPos.z + (tgtPos.z - srcPos.z) * t * stop
+    };
     sceneTraverse.render();
-    if (t < 1) {
-      requestAnimationFrame(flowStep);
+    if (raw < 1) {
+      requestAnimationFrame(flightStep);
     } else {
-      sceneTraverse.state.activeCell = edge.tgt;
-      sceneTraverse.state.flowAnim   = null;
-      sceneTraverse.render();
       document.getElementById('traverse-hint').textContent =
-        `arrived in C_${edge.tgt}`;
+        `arrived in C_${edge.tgt} — viewing from inside`;
     }
   }
-  requestAnimationFrame(flowStep);
+  requestAnimationFrame(flightStep);
 }
 
 document.getElementById('traverse-start').addEventListener('click', startTraversal);
