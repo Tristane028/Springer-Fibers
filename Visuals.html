@@ -473,6 +473,7 @@ function makeScene(canvasId, opts) {
   }
 
   function render() {
+    if (canvas.width === 0 || canvas.height === 0) resize();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (state.showAllEdges) {
       // First pass: faint, only edges NOT involving the active cell
@@ -584,9 +585,10 @@ function setView(name) {
   VIEWS.forEach(v => {
     document.getElementById('view-' + v).classList.toggle('active', v === name);
   });
-  // Canvases inside hidden views report 0x0 size — resize once the view is visible.
-  // requestAnimationFrame ensures the browser has laid the new view out first.
-  requestAnimationFrame(() => {
+  // Canvases inside hidden views (display: none) report 0x0 size. Double rAF
+  // ensures the browser has actually performed layout on the now-visible view
+  // before we call getBoundingClientRect() to set the canvas dimensions.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
     if (name === 'overview') {
       sceneOverview.resize();
       sceneOverview.state.activeCell = null;
@@ -601,7 +603,7 @@ function setView(name) {
       sceneTraverse.state.flowAnim   = null;
       sceneTraverse.render();
     }
-  });
+  }));
   renderBreadcrumb();
 }
 
