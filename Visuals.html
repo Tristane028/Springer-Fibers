@@ -369,6 +369,7 @@ function makeScene(canvasId, opts) {
     highlight: null,
     onClickSphere: opts.onClickSphere || null,
     showAllEdges: opts.showAllEdges !== false,
+    focusMode: !!opts.focusMode,      // when true, dim cells not connected to active
     spheres: []
   };
 
@@ -413,8 +414,19 @@ function makeScene(canvasId, opts) {
     const r    = Math.max(8, RADIUS[cell.dim] * 110 * p.scale * 0.012);
     const isActive = perm === state.activeCell;
     const isHover  = perm === state.highlight;
+    // Determine if this cell is a neighbor of the active cell (in either direction)
+    let isNeighbor = false;
+    if (state.activeCell) {
+      isNeighbor = EDGES.some(e =>
+        (e.src === state.activeCell && e.tgt === perm) ||
+        (e.tgt === state.activeCell && e.src === perm)
+      );
+    }
+    const dimmed = state.focusMode && state.activeCell && !isActive && !isNeighbor;
     ctx.fillStyle   = cell.color;
-    ctx.globalAlpha = isActive ? 1.0 : (isHover ? 0.92 : 0.7);
+    ctx.globalAlpha = dimmed ? 0.18 :
+                      isActive ? 1.0 :
+                      isHover  ? 0.92 : 0.75;
     ctx.beginPath();
     ctx.arc(p.x, p.y, r, 0, Math.PI*2);
     ctx.fill();
@@ -429,12 +441,13 @@ function makeScene(canvasId, opts) {
       ctx.lineWidth   = 1;
       ctx.stroke();
     }
-    ctx.globalAlpha  = 1;
+    ctx.globalAlpha  = dimmed ? 0.3 : 1;
     ctx.fillStyle    = 'rgba(0,0,0,0.85)';
     ctx.font         = '500 12px sans-serif';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText('C_' + perm, p.x, p.y + r + 4);
+    ctx.globalAlpha  = 1;
     return { perm, x: p.x, y: p.y, r };
   }
 
@@ -462,8 +475,19 @@ function makeScene(canvasId, opts) {
   function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (state.showAllEdges) {
-      EDGES.forEach(e => { if (e.src !== state.activeCell) drawEdge(e.src, e.tgt, false); });
-      EDGES.forEach(e => { if (e.src === state.activeCell) drawEdge(e.src, e.tgt, true);  });
+      // First pass: faint, only edges NOT involving the active cell
+      EDGES.forEach(e => {
+        const touchesActive = state.activeCell &&
+          (e.src === state.activeCell || e.tgt === state.activeCell);
+        if (!touchesActive) drawEdge(e.src, e.tgt, false);
+      });
+      // Second pass: highlight edges touching the active cell (both directions)
+      EDGES.forEach(e => {
+        if (state.activeCell &&
+            (e.src === state.activeCell || e.tgt === state.activeCell)) {
+          drawEdge(e.src, e.tgt, true);
+        }
+      });
     } else if (state.flowAnim) {
       drawEdge(state.flowAnim.src, state.flowAnim.tgt, true);
     }
@@ -531,7 +555,7 @@ function makeScene(canvasId, opts) {
   }
   requestAnimationFrame(loop);
 
-  return { state, render, project };
+  return { state, render, project, resize };
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
@@ -546,6 +570,7 @@ const sceneOverview = makeScene('scene-overview', {
 
 const sceneCell = makeScene('scene-cell', {
   autoRotate: true,
+  focusMode: true,                    // dim non-related cells
   onClickSphere: perm => goToCell(perm)
 });
 
@@ -559,17 +584,24 @@ function setView(name) {
   VIEWS.forEach(v => {
     document.getElementById('view-' + v).classList.toggle('active', v === name);
   });
-  if (name === 'overview') {
-    sceneOverview.state.activeCell = null;
-    sceneOverview.render();
-  } else if (name === 'cell') {
-    sceneCell.state.activeCell = currentCell;
-    sceneCell.render();
-  } else if (name === 'traverse') {
-    sceneTraverse.state.activeCell = currentEdge.src;
-    sceneTraverse.state.flowAnim   = null;
-    sceneTraverse.render();
-  }
+  // Canvases inside hidden views report 0x0 size — resize once the view is visible.
+  // requestAnimationFrame ensures the browser has laid the new view out first.
+  requestAnimationFrame(() => {
+    if (name === 'overview') {
+      sceneOverview.resize();
+      sceneOverview.state.activeCell = null;
+      sceneOverview.render();
+    } else if (name === 'cell') {
+      sceneCell.resize();
+      sceneCell.state.activeCell = currentCell;
+      sceneCell.render();
+    } else if (name === 'traverse') {
+      sceneTraverse.resize();
+      sceneTraverse.state.activeCell = currentEdge.src;
+      sceneTraverse.state.flowAnim   = null;
+      sceneTraverse.render();
+    }
+  });
   renderBreadcrumb();
 }
 
