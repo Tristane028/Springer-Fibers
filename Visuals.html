@@ -353,27 +353,108 @@ function makeScene(canvasId, opts) {
     return { perm, x: p.x, y: p.y, r };
   }
 
+  function drawFlyingDot(flow) {
+    if (!POSITIONS[flow.src] || !POSITIONS[flow.tgt]) return;
+    const a = project(POSITIONS[flow.src]);
+    const b = project(POSITIONS[flow.tgt]);
+    const t = flow.t;
+    const x = a.x + (b.x - a.x) * t;
+    const y = a.y + (b.y - a.y) * t;
+
+    // The dot itself (slightly larger than a regular sphere so it stands out)
+    const r = 7;
+    ctx.fillStyle = '#D85A30';
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // A faint trail showing where it's been
+    ctx.strokeStyle = 'rgba(216,90,48,0.45)';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Floating label showing the live parameter value as it grows toward infinity.
+    // Using 1/(1-t) gives a natural divergence: small at the start, → ∞ at t=1.
+    if (flow.limitVar) {
+      let label;
+      if (t >= 0.985) {
+        label = `${flow.limitVar} → ∞`;
+      } else {
+        // Show as a number that grows; round nicely.
+        const val = 1 / Math.max(0.001, 1 - t);
+        const display = val >= 100 ? Math.round(val) :
+                        val >= 10  ? val.toFixed(1) :
+                                     val.toFixed(2);
+        label = `${flow.limitVar} = ${display}`;
+      }
+
+      // Label background pill for readability over any backdrop
+      ctx.font = '500 12px ' + (getComputedStyle(document.body).fontFamily || 'sans-serif');
+      const tw = ctx.measureText(label).width;
+      const pad = 6;
+      const lx = x + r + 10;
+      const ly = y - 9;
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.strokeStyle = 'rgba(216,90,48,0.6)';
+      ctx.lineWidth = 1;
+      // Rounded rect for the label background
+      const bw = tw + pad*2, bh = 22;
+      const radius = 11;
+      ctx.beginPath();
+      ctx.moveTo(lx + radius, ly);
+      ctx.lineTo(lx + bw - radius, ly);
+      ctx.arcTo(lx + bw, ly, lx + bw, ly + radius, radius);
+      ctx.lineTo(lx + bw, ly + bh - radius);
+      ctx.arcTo(lx + bw, ly + bh, lx + bw - radius, ly + bh, radius);
+      ctx.lineTo(lx + radius, ly + bh);
+      ctx.arcTo(lx, ly + bh, lx, ly + bh - radius, radius);
+      ctx.lineTo(lx, ly + radius);
+      ctx.arcTo(lx, ly, lx + radius, ly, radius);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#D85A30';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, lx + pad, ly + bh/2);
+    }
+  }
+
   function render() {
     if (canvas.width === 0 || canvas.height === 0) resize();
     if (!CELLS) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Edges first
     if (state.showAllEdges) {
       EDGES.forEach(e => {
         const t = state.activeCell && (e.src === state.activeCell || e.tgt === state.activeCell);
         if (!t) drawEdge(e.src, e.tgt, false);
       });
+      // The active edge (source of current flow) is highlighted brightest
       EDGES.forEach(e => {
-        if (state.activeCell && (e.src === state.activeCell || e.tgt === state.activeCell)) {
-          drawEdge(e.src, e.tgt, true);
-        }
+        const active = state.activeCell && (e.src === state.activeCell || e.tgt === state.activeCell);
+        const isFlowEdge = state.flowAnim && state.flowAnim.src === e.src && state.flowAnim.tgt === e.tgt;
+        if (active || isFlowEdge) drawEdge(e.src, e.tgt, true);
       });
     } else if (state.flowAnim) {
       drawEdge(state.flowAnim.src, state.flowAnim.tgt, true);
     }
+    // Spheres back-to-front
     const order = Object.keys(POSITIONS)
       .map(p => ({ perm: p, depth: project(POSITIONS[p]).depth }))
       .sort((a, b) => a.depth - b.depth);
     state.spheres = order.map(o => drawSphere(o.perm)).filter(Boolean);
+    // Flying dot on top of everything
+    if (state.flowAnim) drawFlyingDot(state.flowAnim);
   }
 
   // ── Event handlers ─────────────────────────────────────────────────────────
@@ -456,7 +537,7 @@ const sceneCell = makeScene('scene-cell', {
 const sceneTraverse = makeScene('scene-traverse', {
   autoRotate: false,
   showAllEdges: true,
-  firstPerson: true
+  firstPerson: false           // third-person: watch the dot fly from outside
 });
 
 function setView(name) {
@@ -623,15 +704,13 @@ function fillTraverseView(edge) {
     list.appendChild(el);
   });
   document.getElementById('traverse-hint').textContent = 'click "Begin traversal" to start';
-  const srcPos = POSITIONS[edge.src];
-  const tgtPos = POSITIONS[edge.tgt];
-  const dx = tgtPos.x - srcPos.x, dy = tgtPos.y - srcPos.y, dz = tgtPos.z - srcPos.z;
-  sceneTraverse.state.firstPerson = true;
-  sceneTraverse.state.cameraPos = { x: srcPos.x, y: srcPos.y, z: srcPos.z };
-  sceneTraverse.state.yaw = Math.atan2(dx, dz);
-  sceneTraverse.state.pitch = -Math.atan2(dy, Math.hypot(dx, dz));
+  // Third-person: position the camera at a good angle to watch the src->tgt edge
+  sceneTraverse.state.firstPerson = false;
+  sceneTraverse.state.cameraPos = null;
+  sceneTraverse.state.yaw = 0.5;
+  sceneTraverse.state.pitch = -0.15;
   sceneTraverse.state.zoom = 1.0;
-  sceneTraverse.state.activeCell = edge.tgt;
+  sceneTraverse.state.activeCell = edge.src;   // start with source highlighted
   sceneTraverse.state.flowAnim = null;
   sceneTraverse.render();
 }
@@ -643,6 +722,8 @@ function startTraversal() {
   const steps = document.querySelectorAll('#step-list .traversal-step');
   steps.forEach(s => s.classList.remove('active', 'done'));
   document.getElementById('traverse-hint').textContent = 'travelling...';
+
+  // Light up the operation steps in sequence
   const stepDuration = 1000;
   let stepIdx = 0;
   function nextStep() {
@@ -654,29 +735,38 @@ function startTraversal() {
     }
   }
   nextStep();
-  const srcPos = POSITIONS[edge.src];
-  const tgtPos = POSITIONS[edge.tgt];
-  sceneTraverse.state.firstPerson = true;
-  sceneTraverse.state.activeCell = edge.tgt;
-  sceneTraverse.state.flowAnim = null;
-  const dx = tgtPos.x - srcPos.x, dy = tgtPos.y - srcPos.y, dz = tgtPos.z - srcPos.z;
-  sceneTraverse.state.yaw = Math.atan2(dx, dz);
-  sceneTraverse.state.pitch = -Math.atan2(dy, Math.hypot(dx, dz));
+
+  // Reset the camera to a third-person view of the whole fiber so we can watch
+  // the dot fly between cells.
+  sceneTraverse.state.firstPerson = false;
+  sceneTraverse.state.cameraPos = null;
+  sceneTraverse.state.activeCell = edge.src;
   sceneTraverse.state.zoom = 1.0;
+
   const startTime = performance.now();
   const flowDuration = stepDuration * steps.length;
   function flightStep(now) {
     const raw = Math.min(1, (now - startTime) / flowDuration);
+    // Ease-in-out so the dot starts slow, accelerates, then settles
     const t = raw < 0.5 ? 2*raw*raw : 1 - Math.pow(-2*raw + 2, 2) / 2;
-    const stop = 0.92;
-    sceneTraverse.state.cameraPos = {
-      x: srcPos.x + (tgtPos.x - srcPos.x) * t * stop,
-      y: srcPos.y + (tgtPos.y - srcPos.y) * t * stop,
-      z: srcPos.z + (tgtPos.z - srcPos.z) * t * stop
+    sceneTraverse.state.flowAnim = {
+      src: edge.src,
+      tgt: edge.tgt,
+      t,
+      limitVar: edge.limit,
+      srcSubs: edge.srcSubs,
+      tgtSubs: edge.tgtSubs
     };
     sceneTraverse.render();
-    if (raw < 1) requestAnimationFrame(flightStep);
-    else document.getElementById('traverse-hint').textContent = `arrived in C_${edge.tgt} — viewing from inside`;
+    if (raw < 1) {
+      requestAnimationFrame(flightStep);
+    } else {
+      // Arrival: switch active cell, keep the dot visible at the endpoint briefly
+      sceneTraverse.state.activeCell = edge.tgt;
+      sceneTraverse.state.flowAnim = null;
+      sceneTraverse.render();
+      document.getElementById('traverse-hint').textContent = `arrived in C_${edge.tgt}`;
+    }
   }
   requestAnimationFrame(flightStep);
 }
