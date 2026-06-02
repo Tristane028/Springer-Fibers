@@ -2,218 +2,64 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Springer Fiber (2,2) — Interactive Cell Explorer</title>
+<title>Springer Fiber — Interactive Cell Explorer</title>
 <style>
   :root {
-    --bg-primary:   #ffffff;
-    --bg-secondary: #f6f5f0;
-    --bg-tertiary:  #f1efe8;
-    --text-primary: #1a1a1a;
-    --text-secondary: #5f5e5a;
-    --text-tertiary:  #888780;
-    --accent: #D85A30;
-    --border: rgba(0, 0, 0, 0.15);
-    --radius-md: 8px;
-    --radius-lg: 12px;
+    --bg-primary: #ffffff; --bg-secondary: #f6f5f0; --bg-tertiary: #f1efe8;
+    --text-primary: #1a1a1a; --text-secondary: #5f5e5a; --text-tertiary: #888780;
+    --accent: #D85A30; --border: rgba(0,0,0,0.15);
+    --radius-md: 8px; --radius-lg: 12px;
     --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     --font-mono: "SF Mono", Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; }
-  body {
-    font-family: var(--font-sans);
-    color: var(--text-primary);
-    background: var(--bg-tertiary);
-    margin: 0;
-    padding: 1.5rem 1rem;
-    line-height: 1.6;
-  }
+  body { font-family: var(--font-sans); color: var(--text-primary); background: var(--bg-tertiary); margin: 0; padding: 1.5rem 1rem; line-height: 1.6; }
   .container { max-width: 820px; margin: 0 auto; }
-
-  /* Header */
-  .top-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 1rem;
-  }
-  .breadcrumb {
-    font-size: 13px;
-    color: var(--text-secondary);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .breadcrumb .crumb {
-    cursor: pointer;
-    color: var(--text-secondary);
-    transition: color 0.15s;
-  }
+  .top-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 1rem; flex-wrap: wrap; }
+  .breadcrumb { font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+  .breadcrumb .crumb { cursor: pointer; transition: color .15s; }
   .breadcrumb .crumb:hover { color: var(--accent); }
-  .breadcrumb .current {
-    color: var(--text-primary);
-    font-weight: 500;
-    cursor: default;
-  }
+  .breadcrumb .current { color: var(--text-primary); font-weight: 500; cursor: default; }
   .breadcrumb .sep { color: var(--text-tertiary); }
-
-  /* Buttons */
-  button {
-    font-family: inherit;
-    font-size: 13px;
-    background: transparent;
-    border: 0.5px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 6px 14px;
-    cursor: pointer;
-    color: var(--text-primary);
-    transition: background 0.15s, transform 0.05s;
-  }
-  button:hover  { background: var(--bg-secondary); }
-  button:active { transform: scale(0.97); }
-  button.primary {
-    background: var(--text-primary);
-    color: var(--bg-primary);
-    border-color: var(--text-primary);
-  }
+  button { font-family: inherit; font-size: 13px; background: transparent; border: .5px solid var(--border); border-radius: var(--radius-md); padding: 6px 14px; cursor: pointer; color: var(--text-primary); transition: background .15s, transform .05s; }
+  button:hover { background: var(--bg-secondary); }
+  button:active { transform: scale(.97); }
+  button.primary { background: var(--text-primary); color: var(--bg-primary); border-color: var(--text-primary); }
   button.primary:hover { background: #333; }
-  button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  /* Headings */
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  select { font-family: inherit; font-size: 13px; padding: 6px 28px 6px 10px; border-radius: var(--radius-md); border: .5px solid var(--border); background: var(--bg-primary); color: var(--text-primary); cursor: pointer; appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><path d="M0 0l5 6 5-6z" fill="%23888"/></svg>'); background-repeat: no-repeat; background-position: right 10px center; }
   h1 { font-size: 22px; font-weight: 500; margin: 0; }
   h2 { font-size: 18px; font-weight: 500; margin: 2rem 0 1rem; }
   h3 { font-size: 16px; font-weight: 500; margin: 0; }
-  p  { margin: 0.5rem 0; font-size: 14px; }
-  .label-uppercase {
-    font-size: 11px; color: var(--text-tertiary);
-    letter-spacing: 0.05em; text-transform: uppercase;
-    margin: 0 0 6px;
-  }
-
-  /* Scene canvas */
-  .scene-wrap {
-    position: relative;
-    background: var(--bg-secondary);
-    border-radius: var(--radius-lg);
-    border: 0.5px solid var(--border);
-    overflow: hidden;
-  }
+  p { margin: .5rem 0; font-size: 14px; }
+  .label-uppercase { font-size: 11px; color: var(--text-tertiary); letter-spacing: .05em; text-transform: uppercase; margin: 0 0 6px; }
+  .scene-wrap { position: relative; background: var(--bg-secondary); border-radius: var(--radius-lg); border: .5px solid var(--border); overflow: hidden; }
   canvas { display: block; width: 100%; height: 460px; cursor: grab; }
-  .hint {
-    position: absolute; top: 10px; left: 12px;
-    margin: 0; font-size: 11px; color: var(--text-tertiary);
-    pointer-events: none;
-  }
-  .legend {
-    position: absolute; bottom: 10px; right: 12px;
-    display: flex; flex-direction: column; gap: 4px;
-    font-size: 11px; color: var(--text-secondary);
-  }
-  .legend-dot {
-    display: inline-block;
-    border-radius: 50%;
-    vertical-align: middle;
-    margin-right: 4px;
-  }
-
-  /* Info cards */
-  .info-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-top: 1rem;
-  }
-  .info-card {
-    background: var(--bg-primary);
-    border: 0.5px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 12px 14px;
-  }
-
-  /* Action area */
-  .action-area {
-    margin-top: 1rem;
-    background: var(--bg-primary);
-    border: 0.5px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 14px 16px;
-  }
-  .path-row {
-    display: flex; align-items: center;
-    justify-content: space-between; gap: 12px;
-    padding: 8px 0;
-    border-bottom: 0.5px solid var(--border);
-  }
+  .hint { position: absolute; top: 10px; left: 12px; margin: 0; font-size: 11px; color: var(--text-tertiary); pointer-events: none; }
+  .legend { position: absolute; bottom: 10px; right: 12px; display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text-secondary); pointer-events: none; }
+  .legend-dot { display: inline-block; border-radius: 50%; vertical-align: middle; margin-right: 4px; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 1rem; }
+  .info-card { background: var(--bg-primary); border: .5px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; }
+  .action-area { margin-top: 1rem; background: var(--bg-primary); border: .5px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; }
+  .path-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: .5px solid var(--border); }
   .path-row:last-child { border-bottom: none; }
-  .path-info {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--text-secondary);
-    flex: 1;
-  }
-  .path-info .target {
-    font-weight: 500; color: var(--text-primary); font-size: 13px;
-  }
-
-  /* Traversal panel */
-  .traversal-panel {
-    background: var(--bg-primary);
-    border: 0.5px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 14px 16px;
-    margin-top: 1rem;
-  }
-  .traversal-step {
-    display: flex; align-items: flex-start;
-    gap: 12px;
-    padding: 10px 0;
-    border-bottom: 0.5px solid var(--border);
-    opacity: 0.4;
-    transition: opacity 0.4s;
-  }
+  .path-info { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); flex: 1; }
+  .path-info .target { font-weight: 500; color: var(--text-primary); font-size: 13px; }
+  .traversal-panel { background: var(--bg-primary); border: .5px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; margin-top: 1rem; }
+  .traversal-step { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: .5px solid var(--border); opacity: .4; transition: opacity .4s; }
   .traversal-step:last-child { border-bottom: none; }
-  .traversal-step.active  { opacity: 1; }
-  .traversal-step.done    { opacity: 0.6; }
-  .step-num {
-    width: 22px; height: 22px;
-    border-radius: 50%;
-    background: var(--bg-tertiary);
-    color: var(--text-secondary);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 12px; font-weight: 500;
-    flex-shrink: 0;
-    transition: background 0.3s, color 0.3s;
-  }
-  .traversal-step.active .step-num {
-    background: var(--accent);
-    color: white;
-  }
-  .traversal-step.done .step-num {
-    background: var(--text-primary);
-    color: white;
-  }
+  .traversal-step.active { opacity: 1; }
+  .traversal-step.done { opacity: .6; }
+  .step-num { width: 22px; height: 22px; border-radius: 50%; background: var(--bg-tertiary); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; flex-shrink: 0; transition: background .3s, color .3s; }
+  .traversal-step.active .step-num { background: var(--accent); color: white; }
+  .traversal-step.done .step-num { background: var(--text-primary); color: white; }
   .step-body { flex: 1; }
-  .step-title {
-    font-size: 14px; font-weight: 500;
-    margin: 0 0 2px;
-  }
-  .step-detail {
-    font-family: var(--font-mono);
-    font-size: 12px;
-    color: var(--text-secondary);
-    margin: 0;
-  }
-
-  /* View transitions */
+  .step-title { font-size: 14px; font-weight: 500; margin: 0 0 2px; }
+  .step-detail { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); margin: 0; }
   .view { display: none; }
-  .view.active { display: block; animation: fadeIn 0.25s; }
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
+  .view.active { display: block; animation: fadeIn .25s; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .partition-notice { background: var(--bg-primary); border: .5px solid var(--border); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 1rem; font-size: 13px; color: var(--text-secondary); }
 </style>
 </head>
 <body>
@@ -221,41 +67,38 @@
 
   <div class="top-bar">
     <div class="breadcrumb" id="breadcrumb"></div>
-    <button id="home-btn" class="primary">← Big picture</button>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <label for="partition-select" style="font-size: 12px; color: var(--text-tertiary);">Partition:</label>
+      <select id="partition-select">
+        <option value="22">2,2 — 6 cells</option>
+        <option value="32">3,2 — 10 cells</option>
+        <option value="33" disabled>3,3 — 20 cells (run locally)</option>
+        <option value="44" disabled>4,4 — 70 cells (run locally)</option>
+      </select>
+      <button id="home-btn" class="primary">← Big picture</button>
+    </div>
   </div>
 
-  <!-- ─── View 1: Big Picture ─────────────────────────────────────── -->
   <div class="view active" id="view-overview">
-    <h1>The (2,2) Springer fiber</h1>
-    <p style="color: var(--text-secondary);">
-      Six Schubert cells, arranged by dimension. Click any sphere to explore that cell.
-    </p>
+    <h1 id="overview-title">The (2,2) Springer fiber</h1>
+    <p id="overview-summary" style="color: var(--text-secondary);"></p>
     <div class="scene-wrap">
       <canvas id="scene-overview"></canvas>
       <p class="hint">drag to rotate · scroll to zoom · click any sphere to enter</p>
-      <div class="legend">
-        <div><span class="legend-dot" style="width: 10px; height: 10px; background: #888780;"></span> dim 0 (closed point)</div>
-        <div><span class="legend-dot" style="width: 12px; height: 12px; background: #1D9E75;"></span> dim 1</div>
-        <div><span class="legend-dot" style="width: 14px; height: 14px; background: #7F77DD;"></span> dim 2 (top cells)</div>
-      </div>
+      <div class="legend" id="legend-overview"></div>
     </div>
     <p style="margin-top: 1rem; font-size: 13px; color: var(--text-secondary);">
-      Lines show direct closure relations. <span style="color: var(--accent); font-weight: 500;">C_3412</span>
-      and <span style="font-weight: 500;">C_3142</span> are the two top cells — the irreducible
-      components of the fiber. <span style="font-weight: 500;">C_1234</span> is the unique closed point at the bottom.
+      Arrows show direct closure relations (one-way). Spheres with no outgoing arrow are at the top; the closed point is at the bottom.
     </p>
   </div>
 
-  <!-- ─── View 2: Single Cell Explorer ─────────────────────────────── -->
   <div class="view" id="view-cell">
     <h1 id="cell-title" style="font-family: var(--font-mono);"></h1>
     <p id="cell-summary" style="color: var(--text-secondary);"></p>
-
     <div class="scene-wrap">
       <canvas id="scene-cell"></canvas>
       <p class="hint">drag to rotate · scroll to zoom</p>
     </div>
-
     <div class="info-grid">
       <div class="info-card">
         <p class="label-uppercase">Parameter space</p>
@@ -266,40 +109,32 @@
         <p id="cell-plucker" style="margin: 0; font-family: var(--font-mono); font-size: 12px; line-height: 1.7;"></p>
       </div>
     </div>
-
     <div class="action-area">
       <p class="label-uppercase">Choose a path to another cell</p>
       <div id="path-list"></div>
     </div>
   </div>
 
-  <!-- ─── View 3: Path Traversal ──────────────────────────────────── -->
   <div class="view" id="view-traverse">
     <h1>
       <span id="traverse-from" style="font-family: var(--font-mono);"></span>
       <span style="color: var(--text-tertiary); margin: 0 12px;">→</span>
       <span id="traverse-to" style="font-family: var(--font-mono); color: var(--accent);"></span>
     </h1>
-    <p style="color: var(--text-secondary);">
-      Watch the cell degenerate in real time. Each step shows the operation applied.
-    </p>
-
+    <p style="color: var(--text-secondary);">Watch the cell degenerate in real time. Camera flies along the closure edge.</p>
     <div class="scene-wrap">
       <canvas id="scene-traverse"></canvas>
       <p class="hint" id="traverse-hint">click "Begin traversal" to start</p>
     </div>
-
     <div style="display: flex; gap: 8px; margin-top: 1rem;">
       <button id="traverse-start" class="primary">Begin traversal</button>
       <button id="traverse-replay">Replay</button>
       <button id="traverse-back">Back to cell</button>
     </div>
-
     <div class="traversal-panel">
       <p class="label-uppercase">Operations</p>
       <div id="step-list"></div>
     </div>
-
     <div class="info-grid">
       <div class="info-card">
         <p class="label-uppercase">Starting cell</p>
@@ -315,67 +150,102 @@
 </div>
 
 <script>
-// ── Data ──────────────────────────────────────────────────────────────────────
-const CELLS = {
-  '1234': { dim: 0, free: [],          color: '#888780',
-            plucker: { lv1: '[1:0:0:0]', lv2: '[1:0:0:0:0:0]', lv3: '[1:0:0:0]' } },
-  '1324': { dim: 1, free: ['a1'],      color: '#1D9E75',
-            plucker: { lv1: '[1:0:0:0]', lv2: '[a1:1:0:0:0:0]', lv3: '[-1:0:0:0]' } },
-  '1342': { dim: 1, free: ['a2'],      color: '#1D9E75',
-            plucker: { lv1: '[1:0:0:0]', lv2: '[0:1:0:0:0:0]', lv3: '[-a2:0:1:0]' } },
-  '3124': { dim: 1, free: ['a1'],      color: '#1D9E75',
-            plucker: { lv1: '[a1:0:1:0]', lv2: '[0:-1:0:0:0:0]', lv3: '[1:0:0:0]' } },
-  '3142': { dim: 2, free: ['a1','a3'], color: '#7F77DD',
-            plucker: { lv1: '[a1:0:1:0]', lv2: '[0:-1:0:0:0:0]', lv3: '[a3:0:-1:0]' } },
-  '3412': { dim: 2, free: ['a2','a4'], color: '#D85A30',
-            plucker: { lv1: '[a4:0:1:0]', lv2: '[a4²:-a2:a4:-a4:0:1]', lv3: '[-a4:0:1:0]' } }
-};
+// ── Embedded precomputed data ────────────────────────────────────────────────
+const ALL_DATA = {"22": {"partition": "22", "cells": [{"perm": "1234", "dim": 0, "free": [], "plucker": ["[1 : 0 : 0 : 0]", "[1 : 0 : 0 : 0 : 0 : 0]", "[1 : 0 : 0 : 0]"]}, {"perm": "1324", "dim": 1, "free": ["a1"], "plucker": ["[1 : 0 : 0 : 0]", "[a1 : 1 : 0 : 0 : 0 : 0]", "[-1 : 0 : 0 : 0]"]}, {"perm": "1342", "dim": 1, "free": ["a2"], "plucker": ["[1 : 0 : 0 : 0]", "[0 : 1 : 0 : 0 : 0 : 0]", "[-a2 : 0 : 1 : 0]"]}, {"perm": "3124", "dim": 1, "free": ["a1"], "plucker": ["[a1 : 0 : 1 : 0]", "[0 : -1 : 0 : 0 : 0 : 0]", "[1 : 0 : 0 : 0]"]}, {"perm": "3142", "dim": 2, "free": ["a1", "a3"], "plucker": ["[a1 : 0 : 1 : 0]", "[0 : -1 : 0 : 0 : 0 : 0]", "[a3 : 0 : -1 : 0]"]}, {"perm": "3412", "dim": 2, "free": ["a2", "a4"], "plucker": ["[a4 : 0 : 1 : 0]", "[a4**2 : -a2 : a4 : -a4 : 0 : 1]", "[-a4 : 0 : 1 : 0]"]}], "edges": [{"src": "1324", "tgt": "1234", "limit": "a1", "srcSubs": {}, "tgtSubs": {}}, {"src": "1342", "tgt": "1324", "limit": "a2", "srcSubs": {}, "tgtSubs": {"a1": "0"}}, {"src": "3124", "tgt": "1324", "limit": "a1", "srcSubs": {}, "tgtSubs": {"a1": "0"}}, {"src": "3142", "tgt": "1324", "limit": "a1", "srcSubs": {"a3": "a1"}, "tgtSubs": {"a1": "0"}}, {"src": "3142", "tgt": "1342", "limit": "a1", "srcSubs": {"a3": "0"}, "tgtSubs": {"a2": "0"}}, {"src": "3142", "tgt": "3124", "limit": "a3", "srcSubs": {"a1": "0"}, "tgtSubs": {"a1": "0"}}, {"src": "3412", "tgt": "1234", "limit": "a2", "srcSubs": {"a4": "a2"}, "tgtSubs": {}}, {"src": "3412", "tgt": "1324", "limit": "a4", "srcSubs": {"a2": "a4**2"}, "tgtSubs": {"a1": "-1"}}, {"src": "3412", "tgt": "3142", "limit": "a2", "srcSubs": {"a4": "0"}, "tgtSubs": {"a1": "0", "a3": "0"}}]}, "32": {"partition": "32", "cells": [{"perm": "12345", "dim": 0, "free": [], "plucker": ["[1 : 0 : 0 : 0 : 0]", "[1 : 0 : 0 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[1 : 0 : 0 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[1 : 0 : 0 : 0 : 0]"]}, {"perm": "12435", "dim": 1, "free": ["a1"], "plucker": ["[1 : 0 : 0 : 0 : 0]", "[1 : 0 : 0 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[a1 : 1 : 0 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[-1 : 0 : 0 : 0 : 0]"]}, {"perm": "12453", "dim": 1, "free": ["a2"], "plucker": ["[1 : 0 : 0 : 0 : 0]", "[1 : 0 : 0 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[0 : 1 : 0 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[-a2 : 0 : 1 : 0 : 0]"]}, {"perm": "14235", "dim": 1, "free": ["a1"], "plucker": ["[1 : 0 : 0 : 0 : 0]", "[a1 : 0 : 1 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[0 : -1 : 0 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[1 : 0 : 0 : 0 : 0]"]}, {"perm": "14253", "dim": 2, "free": ["a1", "a3"], "plucker": ["[1 : 0 : 0 : 0 : 0]", "[a1 : 0 : 1 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[0 : -1 : 0 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[a3 : 0 : -1 : 0 : 0]"]}, {"perm": "14523", "dim": 2, "free": ["a2", "a4"], "plucker": ["[1 : 0 : 0 : 0 : 0]", "[a4 : 0 : 1 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[a4**2 : -a2 : a4 : -a4 : 0 : 1 : 0 : 0 : 0 : 0]", "[-a4 : 0 : 1 : 0 : 0]"]}, {"perm": "41235", "dim": 1, "free": ["a1"], "plucker": ["[a1 : 0 : 0 : 1 : 0]", "[0 : 0 : -1 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[0 : 1 : 0 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[-1 : 0 : 0 : 0 : 0]"]}, {"perm": "41253", "dim": 2, "free": ["a1", "a4"], "plucker": ["[a1 : 0 : 0 : 1 : 0]", "[0 : 0 : -1 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[0 : 1 : 0 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[-a4 : 0 : 1 : 0 : 0]"]}, {"perm": "41523", "dim": 2, "free": ["a1", "a3"], "plucker": ["[a1 : 0 : 0 : 1 : 0]", "[0 : 0 : -1 : 0 : 0 : 0 : 0 : 0 : 0 : 0]", "[0 : a3 : 0 : 0 : 0 : -1 : 0 : 0 : 0 : 0]", "[0 : 0 : -1 : 0 : 0]"]}, {"perm": "45123", "dim": 2, "free": ["a2", "a4"], "plucker": ["[a4 : 0 : 0 : 1 : 0]", "[a4**2 : 0 : -a2 : a4 : 0 : -a4 : 0 : 0 : 0 : 1]", "[0 : -a4 : 0 : 0 : 0 : 1 : 0 : 0 : 0 : 0]", "[0 : 0 : 1 : 0 : 0]"]}], "edges": [{"src": "12435", "tgt": "12345", "limit": "a1", "srcSubs": {}, "tgtSubs": {}}, {"src": "12453", "tgt": "12435", "limit": "a2", "srcSubs": {}, "tgtSubs": {"a1": "0"}}, {"src": "14235", "tgt": "12435", "limit": "a1", "srcSubs": {}, "tgtSubs": {"a1": "0"}}, {"src": "14253", "tgt": "12435", "limit": "a1", "srcSubs": {"a3": "a1"}, "tgtSubs": {"a1": "0"}}, {"src": "14253", "tgt": "12453", "limit": "a1", "srcSubs": {"a3": "0"}, "tgtSubs": {"a2": "0"}}, {"src": "14253", "tgt": "14235", "limit": "a3", "srcSubs": {"a1": "0"}, "tgtSubs": {"a1": "0"}}, {"src": "14523", "tgt": "12345", "limit": "a2", "srcSubs": {"a4": "a2"}, "tgtSubs": {}}, {"src": "14523", "tgt": "12435", "limit": "a4", "srcSubs": {"a2": "a4**2"}, "tgtSubs": {"a1": "-1"}}, {"src": "14523", "tgt": "14253", "limit": "a2", "srcSubs": {"a4": "0"}, "tgtSubs": {"a1": "0", "a3": "0"}}, {"src": "41235", "tgt": "14235", "limit": "a1", "srcSubs": {}, "tgtSubs": {"a1": "0"}}, {"src": "41253", "tgt": "14235", "limit": "a1", "srcSubs": {"a4": "a1"}, "tgtSubs": {"a1": "0"}}, {"src": "41253", "tgt": "14253", "limit": "a1", "srcSubs": {"a4": "0"}, "tgtSubs": {"a1": "0", "a3": "0"}}, {"src": "41253", "tgt": "41235", "limit": "a4", "srcSubs": {"a1": "0"}, "tgtSubs": {"a1": "0"}}, {"src": "41523", "tgt": "14253", "limit": "a1", "srcSubs": {"a3": "a1"}, "tgtSubs": {"a1": "0", "a3": "0"}}, {"src": "41523", "tgt": "14523", "limit": "a1", "srcSubs": {"a3": "0"}, "tgtSubs": {"a2": "0", "a4": "0"}}, {"src": "41523", "tgt": "41253", "limit": "a3", "srcSubs": {"a1": "0"}, "tgtSubs": {"a1": "0", "a4": "0"}}, {"src": "45123", "tgt": "12453", "limit": "a2", "srcSubs": {"a4": "a2"}, "tgtSubs": {"a2": "0"}}, {"src": "45123", "tgt": "14253", "limit": "a4", "srcSubs": {"a2": "a4**2"}, "tgtSubs": {"a1": "-1", "a3": "0"}}, {"src": "45123", "tgt": "41523", "limit": "a2", "srcSubs": {"a4": "0"}, "tgtSubs": {"a1": "0", "a3": "0"}}]}};
 
-const EDGES = [
-  { src: '1324', tgt: '1234', limit: 'a1', srcSubs: {},          tgtSubs: {} },
-  { src: '1342', tgt: '1324', limit: 'a2', srcSubs: {},          tgtSubs: {a1: '0'} },
-  { src: '3124', tgt: '1324', limit: 'a1', srcSubs: {},          tgtSubs: {a1: '0'} },
-  { src: '3142', tgt: '1324', limit: 'a1', srcSubs: {a3: 'a1'},  tgtSubs: {a1: '0'} },
-  { src: '3142', tgt: '3124', limit: 'a3', srcSubs: {a1: '0'},   tgtSubs: {a1: '0'} },
-  { src: '3142', tgt: '1342', limit: 'a1', srcSubs: {a3: '0'},   tgtSubs: {a2: '0'} },
-  { src: '3412', tgt: '1234', limit: 'a2', srcSubs: {a4: 'a2'},  tgtSubs: {} },
-  { src: '3412', tgt: '1324', limit: 'a4', srcSubs: {a2: 'a4²'}, tgtSubs: {a1: '-1'} },
-  { src: '3412', tgt: '3142', limit: 'a2', srcSubs: {a4: '0'},   tgtSubs: {a1: '0', a3: '0'} }
-];
+// ── State that depends on which partition is loaded ───────────────────────────
+let DATA;      // current partition's data
+let CELLS;     // { perm -> { dim, free, plucker, color } }
+let EDGES;     // array of { src, tgt, limit, srcSubs, tgtSubs }
+let POSITIONS; // { perm -> {x,y,z} } algorithmically laid out
+const RADIUS = { 0: 0.22, 1: 0.30, 2: 0.40, 3: 0.50, 4: 0.58 };
+const DIM_COLORS = ['#888780', '#1D9E75', '#7F77DD', '#D85A30', '#4F6BD6', '#B14CCB'];
 
-const POSITIONS = {
-  '3412': { x:  1.6, y:  1.6, z:  0.2 },
-  '3142': { x: -1.6, y:  1.0, z: -0.2 },
-  '1342': { x: -1.2, y: -0.2, z:  1.0 },
-  '3124': { x:  0.0, y: -0.2, z: -1.2 },
-  '1324': { x:  1.4, y: -0.2, z:  0.6 },
-  '1234': { x:  0.0, y: -1.6, z:  0.0 }
-};
+// ── Layout: arrange cells in 3D, stratified by dimension ─────────────────────
+function layoutCells(cells) {
+  const positions = {};
+  const byDim = {};
+  cells.forEach(c => {
+    if (!byDim[c.dim]) byDim[c.dim] = [];
+    byDim[c.dim].push(c);
+  });
+  const maxDim = Math.max(...cells.map(c => c.dim));
+  // Vertical: dim 0 at y = -1.5, top dim at y = +1.5
+  const yMin = -1.6, yMax = 1.8;
+  Object.keys(byDim).forEach(d => {
+    const group  = byDim[d];
+    const dimNum = parseInt(d);
+    const y      = maxDim === 0 ? 0 : yMin + (yMax - yMin) * (dimNum / Math.max(maxDim, 1));
+    // Lay out around a circle whose radius grows with group size
+    const radius = group.length === 1 ? 0 : 1.2 + group.length * 0.15;
+    group.forEach((c, i) => {
+      const ang = (i / group.length) * Math.PI * 2 + dimNum * 0.4;
+      positions[c.perm] = {
+        x: radius * Math.cos(ang),
+        y: y,
+        z: radius * Math.sin(ang)
+      };
+    });
+  });
+  return positions;
+}
 
-const RADIUS = { 0: 0.22, 1: 0.32, 2: 0.46 };
+function loadPartition(name) {
+  DATA = ALL_DATA[name];
+  if (!DATA) {
+    alert(`Data for partition ${name} is not precomputed in this build. Run compute_data.py ${name} to generate it.`);
+    return false;
+  }
+  CELLS = {};
+  DATA.cells.forEach(c => {
+    CELLS[c.perm] = {
+      dim:     c.dim,
+      free:    c.free,
+      plucker: c.plucker,
+      color:   DIM_COLORS[Math.min(c.dim, DIM_COLORS.length - 1)]
+    };
+  });
+  EDGES     = DATA.edges;
+  POSITIONS = layoutCells(DATA.cells);
 
-// ── Shared 3D scene module ────────────────────────────────────────────────────
+  // Update header
+  const digits = name.split('').map(d => parseInt(d));
+  const partLabel = digits.join(',');
+  document.getElementById('overview-title').textContent = `The (${partLabel}) Springer fiber`;
+  document.getElementById('overview-summary').textContent =
+    `${DATA.cells.length} Schubert cells, arranged by dimension. Click any sphere to explore that cell.`;
+  // Legend by dimension
+  const legend = document.getElementById('legend-overview');
+  legend.innerHTML = '';
+  const dims = [...new Set(DATA.cells.map(c => c.dim))].sort((a,b) => a - b);
+  dims.forEach(d => {
+    const row = document.createElement('div');
+    const size = 8 + d * 2;
+    row.innerHTML = `<span class="legend-dot" style="width:${size}px;height:${size}px;background:${DIM_COLORS[Math.min(d, DIM_COLORS.length-1)]};"></span> dim ${d}`;
+    legend.appendChild(row);
+  });
+  return true;
+}
+
+// ── 3D scene module ──────────────────────────────────────────────────────────
 function makeScene(canvasId, opts) {
   opts = opts || {};
   const canvas = document.getElementById(canvasId);
   const ctx    = canvas.getContext('2d');
   const DPR    = window.devicePixelRatio || 1;
-  const state  = {
+  const state = {
     yaw: 0.5, pitch: -0.15, zoom: 1.0,
     dragging: false, lastX: 0, lastY: 0,
     rotating: !!opts.autoRotate,
-    activeCell: opts.activeCell || null,
+    activeCell: null,
     flowAnim: null,
     highlight: null,
     onClickSphere: opts.onClickSphere || null,
     showAllEdges: opts.showAllEdges !== false,
     focusMode: !!opts.focusMode,
-    spheres: [],
-    // First-person camera: cameraPos is a point in scene-space; when set, the
-    // projection translates the world so this point sits at the camera origin,
-    // simulating "looking through the eyes of" that location.
+    firstPerson: !!opts.firstPerson,
     cameraPos: null,
-    firstPerson: false
+    spheres: []
   };
 
   function resize() {
@@ -387,7 +257,6 @@ function makeScene(canvasId, opts) {
   resize();
 
   function project(p) {
-    // First-person: translate world so the camera is at origin
     let px = p.x, py = p.y, pz = p.z;
     if (state.firstPerson && state.cameraPos) {
       px -= state.cameraPos.x;
@@ -400,8 +269,6 @@ function makeScene(canvasId, opts) {
     let z = -px*sy + pz*cy;
     let y =  py*cp - z*sp;
         z =  py*sp + z*cp;
-    // In first-person mode pull the "camera distance" closer so nearby cells
-    // fill more of the screen and a sense of presence emerges.
     const camDist = state.firstPerson ? 1.5 : 5;
     const f  = 320 * state.zoom;
     const dz = camDist - z;
@@ -413,58 +280,45 @@ function makeScene(canvasId, opts) {
   }
 
   function drawEdge(srcPerm, tgtPerm, highlighted) {
+    if (!POSITIONS[srcPerm] || !POSITIONS[tgtPerm]) return;
     const p1 = project(POSITIONS[srcPerm]);
     const p2 = project(POSITIONS[tgtPerm]);
-    const stroke = highlighted ? 'rgba(216, 90, 48, 0.85)' : 'rgba(120,120,120,0.32)';
-    const lw     = highlighted ? 2 : 0.9;
+    const stroke = highlighted ? 'rgba(216,90,48,0.85)' : 'rgba(120,120,120,0.32)';
+    const lw = highlighted ? 2 : 0.9;
     ctx.strokeStyle = stroke;
     ctx.lineWidth   = lw;
-
-    // Shorten endpoints so the arrowhead doesn't overlap the spheres
-    const dx   = p2.x - p1.x;
-    const dy   = p2.y - p1.y;
-    const len  = Math.hypot(dx, dy);
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const len = Math.hypot(dx, dy);
     if (len < 1) return;
-    const ux   = dx / len, uy = dy / len;
-    const r1   = Math.max(8, RADIUS[CELLS[srcPerm].dim] * 110 * p1.scale * 0.012);
-    const r2   = Math.max(8, RADIUS[CELLS[tgtPerm].dim] * 110 * p2.scale * 0.012);
-    const sx   = p1.x + ux * r1;
-    const sy   = p1.y + uy * r1;
-    const ex   = p2.x - ux * r2;
-    const ey   = p2.y - uy * r2;
-
-    // Shaft
+    const ux = dx/len, uy = dy/len;
+    const r1 = Math.max(8, RADIUS[Math.min(CELLS[srcPerm].dim, 4)] * 110 * p1.scale * 0.012);
+    const r2 = Math.max(8, RADIUS[Math.min(CELLS[tgtPerm].dim, 4)] * 110 * p2.scale * 0.012);
+    const sx = p1.x + ux*r1, sy = p1.y + uy*r1;
+    const ex = p2.x - ux*r2, ey = p2.y - uy*r2;
     ctx.beginPath();
     ctx.moveTo(sx, sy);
     ctx.lineTo(ex, ey);
     ctx.stroke();
-
-    // Arrowhead at the target end
-    const headLen   = highlighted ? 12 : 8;
-    const headAngle = 0.45;
-    const ang       = Math.atan2(uy, ux);
+    // Arrowhead
+    const headLen = highlighted ? 12 : 8;
+    const headAng = 0.45;
+    const ang = Math.atan2(uy, ux);
     ctx.fillStyle = stroke;
     ctx.beginPath();
     ctx.moveTo(ex, ey);
-    ctx.lineTo(
-      ex - headLen * Math.cos(ang - headAngle),
-      ey - headLen * Math.sin(ang - headAngle)
-    );
-    ctx.lineTo(
-      ex - headLen * Math.cos(ang + headAngle),
-      ey - headLen * Math.sin(ang + headAngle)
-    );
+    ctx.lineTo(ex - headLen*Math.cos(ang - headAng), ey - headLen*Math.sin(ang - headAng));
+    ctx.lineTo(ex - headLen*Math.cos(ang + headAng), ey - headLen*Math.sin(ang + headAng));
     ctx.closePath();
     ctx.fill();
   }
 
   function drawSphere(perm) {
-    const p    = project(POSITIONS[perm]);
     const cell = CELLS[perm];
-    const r    = Math.max(8, RADIUS[cell.dim] * 110 * p.scale * 0.012);
+    if (!cell || !POSITIONS[perm]) return null;
+    const p = project(POSITIONS[perm]);
+    const r = Math.max(8, RADIUS[Math.min(cell.dim, 4)] * 110 * p.scale * 0.012);
     const isActive = perm === state.activeCell;
-    const isHover  = perm === state.highlight;
-    // Determine if this cell is a neighbor of the active cell (in either direction)
+    const isHover = perm === state.highlight;
     let isNeighbor = false;
     if (state.activeCell) {
       isNeighbor = EDGES.some(e =>
@@ -473,69 +327,43 @@ function makeScene(canvasId, opts) {
       );
     }
     const dimmed = state.focusMode && state.activeCell && !isActive && !isNeighbor;
-    ctx.fillStyle   = cell.color;
-    ctx.globalAlpha = dimmed ? 0.18 :
-                      isActive ? 1.0 :
-                      isHover  ? 0.92 : 0.75;
+    ctx.fillStyle = cell.color;
+    ctx.globalAlpha = dimmed ? 0.18 : isActive ? 1.0 : isHover ? 0.92 : 0.75;
     ctx.beginPath();
     ctx.arc(p.x, p.y, r, 0, Math.PI*2);
     ctx.fill();
     if (isActive) {
       ctx.globalAlpha = 1;
       ctx.strokeStyle = '#26215C';
-      ctx.lineWidth   = 2.5;
+      ctx.lineWidth = 2.5;
       ctx.stroke();
     } else if (isHover) {
       ctx.globalAlpha = 1;
       ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-      ctx.lineWidth   = 1;
+      ctx.lineWidth = 1;
       ctx.stroke();
     }
-    ctx.globalAlpha  = dimmed ? 0.3 : 1;
-    ctx.fillStyle    = 'rgba(0,0,0,0.85)';
-    ctx.font         = '500 12px sans-serif';
-    ctx.textAlign    = 'center';
+    ctx.globalAlpha = dimmed ? 0.3 : 1;
+    ctx.fillStyle = 'rgba(0,0,0,0.85)';
+    ctx.font = '500 11px sans-serif';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText('C_' + perm, p.x, p.y + r + 4);
-    ctx.globalAlpha  = 1;
+    ctx.globalAlpha = 1;
     return { perm, x: p.x, y: p.y, r };
-  }
-
-  function drawFlow() {
-    if (!state.flowAnim) return;
-    const a = project(POSITIONS[state.flowAnim.src]);
-    const b = project(POSITIONS[state.flowAnim.tgt]);
-    const t = state.flowAnim.t;
-    const x = a.x + (b.x - a.x) * t;
-    const y = a.y + (b.y - a.y) * t;
-    ctx.fillStyle = '#D85A30';
-    ctx.beginPath();
-    ctx.arc(x, y, 6, 0, Math.PI*2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(216,90,48,0.55)';
-    ctx.lineWidth   = 2;
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ctx.setLineDash([]);
   }
 
   function render() {
     if (canvas.width === 0 || canvas.height === 0) resize();
+    if (!CELLS) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (state.showAllEdges) {
-      // First pass: faint, only edges NOT involving the active cell
       EDGES.forEach(e => {
-        const touchesActive = state.activeCell &&
-          (e.src === state.activeCell || e.tgt === state.activeCell);
-        if (!touchesActive) drawEdge(e.src, e.tgt, false);
+        const t = state.activeCell && (e.src === state.activeCell || e.tgt === state.activeCell);
+        if (!t) drawEdge(e.src, e.tgt, false);
       });
-      // Second pass: highlight edges touching the active cell (both directions)
       EDGES.forEach(e => {
-        if (state.activeCell &&
-            (e.src === state.activeCell || e.tgt === state.activeCell)) {
+        if (state.activeCell && (e.src === state.activeCell || e.tgt === state.activeCell)) {
           drawEdge(e.src, e.tgt, true);
         }
       });
@@ -545,17 +373,18 @@ function makeScene(canvasId, opts) {
     const order = Object.keys(POSITIONS)
       .map(p => ({ perm: p, depth: project(POSITIONS[p]).depth }))
       .sort((a, b) => a.depth - b.depth);
-    state.spheres = order.map(o => drawSphere(o.perm));
-    drawFlow();
+    state.spheres = order.map(o => drawSphere(o.perm)).filter(Boolean);
   }
 
+  // ── Event handlers ─────────────────────────────────────────────────────────
   canvas.addEventListener('mousedown', e => {
     state.dragging = true;
     state.lastX = e.clientX; state.lastY = e.clientY;
     canvas.style.cursor = 'grabbing';
   });
   window.addEventListener('mouseup', () => {
-    state.dragging = false; canvas.style.cursor = 'grab';
+    state.dragging = false;
+    canvas.style.cursor = 'grab';
   });
   canvas.addEventListener('mousemove', e => {
     if (!state.dragging) {
@@ -581,7 +410,7 @@ function makeScene(canvasId, opts) {
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
     state.zoom *= e.deltaY > 0 ? 0.92 : 1.08;
-    state.zoom  = Math.max(0.4, Math.min(2.5, state.zoom));
+    state.zoom  = Math.max(0.3, Math.min(3.0, state.zoom));
     render();
   }, { passive: false });
   canvas.addEventListener('click', e => {
@@ -606,29 +435,28 @@ function makeScene(canvasId, opts) {
   }
   requestAnimationFrame(loop);
 
-  return { state, render, project, resize };
+  return { state, render, resize };
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
 const VIEWS = ['overview', 'cell', 'traverse'];
-let currentView    = 'overview';
-let currentCell    = null;
-let currentEdge    = null;
+let currentView = 'overview';
+let currentCell = null;
+let currentEdge = null;
+
 const sceneOverview = makeScene('scene-overview', {
   autoRotate: true,
   onClickSphere: perm => goToCell(perm)
 });
-
 const sceneCell = makeScene('scene-cell', {
   autoRotate: true,
-  focusMode: true,                    // dim non-related cells
+  focusMode: true,
   onClickSphere: perm => goToCell(perm)
 });
-
 const sceneTraverse = makeScene('scene-traverse', {
   autoRotate: false,
-  showAllEdges: true,            // show all closure arrows for context
-  firstPerson: true              // first-person camera flies along the edge
+  showAllEdges: true,
+  firstPerson: true
 });
 
 function setView(name) {
@@ -636,9 +464,6 @@ function setView(name) {
   VIEWS.forEach(v => {
     document.getElementById('view-' + v).classList.toggle('active', v === name);
   });
-  // Canvases inside hidden views (display: none) report 0x0 size. Double rAF
-  // ensures the browser has actually performed layout on the now-visible view
-  // before we call getBoundingClientRect() to set the canvas dimensions.
   requestAnimationFrame(() => requestAnimationFrame(() => {
     if (name === 'overview') {
       sceneOverview.resize();
@@ -651,7 +476,7 @@ function setView(name) {
     } else if (name === 'traverse') {
       sceneTraverse.resize();
       sceneTraverse.state.activeCell = currentEdge.src;
-      sceneTraverse.state.flowAnim   = null;
+      sceneTraverse.state.flowAnim = null;
       sceneTraverse.render();
     }
   }));
@@ -660,16 +485,14 @@ function setView(name) {
 
 function renderBreadcrumb() {
   const bc = document.getElementById('breadcrumb');
-  let html = '<span class="crumb' + (currentView === 'overview' ? ' current' : '') +
-             '" data-go="overview">All cells</span>';
+  let html = `<span class="crumb${currentView === 'overview' ? ' current' : ''}" data-go="overview">All cells (${DATA.partition})</span>`;
   if (currentCell && currentView !== 'overview') {
     html += '<span class="sep">›</span>';
-    html += '<span class="crumb' + (currentView === 'cell' ? ' current' : '') +
-            '" data-go="cell">C_' + currentCell + '</span>';
+    html += `<span class="crumb${currentView === 'cell' ? ' current' : ''}" data-go="cell">C_${currentCell}</span>`;
   }
   if (currentEdge && currentView === 'traverse') {
     html += '<span class="sep">›</span>';
-    html += '<span class="current">→ C_' + currentEdge.tgt + '</span>';
+    html += `<span class="current">→ C_${currentEdge.tgt}</span>`;
   }
   bc.innerHTML = html;
   bc.querySelectorAll('.crumb[data-go]').forEach(el => {
@@ -702,6 +525,13 @@ function goToTraverse(edge) {
 
 document.getElementById('home-btn').addEventListener('click', goHome);
 
+// ── Partition switcher ────────────────────────────────────────────────────────
+document.getElementById('partition-select').addEventListener('change', e => {
+  if (loadPartition(e.target.value)) {
+    goHome();
+  }
+});
+
 // ── Cell view ─────────────────────────────────────────────────────────────────
 function fillCellView(perm) {
   const cell = CELLS[perm];
@@ -712,14 +542,13 @@ function fillCellView(perm) {
   document.getElementById('cell-param').textContent =
     cell.free.length ? `A^${cell.dim} with coordinates (${cell.free.join(', ')})` : 'A^0 (single point)';
   document.getElementById('cell-plucker').innerHTML =
-    `lv1: ${cell.plucker.lv1}<br>lv2: ${cell.plucker.lv2}<br>lv3: ${cell.plucker.lv3}`;
+    cell.plucker.map((p, i) => `lv${i+1}: ${p}`).join('<br>');
 
   const outgoing = EDGES.filter(e => e.src === perm);
   const list = document.getElementById('path-list');
   list.innerHTML = '';
   if (outgoing.length === 0) {
-    list.innerHTML = '<p style="margin: 8px 0; font-size: 13px; color: var(--text-tertiary);">' +
-                     'This cell has no outgoing paths — it is the minimum of the closure poset.</p>';
+    list.innerHTML = '<p style="margin: 8px 0; font-size: 13px; color: var(--text-tertiary);">This cell has no outgoing paths — it has no proper boundary (closed orbit).</p>';
     return;
   }
   outgoing.forEach(edge => {
@@ -730,7 +559,7 @@ function fillCellView(perm) {
       parts.push('src: ' + Object.entries(edge.srcSubs).map(([k,v]) => `${k}=${v}`).join(', '));
     if (Object.keys(edge.tgtSubs).length)
       parts.push('tgt: ' + Object.entries(edge.tgtSubs).map(([k,v]) => `${k}=${v}`).join(', '));
-    parts.push(edge.limit + '→∞');
+    if (edge.limit) parts.push(edge.limit + '→∞');
     row.innerHTML = `
       <div class="path-info">
         <div class="target">→ C_${edge.tgt}</div>
@@ -758,34 +587,28 @@ function buildSteps(edge) {
       detail: Object.entries(edge.tgtSubs).map(([k,v]) => `${k} = ${v}`).join(', ')
     });
   }
-  steps.push({
-    title: `Send ${edge.limit} → ∞`,
-    detail: 'The scaled source vectors converge to the target.'
-  });
-  steps.push({
-    title: `Land in C_${edge.tgt}`,
-    detail: 'Traversal complete.'
-  });
+  if (edge.limit) {
+    steps.push({ title: `Send ${edge.limit} → ∞`, detail: 'The scaled source vectors converge to the target.' });
+  }
+  steps.push({ title: `Land in C_${edge.tgt}`, detail: 'Traversal complete.' });
   return steps;
 }
 
 function fillTraverseView(edge) {
   document.getElementById('traverse-from').textContent = 'C_' + edge.src;
-  document.getElementById('traverse-to').textContent   = 'C_' + edge.tgt;
-
+  document.getElementById('traverse-to').textContent = 'C_' + edge.tgt;
   const srcCell = CELLS[edge.src];
   const tgtCell = CELLS[edge.tgt];
   document.getElementById('start-info').innerHTML =
     `<span style="color: var(--text-primary); font-weight: 500;">C_${edge.src}</span> · dim ${srcCell.dim}<br>` +
     `free: ${srcCell.free.length ? srcCell.free.join(', ') : 'none'}<br>` +
-    `lv1: ${srcCell.plucker.lv1}`;
+    `lv1: ${srcCell.plucker[0] || ''}`;
   document.getElementById('land-info').innerHTML =
     `<span style="color: var(--text-primary); font-weight: 500;">C_${edge.tgt}</span> · dim ${tgtCell.dim}<br>` +
     `free: ${tgtCell.free.length ? tgtCell.free.join(', ') : 'none'}<br>` +
-    `lv1: ${tgtCell.plucker.lv1}`;
-
+    `lv1: ${tgtCell.plucker[0] || ''}`;
   const steps = buildSteps(edge);
-  const list  = document.getElementById('step-list');
+  const list = document.getElementById('step-list');
   list.innerHTML = '';
   steps.forEach((s, i) => {
     const el = document.createElement('div');
@@ -802,28 +625,24 @@ function fillTraverseView(edge) {
   document.getElementById('traverse-hint').textContent = 'click "Begin traversal" to start';
   const srcPos = POSITIONS[edge.src];
   const tgtPos = POSITIONS[edge.tgt];
-  const dx = tgtPos.x - srcPos.x;
-  const dy = tgtPos.y - srcPos.y;
-  const dz = tgtPos.z - srcPos.z;
+  const dx = tgtPos.x - srcPos.x, dy = tgtPos.y - srcPos.y, dz = tgtPos.z - srcPos.z;
   sceneTraverse.state.firstPerson = true;
-  sceneTraverse.state.cameraPos   = { x: srcPos.x, y: srcPos.y, z: srcPos.z };
-  sceneTraverse.state.yaw         = Math.atan2(dx, dz);
-  sceneTraverse.state.pitch       = -Math.atan2(dy, Math.hypot(dx, dz));
-  sceneTraverse.state.zoom        = 1.0;
-  sceneTraverse.state.activeCell  = edge.tgt;  // target highlighted while we look at it
-  sceneTraverse.state.flowAnim    = null;
+  sceneTraverse.state.cameraPos = { x: srcPos.x, y: srcPos.y, z: srcPos.z };
+  sceneTraverse.state.yaw = Math.atan2(dx, dz);
+  sceneTraverse.state.pitch = -Math.atan2(dy, Math.hypot(dx, dz));
+  sceneTraverse.state.zoom = 1.0;
+  sceneTraverse.state.activeCell = edge.tgt;
+  sceneTraverse.state.flowAnim = null;
   sceneTraverse.render();
 }
 
 let traverseTimer = null;
 function startTraversal() {
   if (!currentEdge) return;
-  const edge  = currentEdge;
+  const edge = currentEdge;
   const steps = document.querySelectorAll('#step-list .traversal-step');
   steps.forEach(s => s.classList.remove('active', 'done'));
   document.getElementById('traverse-hint').textContent = 'travelling...';
-
-  // Time the step highlights in parallel with the camera flight
   const stepDuration = 1000;
   let stepIdx = 0;
   function nextStep() {
@@ -835,31 +654,20 @@ function startTraversal() {
     }
   }
   nextStep();
-
   const srcPos = POSITIONS[edge.src];
   const tgtPos = POSITIONS[edge.tgt];
-
-  // First-person flight: camera position interpolates from src to a point just
-  // shy of the target so the target sphere fills the view on arrival.
   sceneTraverse.state.firstPerson = true;
-  sceneTraverse.state.activeCell  = edge.tgt; // highlight target as we approach
-  sceneTraverse.state.flowAnim    = null;
-
-  // Aim the view roughly toward the target
-  const dx = tgtPos.x - srcPos.x;
-  const dy = tgtPos.y - srcPos.y;
-  const dz = tgtPos.z - srcPos.z;
-  sceneTraverse.state.yaw   = Math.atan2(dx, dz);
+  sceneTraverse.state.activeCell = edge.tgt;
+  sceneTraverse.state.flowAnim = null;
+  const dx = tgtPos.x - srcPos.x, dy = tgtPos.y - srcPos.y, dz = tgtPos.z - srcPos.z;
+  sceneTraverse.state.yaw = Math.atan2(dx, dz);
   sceneTraverse.state.pitch = -Math.atan2(dy, Math.hypot(dx, dz));
-  sceneTraverse.state.zoom  = 1.0;
-
-  const startTime    = performance.now();
+  sceneTraverse.state.zoom = 1.0;
+  const startTime = performance.now();
   const flowDuration = stepDuration * steps.length;
   function flightStep(now) {
     const raw = Math.min(1, (now - startTime) / flowDuration);
-    // ease-in-out for a smoother feel
-    const t = raw < 0.5 ? 2 * raw * raw : 1 - Math.pow(-2 * raw + 2, 2) / 2;
-    // Stop a small fraction shy of the target so we don't pass through it
+    const t = raw < 0.5 ? 2*raw*raw : 1 - Math.pow(-2*raw + 2, 2) / 2;
     const stop = 0.92;
     sceneTraverse.state.cameraPos = {
       x: srcPos.x + (tgtPos.x - srcPos.x) * t * stop,
@@ -867,12 +675,8 @@ function startTraversal() {
       z: srcPos.z + (tgtPos.z - srcPos.z) * t * stop
     };
     sceneTraverse.render();
-    if (raw < 1) {
-      requestAnimationFrame(flightStep);
-    } else {
-      document.getElementById('traverse-hint').textContent =
-        `arrived in C_${edge.tgt} — viewing from inside`;
-    }
+    if (raw < 1) requestAnimationFrame(flightStep);
+    else document.getElementById('traverse-hint').textContent = `arrived in C_${edge.tgt} — viewing from inside`;
   }
   requestAnimationFrame(flightStep);
 }
@@ -889,6 +693,7 @@ document.getElementById('traverse-back').addEventListener('click', () => {
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+loadPartition('22');
 setView('overview');
 sceneOverview.render();
 </script>
