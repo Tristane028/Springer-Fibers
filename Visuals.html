@@ -326,9 +326,12 @@ function makeScene(canvasId, opts) {
         (e.tgt === state.activeCell && e.src === perm)
       );
     }
-    const dimmed = state.focusMode && state.activeCell && !isActive && !isNeighbor;
+    // Hide cells that don't connect to the active cell when in focus mode
+    if (state.focusMode && state.activeCell && !isActive && !isNeighbor) {
+      return null;
+    }
     ctx.fillStyle = cell.color;
-    ctx.globalAlpha = dimmed ? 0.18 : isActive ? 1.0 : isHover ? 0.92 : 0.75;
+    ctx.globalAlpha = isActive ? 1.0 : isHover ? 0.92 : 0.75;
     ctx.beginPath();
     ctx.arc(p.x, p.y, r, 0, Math.PI*2);
     ctx.fill();
@@ -343,13 +346,12 @@ function makeScene(canvasId, opts) {
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-    ctx.globalAlpha = dimmed ? 0.3 : 1;
+    ctx.globalAlpha = 1;
     ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.font = '500 11px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillText('C_' + perm, p.x, p.y + r + 4);
-    ctx.globalAlpha = 1;
     return { perm, x: p.x, y: p.y, r };
   }
 
@@ -381,14 +383,14 @@ function makeScene(canvasId, opts) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Floating label showing the live parameter value as it grows toward infinity.
-    // Using 1/(1-t) gives a natural divergence: small at the start, → ∞ at t=1.
+    // Live label on top of the dot, showing the limit variable's value as it
+    // grows toward infinity. Using 1/(1-t) gives a natural divergence pattern:
+    // a small starting value, accelerating growth, → ∞ at t=1.
     if (flow.limitVar) {
       let label;
       if (t >= 0.985) {
         label = `${flow.limitVar} → ∞`;
       } else {
-        // Show as a number that grows; round nicely.
         const val = 1 / Math.max(0.001, 1 - t);
         const display = val >= 100 ? Math.round(val) :
                         val >= 10  ? val.toFixed(1) :
@@ -396,18 +398,28 @@ function makeScene(canvasId, opts) {
         label = `${flow.limitVar} = ${display}`;
       }
 
-      // Label background pill for readability over any backdrop
-      ctx.font = '500 12px ' + (getComputedStyle(document.body).fontFamily || 'sans-serif');
-      const tw = ctx.measureText(label).width;
-      const pad = 6;
-      const lx = x + r + 10;
-      const ly = y - 9;
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.font = '600 13px ' + (getComputedStyle(document.body).fontFamily || 'sans-serif');
+      const tw  = ctx.measureText(label).width;
+      const pad = 7;
+      const bw  = tw + pad * 2;
+      const bh  = 22;
+      // Position the label centered horizontally over the dot, sitting above it
+      const lx = x - bw / 2;
+      const ly = y - r - bh - 8;
+
+      // Connector tick: a small line from the bottom of the label to the dot
+      ctx.strokeStyle = 'rgba(216,90,48,0.65)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, ly + bh);
+      ctx.lineTo(x, y - r);
+      ctx.stroke();
+
+      // Rounded-rect background for the label
+      const radius = 11;
+      ctx.fillStyle = 'rgba(255,255,255,0.97)';
       ctx.strokeStyle = 'rgba(216,90,48,0.6)';
       ctx.lineWidth = 1;
-      // Rounded rect for the label background
-      const bw = tw + pad*2, bh = 22;
-      const radius = 11;
       ctx.beginPath();
       ctx.moveTo(lx + radius, ly);
       ctx.lineTo(lx + bw - radius, ly);
@@ -423,9 +435,9 @@ function makeScene(canvasId, opts) {
       ctx.stroke();
 
       ctx.fillStyle = '#D85A30';
-      ctx.textAlign = 'left';
+      ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(label, lx + pad, ly + bh/2);
+      ctx.fillText(label, x, ly + bh / 2);
     }
   }
 
@@ -436,8 +448,10 @@ function makeScene(canvasId, opts) {
     // Edges first
     if (state.showAllEdges) {
       EDGES.forEach(e => {
-        const t = state.activeCell && (e.src === state.activeCell || e.tgt === state.activeCell);
-        if (!t) drawEdge(e.src, e.tgt, false);
+        const touchesActive = state.activeCell && (e.src === state.activeCell || e.tgt === state.activeCell);
+        // In focus mode, hide edges that don't touch the active cell entirely
+        if (state.focusMode && state.activeCell && !touchesActive) return;
+        if (!touchesActive) drawEdge(e.src, e.tgt, false);
       });
       // The active edge (source of current flow) is highlighted brightest
       EDGES.forEach(e => {
@@ -537,6 +551,7 @@ const sceneCell = makeScene('scene-cell', {
 const sceneTraverse = makeScene('scene-traverse', {
   autoRotate: false,
   showAllEdges: true,
+  focusMode: true,             // hide cells that don't connect to the active cell
   firstPerson: false           // third-person: watch the dot fly from outside
 });
 
