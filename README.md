@@ -56,7 +56,7 @@
   <li>Computes the <strong>cell ideal</strong> for each cell via Gröbner-basis elimination: the polynomial relations among Plücker coordinates that cut out the cell's image in the Grassmannian. Most relations are linear (<code>p_I = 0</code> or <code>p_I = ±1</code>), but higher-dimensional cells produce genuine polynomial relations (e.g. <code>p2_12 = (p3_123)²</code> for the top cell of (12)(34))</li>
 </ul>
 
-[Explore the (2,2) Springer fiber](https://tristane028.github.io/Springer-Fibers/Visuals.html) →
+[Explore Springer Fibers in a Directed Graph](https://tristane028.github.io/Springer-Fibers/Visuals.html) →
 
 <h2>Running the Scripts</h2>
 
