@@ -172,13 +172,13 @@ function matEl(matrix,labelText,opts={}){
   }));
   if(opts.dotted){
     const regions=Array.isArray(opts.dotted)?opts.dotted:[opts.dotted];
-    const cell=cellW,gap=2,pad=6,inset=3;
+    const cw=cellW,ch=24,gap=2,pad=6,inset=3;
     regions.forEach(({r0,r1,c0,c1})=>{
       const box=document.createElement('div');box.className='dotbox';
-      box.style.left=(pad+c0*(cell+gap)-inset)+'px';
-      box.style.top=(pad+r0*(cell+gap)-inset)+'px';
-      box.style.width=((c1-c0+1)*cell+(c1-c0)*gap+2*inset)+'px';
-      box.style.height=((r1-r0+1)*cell+(r1-r0)*gap+2*inset)+'px';
+      box.style.left=(pad+c0*(cw+gap)-inset)+'px';
+      box.style.top=(pad+r0*(ch+gap)-inset)+'px';
+      box.style.width=((c1-c0+1)*cw+(c1-c0)*gap+2*inset)+'px';
+      box.style.height=((r1-r0+1)*ch+(r1-r0)*gap+2*inset)+'px';
       mat.appendChild(box);
     });
   }
