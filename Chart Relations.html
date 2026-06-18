@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Arc peeling · M = T_a · R</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap');
+  :root{
+    --ink:#111317; --panel:#171a20; --edge:#22262e; --text:#e9e4d6;
+    --dim:#565b64; --gold:#c8a25a;
+    --c0:#d9a441; --c1:#4bb6a8; --c2:#d98aa0; --c3:#9b8cdd;
+    --c4:#7bbf6a; --c5:#5aa9d6; --c6:#e08a5a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ink);color:var(--text);
+    font-family:Inter,system-ui,sans-serif;padding:30px 20px}
+  .wrap{max-width:920px;margin:0 auto}
+  h1{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:40px;
+    margin:0 0 6px;letter-spacing:.3px}
+  .sub{color:var(--dim);font-size:13.5px;max-width:620px;line-height:1.5}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:22px 0 18px}
+  label.k{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:1px}
+  input{background:#0c0e12;border:1px solid var(--edge);color:var(--text);border-radius:8px;
+    padding:9px 12px;font:600 15px 'JetBrains Mono',monospace;letter-spacing:2px;width:240px}
+  input:focus{outline:none;border-color:var(--gold)}
+  button{background:transparent;border:1px solid var(--edge);color:var(--text);border-radius:8px;
+    padding:9px 15px;font:500 13px Inter,sans-serif;cursor:pointer;transition:all .15s}
+  button:hover{border-color:var(--gold);color:var(--gold)}
+  .chip{font:500 12.5px Inter;color:var(--dim);cursor:pointer;border:1px solid var(--edge);
+    border-radius:20px;padding:5px 11px}
+  .chip:hover{border-color:var(--gold);color:var(--gold)}
+  .err{color:#e08a5a;font:500 13px 'JetBrains Mono',monospace;margin:6px 0}
+  .stage{background:var(--panel);border:1px solid var(--edge);border-radius:12px;
+    padding:16px 18px;margin:16px 0}
+  .stage h2{font-family:'Cormorant Garamond',serif;font-weight:600;font-size:22px;margin:0 0 10px;
+    color:var(--text)}
+  .note{color:var(--dim);font-size:12.5px;line-height:1.5;margin:8px 0 0}
+  .eqrow{display:flex;flex-wrap:wrap;align-items:center;gap:18px}
+  .op{font:600 22px 'JetBrains Mono',monospace;color:var(--gold)}
+  .matwrap{display:inline-flex;align-items:stretch}
+  .brk{width:9px;border:2px solid var(--dim);border-right:none;border-radius:2px 0 0 2px}
+  .brk.r{border:2px solid var(--dim);border-left:none;border-radius:0 2px 2px 0}
+  .mat{display:grid;gap:2px;padding:4px 7px}
+  .cell{width:24px;height:24px;display:flex;align-items:center;justify-content:center;
+    font:700 14px 'JetBrains Mono',monospace}
+  .mlabel{font:500 11px Inter;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;
+    margin-bottom:6px;opacity:.8}
+  .v0{color:var(--dim);opacity:.45;font-weight:500}
+  .v1{color:#cfcabb}
+  .arcsvg{display:block;margin:4px auto 0;max-width:100%}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font:500 13px 'JetBrains Mono',monospace}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .sw{width:11px;height:11px;border-radius:3px}
+  .blockhi .cell{background:rgba(200,162,90,.10)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Arc peeling</h1>
+  <div class="sub">Enter a noncrossing BT-string (B opens an arc, T closes the most recent one).
+    The page builds its matrix <b>M</b>, peels the outermost arc as
+    <b>M = T<sub>a</sub> · R</b>, extracts the inner block, and re-embeds it in an identity border.</div>
+
+  <div class="controls">
+    <label class="k">BT-string</label>
+    <input id="bt" value="BBTBTT" spellcheck="false" />
+    <button id="go">Compute</button>
+    <span class="chip" data-bt="BBTBTT">BBTBTT</span>
+    <span class="chip" data-bt="BBBBTTTT">BBBBTTTT</span>
+    <span class="chip" data-bt="BBTBBTTT">BBTBBTTT</span>
+  </div>
+  <div id="err" class="err"></div>
+  <div id="out"></div>
+</div>
+
+<script>
+const COLORS=['--c0','--c1','--c2','--c3','--c4','--c5','--c6'];
+const cssvar=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const labelOf=i=>String.fromCharCode(96+i);
+
+function parseBT(s){
+  s=s.replace(/\s+/g,'').toUpperCase();
+  if(!s) throw "empty string — type something like BBTBTT.";
+  const bad=[...new Set([...s].filter(c=>c!=='B'&&c!=='T'))];
+  if(bad.length) throw "only B and T are allowed; found "+bad.join(', ')+".";
+  const st=[],p=[];
+  for(let i=0;i<s.length;i++){
+    if(s[i]==='B') st.push(i+1);
+    else{ if(!st.length) throw "the T at position "+(i+1)+" has no open B before it.";
+          p.push([st.pop(), i+1]); }
+  }
+  if(st.length) throw st.length+" B(s) never closed (open at "+st.join(', ')+").";
+  return p;
+}
+
+function buildMatrix(pairs){
+  const arcs=pairs.map(p=>[Math.min(...p),Math.max(...p)]).sort((a,b)=>a[0]-b[0]);
+  const m=arcs.length,n=2*m,L={},R={},lab={};
+  for(let i=1;i<=m;i++){L[i]=arcs[i-1][0];R[i]=arcs[i-1][1];lab[i]=labelOf(i);}
+  const anc=i=>{const a=[];for(let j=1;j<=m;j++)if(j!==i&&L[j]<L[i]&&R[j]>R[i])a.push(j);
+    a.sort((p,q)=>L[q]-L[p]);return a;};
+  const depth=i=>anc(i).length;
+  const grid=Array.from({length:n},()=>Array(n).fill('0'));
+  const cur={},sa={},ea={};
+  for(let i=1;i<=m;i++){sa[L[i]]=i;ea[R[i]]=i;}
+  for(let c=1;c<=n;c++){
+    if(sa[c]!==undefined){const i=sa[c],ch=[i,...anc(i)],len=ch.length,tr=i-(len-1);
+      ch.forEach((ar,k)=>{grid[tr+k-1][c-1]=lab[ar];cur[ar]=tr+k;});grid[m+i-1][c-1]='1';}
+    else if(ea[c]!==undefined){const i=ea[c];grid[cur[i]-1][c-1]='1';}
+  }
+  const deps={}; for(let i=1;i<=m;i++) deps[i]=depth(i);
+  return {arcs,m,n,L,R,lab,grid,deps};
+}
+
+function peel(grid,m,n){
+  const Ta=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>
+      i===j?'1':(j===i+m&&i<m?'a':'0')));
+  const Rm=grid.map(r=>r.slice());
+  for(let i=0;i<m;i++){const p=grid[m+i].indexOf('1');const t=grid[i][p];
+    Rm[i][p]=(t==='a')?'0':(t==='0'?'-a':t+'-a');}
+  const keepR=[...Array(n).keys()].filter(r=>r!==m-1&&r!==m);
+  const keepC=[...Array(n).keys()].filter(c=>c!==0&&c!==n-1);
+  const block=keepR.map(r=>keepC.map(c=>Rm[r][c]));
+  const N=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?'1':'0'));
+  for(let i=0;i<block.length;i++)for(let j=0;j<block[0].length;j++)N[i+1][j+1]=block[i][j];
+  return {Ta,Rm,block,N,keepR,keepC};
+}
+
+function colorFor(v){
+  const ch=v[0];
+  if(ch>='a'&&ch<='z'){const idx=ch.charCodeAt(0)-97;return cssvar(COLORS[idx%COLORS.length]);}
+  return null;
+}
+function matEl(matrix,labelText,opts={}){
+  const wrap=document.createElement('div');
+  if(labelText){const l=document.createElement('div');l.className='mlabel';l.textContent=labelText;wrap.appendChild(l);}
+  const row=document.createElement('div');row.className='matwrap';
+  const lb=document.createElement('div');lb.className='brk';
+  const rb=document.createElement('div');rb.className='brk r';
+  const mat=document.createElement('div');mat.className='mat';
+  if(opts.hiBlock) mat.classList.add('blockhi');
+  mat.style.gridTemplateColumns=`repeat(${matrix[0].length},24px)`;
+  for(const r of matrix) for(const v of r){
+    const c=document.createElement('div');c.className='cell';c.textContent=v;
+    if(v==='0')c.classList.add('v0');
+    else if(v==='1')c.classList.add('v1');
+    else{const col=colorFor(v);if(col)c.style.color=col;}
+    mat.appendChild(c);
+  }
+  row.appendChild(lb);row.appendChild(mat);row.appendChild(rb);
+  wrap.appendChild(row);return wrap;
+}
+
+function arcSVG(info){
+  const {m,n,L,R,deps,lab}=info;
+  const sx=44,mx=34,gap=28;
+  const x=i=>mx+(i-1)*sx, W=x(n)+mx;
+  const maxD=m?Math.max(...Object.values(deps)):0;
+  const baseY=(maxD+1)*gap+14, H=baseY+30;
+  const ns='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(ns,'svg');
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.setAttribute('class','arcsvg');
+  svg.style.maxWidth=W+'px';
+  const line=document.createElementNS(ns,'line');
+  line.setAttribute('x1',x(1)-12);line.setAttribute('x2',x(n)+12);
+  line.setAttribute('y1',baseY);line.setAttribute('y2',baseY);
+  line.setAttribute('stroke',cssvar('--edge'));svg.appendChild(line);
+  for(let i=1;i<=m;i++){
+    const apex=baseY-(maxD-deps[i]+1)*gap, cy=2*apex-baseY;
+    const xl=x(L[i]),xr=x(R[i]),mid=(xl+xr)/2,col=cssvar(COLORS[(i-1)%COLORS.length]);
+    const p=document.createElementNS(ns,'path');
+    p.setAttribute('d',`M ${xl} ${baseY} Q ${mid} ${cy} ${xr} ${baseY}`);
+    p.setAttribute('fill','none');p.setAttribute('stroke',col);p.setAttribute('stroke-width','1.8');
+    svg.appendChild(p);
+    const t=document.createElementNS(ns,'text');
+    t.setAttribute('x',mid);t.setAttribute('y',apex-4);t.setAttribute('text-anchor','middle');
+    t.setAttribute('fill',col);t.setAttribute('style',"font:600 13px 'JetBrains Mono',monospace");
+    t.textContent=lab[i];svg.appendChild(t);
+  }
+  for(let i=1;i<=n;i++){
+    const dot=document.createElementNS(ns,'circle');
+    dot.setAttribute('cx',x(i));dot.setAttribute('cy',baseY);dot.setAttribute('r','4');
+    dot.setAttribute('fill','#3a4049');svg.appendChild(dot);
+    const num=document.createElementNS(ns,'text');
+    num.setAttribute('x',x(i));num.setAttribute('y',baseY+18);num.setAttribute('text-anchor','middle');
+    num.setAttribute('fill',cssvar('--dim'));
+    num.setAttribute('style',"font:500 12px 'JetBrains Mono',monospace");
+    num.textContent=i;svg.appendChild(num);
+  }
+  return svg;
+}
+
+function stage(title){const s=document.createElement('div');s.className='stage';
+  const h=document.createElement('h2');h.textContent=title;s.appendChild(h);return s;}
+
+function compute(){
+  const out=document.getElementById('out'), err=document.getElementById('err');
+  out.innerHTML='';err.textContent='';
+  let pairs;
+  try{pairs=parseBT(document.getElementById('bt').value);}
+  catch(e){err.textContent=e;return;}
+  const info=buildMatrix(pairs);
+  const {m,n,grid,lab,arcs}=info;
+  const {Ta,Rm,block,N}=peel(grid,m,n);
+
+  // diagram
+  const sd=stage('Arc diagram');
+  sd.appendChild(arcSVG(info));
+  const leg=document.createElement('div');leg.className='legend';
+  arcs.forEach((ar,k)=>{const sp=document.createElement('span');
+    const sw=document.createElement('span');sw.className='sw';
+    sw.style.background=cssvar(COLORS[k%COLORS.length]);
+    sp.appendChild(sw);sp.appendChild(document.createTextNode(`${lab[k+1]}=(${ar[0]},${ar[1]})`));
+    sp.style.color=cssvar(COLORS[k%COLORS.length]);leg.appendChild(sp);});
+  sd.appendChild(leg);out.appendChild(sd);
+
+  // factorization
+  const sf=stage('Factorization  M = T_a · R');
+  const row=document.createElement('div');row.className='eqrow';
+  row.appendChild(matEl(grid,'M'));
+  const eq=document.createElement('span');eq.className='op';eq.textContent='=';row.appendChild(eq);
+  row.appendChild(matEl(Ta,'T_a'));
+  const dot=document.createElement('span');dot.className='op';dot.textContent='·';row.appendChild(dot);
+  row.appendChild(matEl(Rm,'R'));
+  sf.appendChild(row);
+  const note=document.createElement('div');note.className='note';
+  note.innerHTML="T<sub>a</sub> = [[I, a·I],[0, I]] is unipotent, so R = T<sub>a</sub><sup>−1</sup>M = "+
+    "(top block − a·bottom block, bottom block unchanged). The a&rsquo;s in M&rsquo;s upper block "+
+    "sit exactly over the lower-block pivots, so they cancel to 0.";
+  sf.appendChild(note);out.appendChild(sf);
+
+  // extract
+  const se=stage('Extract  ·  rows {1,2,…} \\ {m,m+1},  cols {2,…,n−1}');
+  const erow=document.createElement('div');erow.className='eqrow';
+  erow.appendChild(matEl(Rm,'R (block highlighted)'));
+  const arr=document.createElement('span');arr.className='op';arr.textContent='→';erow.appendChild(arr);
+  erow.appendChild(matEl(block,'inner block',{hiBlock:true}));
+  se.appendChild(erow);
+  const en=document.createElement('div');en.className='note';
+  en.textContent="Dropping columns 1 and n removes the outermost arc&rsquo;s endpoints, and dropping rows "+
+    "m and m+1 removes the two rows tied to that arc. What remains is the matrix of the inner matching "+
+    "(the BT-string with its outer B…T stripped).";
+  se.appendChild(en);out.appendChild(se);
+
+  // re-embed
+  const sr=stage('Re-embed in identity border  →  N');
+  const rrow=document.createElement('div');rrow.className='eqrow';
+  rrow.appendChild(matEl(block,'inner block',{hiBlock:true}));
+  const arr2=document.createElement('span');arr2.className='op';arr2.textContent='→';rrow.appendChild(arr2);
+  rrow.appendChild(matEl(N,'N',{}));
+  sr.appendChild(rrow);out.appendChild(sr);
+}
+
+document.getElementById('go').addEventListener('click',compute);
+document.getElementById('bt').addEventListener('keydown',e=>{if(e.key==='Enter')compute();});
+document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{
+  document.getElementById('bt').value=c.dataset.bt;compute();}));
+compute();
+</script>
+</body>
+</html>
