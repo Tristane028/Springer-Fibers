@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Arc peeling · M = T_a · R</title>
+<title>Chart Relations · M = T_a · R</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap');
   :root{
@@ -41,9 +41,9 @@
   .matwrap{display:inline-flex;align-items:stretch}
   .brk{width:9px;border:2px solid var(--dim);border-right:none;border-radius:2px 0 0 2px}
   .brk.r{border:2px solid var(--dim);border-left:none;border-radius:0 2px 2px 0}
-  .mat{display:grid;gap:2px;padding:4px 7px}
+  .mat{display:grid;gap:2px;padding:6px;position:relative}
   .cell{width:24px;height:24px;display:flex;align-items:center;justify-content:center;
-    font:700 14px 'JetBrains Mono',monospace}
+    font:700 14px 'JetBrains Mono',monospace;border-radius:3px}
   .mlabel{font:500 11px Inter;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;
     margin-bottom:6px;opacity:.8}
   .v0{color:var(--dim);opacity:.45;font-weight:500}
@@ -52,12 +52,14 @@
   .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;font:500 13px 'JetBrains Mono',monospace}
   .legend span{display:flex;align-items:center;gap:6px}
   .sw{width:11px;height:11px;border-radius:3px}
-  .blockhi .cell{background:rgba(200,162,90,.10)}
+  .hicell{background:rgba(200,162,90,.14)}
+  .dotbox{position:absolute;border:1.7px dashed var(--gold);border-radius:5px;
+    pointer-events:none;opacity:.85}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Arc peeling</h1>
+  <h1>Chart Relations</h1>
   <div class="sub">Enter a noncrossing BT-string (B opens an arc, T closes the most recent one).
     The page builds its matrix <b>M</b>, peels the outermost arc as
     <b>M = T<sub>a</sub> · R</b>, extracts the inner block, and re-embeds it in an identity border.</div>
@@ -139,14 +141,25 @@ function matEl(matrix,labelText,opts={}){
   const lb=document.createElement('div');lb.className='brk';
   const rb=document.createElement('div');rb.className='brk r';
   const mat=document.createElement('div');mat.className='mat';
-  if(opts.hiBlock) mat.classList.add('blockhi');
-  mat.style.gridTemplateColumns=`repeat(${matrix[0].length},24px)`;
-  for(const r of matrix) for(const v of r){
+  const cols=matrix[0].length;
+  mat.style.gridTemplateColumns=`repeat(${cols},24px)`;
+  const hi=opts.hiCells||null;
+  matrix.forEach((r,ri)=>r.forEach((v,ci)=>{
     const c=document.createElement('div');c.className='cell';c.textContent=v;
     if(v==='0')c.classList.add('v0');
     else if(v==='1')c.classList.add('v1');
     else{const col=colorFor(v);if(col)c.style.color=col;}
+    if(hi&&hi.has(ri+'-'+ci))c.classList.add('hicell');
     mat.appendChild(c);
+  }));
+  if(opts.dotted){
+    const cell=24,gap=2,pad=6,inset=3,{r0,r1,c0,c1}=opts.dotted;
+    const box=document.createElement('div');box.className='dotbox';
+    box.style.left=(pad+c0*(cell+gap)-inset)+'px';
+    box.style.top=(pad+r0*(cell+gap)-inset)+'px';
+    box.style.width=((c1-c0+1)*cell+(c1-c0)*gap+2*inset)+'px';
+    box.style.height=((r1-r0+1)*cell+(r1-r0)*gap+2*inset)+'px';
+    mat.appendChild(box);
   }
   row.appendChild(lb);row.appendChild(mat);row.appendChild(rb);
   wrap.appendChild(row);return wrap;
@@ -202,7 +215,7 @@ function compute(){
   catch(e){err.textContent=e;return;}
   const info=buildMatrix(pairs);
   const {m,n,grid,lab,arcs}=info;
-  const {Ta,Rm,block,N}=peel(grid,m,n);
+  const {Ta,Rm,block,N,keepR,keepC}=peel(grid,m,n);
 
   // diagram
   const sd=stage('Arc diagram');
@@ -233,9 +246,11 @@ function compute(){
   // extract
   const se=stage('Extract  ·  rows {1,2,…} \\ {m,m+1},  cols {2,…,n−1}');
   const erow=document.createElement('div');erow.className='eqrow';
-  erow.appendChild(matEl(Rm,'R (block highlighted)'));
+  const hiSet=new Set(); keepR.forEach(r=>keepC.forEach(c=>hiSet.add(r+'-'+c)));
+  erow.appendChild(matEl(Rm,'R (extracted cells shaded)',{hiCells:hiSet}));
   const arr=document.createElement('span');arr.className='op';arr.textContent='→';erow.appendChild(arr);
-  erow.appendChild(matEl(block,'inner block',{hiBlock:true}));
+  erow.appendChild(matEl(block,'inner block',
+    {dotted:{r0:0,r1:block.length-1,c0:0,c1:block[0].length-1}}));
   se.appendChild(erow);
   const en=document.createElement('div');en.className='note';
   en.textContent="Dropping columns 1 and n removes the outermost arc&rsquo;s endpoints, and dropping rows "+
@@ -246,9 +261,10 @@ function compute(){
   // re-embed
   const sr=stage('Re-embed in identity border  →  N');
   const rrow=document.createElement('div');rrow.className='eqrow';
-  rrow.appendChild(matEl(block,'inner block',{hiBlock:true}));
+  rrow.appendChild(matEl(block,'inner block',
+    {dotted:{r0:0,r1:block.length-1,c0:0,c1:block[0].length-1}}));
   const arr2=document.createElement('span');arr2.className='op';arr2.textContent='→';rrow.appendChild(arr2);
-  rrow.appendChild(matEl(N,'N',{}));
+  rrow.appendChild(matEl(N,'N',{dotted:{r0:1,r1:n-2,c0:1,c1:n-2}}));
   sr.appendChild(rrow);out.appendChild(sr);
 }
 
