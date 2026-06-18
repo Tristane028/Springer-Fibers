@@ -55,6 +55,9 @@
   .hicell{background:rgba(200,162,90,.14)}
   .dotbox{position:absolute;border:1.7px dashed var(--gold);border-radius:5px;
     pointer-events:none;opacity:.85}
+  .divln{position:absolute;pointer-events:none;opacity:.8}
+  .divln.h{border-top:1.6px dashed var(--gold)}
+  .divln.v{border-left:1.6px dashed var(--gold)}
 </style>
 </head>
 <body>
@@ -129,9 +132,22 @@ function peel(grid,m,n){
   return {Ta,Rm,block,N,keepR,keepC};
 }
 
+function peelInv(grid,m,n){
+  // T_{1/a} = [[I,0],[(1/a)I, I]]  (lower unipotent); R' = T_{1/a}^{-1} M
+  // leaves the top block, replaces bottom with (bottom - (1/a)*top).
+  const Tinv=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>
+      i===j?'1':(i>=m&&j===i-m?'1/a':'0')));
+  const negOverA=t=>(t==='0')?'0':(t==='a')?'-1':(t==='1')?'-1/a':'-'+t+'/a';
+  const addStr=(bot,term)=>(term==='0')?bot:(bot==='0')?term:(term==='-1')?'0':'1'+term;
+  const Rp=grid.map(r=>r.slice());
+  for(let i=0;i<m;i++) for(let j=0;j<n;j++)
+    Rp[m+i][j]=addStr(grid[m+i][j], negOverA(grid[i][j]));
+  return {Tinv,Rp};
+}
+
 function colorFor(v){
-  const ch=v[0];
-  if(ch>='a'&&ch<='z'){const idx=ch.charCodeAt(0)-97;return cssvar(COLORS[idx%COLORS.length]);}
+  const mch=String(v).match(/[a-z]/);
+  if(mch){const idx=mch[0].charCodeAt(0)-97;return cssvar(COLORS[idx%COLORS.length]);}
   return null;
 }
 function matEl(matrix,labelText,opts={}){
@@ -142,10 +158,12 @@ function matEl(matrix,labelText,opts={}){
   const rb=document.createElement('div');rb.className='brk r';
   const mat=document.createElement('div');mat.className='mat';
   const cols=matrix[0].length;
-  mat.style.gridTemplateColumns=`repeat(${cols},24px)`;
+  const maxLen=Math.max(1,...matrix.flat().map(s=>String(s).length));
+  const cellW=Math.max(24,maxLen*8+6);
+  mat.style.gridTemplateColumns=`repeat(${cols},${cellW}px)`;
   const hi=opts.hiCells||null;
   matrix.forEach((r,ri)=>r.forEach((v,ci)=>{
-    const c=document.createElement('div');c.className='cell';c.textContent=v;
+    const c=document.createElement('div');c.className='cell';c.textContent=v;c.style.width=cellW+'px';
     if(v==='0')c.classList.add('v0');
     else if(v==='1')c.classList.add('v1');
     else{const col=colorFor(v);if(col)c.style.color=col;}
@@ -154,7 +172,7 @@ function matEl(matrix,labelText,opts={}){
   }));
   if(opts.dotted){
     const regions=Array.isArray(opts.dotted)?opts.dotted:[opts.dotted];
-    const cell=24,gap=2,pad=6,inset=3;
+    const cell=cellW,gap=2,pad=6,inset=3;
     regions.forEach(({r0,r1,c0,c1})=>{
       const box=document.createElement('div');box.className='dotbox';
       box.style.left=(pad+c0*(cell+gap)-inset)+'px';
@@ -162,6 +180,22 @@ function matEl(matrix,labelText,opts={}){
       box.style.width=((c1-c0+1)*cell+(c1-c0)*gap+2*inset)+'px';
       box.style.height=((r1-r0+1)*cell+(r1-r0)*gap+2*inset)+'px';
       mat.appendChild(box);
+    });
+  }
+  if(opts.split){
+    const cellH=24,gap=2,pad=6;
+    const totW=cols*cellW+(cols-1)*gap, totH=matrix.length*cellH+(matrix.length-1)*gap;
+    (opts.split.rows||[]).forEach(k=>{
+      const ln=document.createElement('div');ln.className='divln h';
+      ln.style.left=(pad-3)+'px';ln.style.width=(totW+6)+'px';
+      ln.style.top=(pad+k*(cellH+gap)-gap/2)+'px';ln.style.height='0px';
+      mat.appendChild(ln);
+    });
+    (opts.split.cols||[]).forEach(j=>{
+      const ln=document.createElement('div');ln.className='divln v';
+      ln.style.top=(pad-3)+'px';ln.style.height=(totH+6)+'px';
+      ln.style.left=(pad+j*(cellW+gap)-gap/2)+'px';ln.style.width='0px';
+      mat.appendChild(ln);
     });
   }
   row.appendChild(lb);row.appendChild(mat);row.appendChild(rb);
@@ -236,9 +270,9 @@ function compute(){
   const row=document.createElement('div');row.className='eqrow';
   row.appendChild(matEl(grid,'M'));
   const eq=document.createElement('span');eq.className='op';eq.textContent='=';row.appendChild(eq);
-  row.appendChild(matEl(Ta,'T_a'));
+  row.appendChild(matEl(Ta,'T_a',{split:{rows:[m],cols:[m]}}));
   const dot=document.createElement('span');dot.className='op';dot.textContent='·';row.appendChild(dot);
-  row.appendChild(matEl(Rm,'R'));
+  row.appendChild(matEl(Rm,'R',{split:{rows:[m]}}));
   sf.appendChild(row);
   const note=document.createElement('div');note.className='note';
   note.innerHTML="T<sub>a</sub> = [[I, a·I],[0, I]] is unipotent, so R = T<sub>a</sub><sup>−1</sup>M = "+
@@ -271,6 +305,44 @@ function compute(){
   const arr2=document.createElement('span');arr2.className='op';arr2.textContent='→';rrow.appendChild(arr2);
   rrow.appendChild(matEl(N,'N',{dotted:{r0:1,r1:n-2,c0:1,c1:n-2}}));
   sr.appendChild(rrow);out.appendChild(sr);
+
+  // inverse factorization  M = T_{1/a} · R'
+  const {Tinv,Rp}=peelInv(grid,m,n);
+  const si=stage('Inverse factorization  M = T_{1/a} · R\u2032');
+  const irow=document.createElement('div');irow.className='eqrow';
+  irow.appendChild(matEl(grid,'M'));
+  const e1=document.createElement('span');e1.className='op';e1.textContent='=';irow.appendChild(e1);
+  irow.appendChild(matEl(Tinv,'T_{1/a}',{split:{rows:[m],cols:[m]}}));
+  const e2=document.createElement('span');e2.className='op';e2.textContent='\u00b7';irow.appendChild(e2);
+  irow.appendChild(matEl(Rp,'R\u2032',{split:{rows:[m]}}));
+  si.appendChild(irow);
+  const inote=document.createElement('div');inote.className='note';
+  inote.innerHTML="T<sub>1/a</sub> = [[I, 0],[(1/a)·I, I]] is lower unipotent, so "+
+    "R\u2032 = T<sub>1/a</sub><sup>−1</sup>M leaves the upper block unchanged and replaces the "+
+    "lower block with (lower − (1/a)·upper). Right-multiplying T<sub>1/a</sub> · R\u2032 returns M.";
+  si.appendChild(inote);out.appendChild(si);
+
+  // agreement  T_a · R = T_{1/a} · R'  ( = M )
+  const mkop=t=>{const s=document.createElement('span');s.className='op';s.textContent=t;return s;};
+  const sa=stage('Both factorizations agree  ·  T_a · R = T_{1/a} · R\u2032 = M');
+  const arow=document.createElement('div');arow.className='eqrow';
+  arow.appendChild(matEl(Ta,'T_a',{split:{rows:[m],cols:[m]}}));
+  arow.appendChild(mkop('\u00b7'));
+  arow.appendChild(matEl(Rm,'R'));
+  arow.appendChild(mkop('='));
+  arow.appendChild(matEl(Tinv,'T_{1/a}',{split:{rows:[m],cols:[m]}}));
+  arow.appendChild(mkop('\u00b7'));
+  arow.appendChild(matEl(Rp,'R\u2032',{dotted:{r0:1,r1:n-2,c0:1,c1:n-2}}));
+  sa.appendChild(arow);
+  const anote=document.createElement('div');anote.className='note';
+  anote.textContent="Both products return the original matrix M, so the upper and lower "+
+    "factorizations describe the same matrix:";
+  sa.appendChild(anote);
+  const arow2=document.createElement('div');arow2.className='eqrow';
+  arow2.appendChild(mkop('='));
+  arow2.appendChild(matEl(grid,'M'));
+  sa.appendChild(arow2);
+  out.appendChild(sa);
 }
 
 document.getElementById('go').addEventListener('click',compute);
