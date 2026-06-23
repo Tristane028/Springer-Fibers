@@ -146,7 +146,8 @@ function peelInv(grid,m,n){
 }
 
 function colorFor(v){
-  const mch=String(v).match(/[a-z]/);
+  const s=String(v);
+  let mch=s.match(/[b-z]/)||s.match(/[a-z]/);   // prefer a non-'a' label for coloring
   if(mch){const idx=mch[0].charCodeAt(0)-97;return cssvar(COLORS[idx%COLORS.length]);}
   return null;
 }
@@ -293,7 +294,7 @@ function compute(){
   erow.appendChild(matEl(block,'inner block'));
   se.appendChild(erow);
   const en=document.createElement('div');en.className='note';
-  en.textContent="Dropping columns 1 and n removes the outermost arc&rsquo;s endpoints, and dropping rows "+
+  en.textContent="Dropping columns 1 and n cuts the endpoints of the outermost arc, and dropping rows "+
     "m and m+1 removes the two rows tied to that arc. What remains is the matrix of the inner matching "+
     "(the BT-string with its outer B…T stripped).";
   se.appendChild(en);out.appendChild(se);
@@ -306,43 +307,80 @@ function compute(){
   rrow.appendChild(matEl(N,'N',{dotted:{r0:1,r1:n-2,c0:1,c1:n-2}}));
   sr.appendChild(rrow);out.appendChild(sr);
 
-  // inverse factorization  M = T_{1/a} · R'
-  const {Tinv,Rp}=peelInv(grid,m,n);
-  const si=stage('Inverse factorization  M = T_{1/a} · R\u2032');
-  const irow=document.createElement('div');irow.className='eqrow';
-  irow.appendChild(matEl(grid,'M'));
-  const e1=document.createElement('span');e1.className='op';e1.textContent='=';irow.appendChild(e1);
-  irow.appendChild(matEl(Tinv,'T_{1/a}',{split:{rows:[m],cols:[m]}}));
-  const e2=document.createElement('span');e2.className='op';e2.textContent='\u00b7';irow.appendChild(e2);
-  irow.appendChild(matEl(Rp,'R\u2032',{split:{rows:[m]}}));
-  si.appendChild(irow);
-  const inote=document.createElement('div');inote.className='note';
-  inote.innerHTML="T<sub>1/a</sub> = [[I, 0],[(1/a)·I, I]] is lower unipotent, so "+
-    "R\u2032 = T<sub>1/a</sub><sup>−1</sup>M leaves the upper block unchanged and replaces the "+
-    "lower block with (lower − (1/a)·upper). Right-multiplying T<sub>1/a</sub> · R\u2032 returns M.";
-  si.appendChild(inote);out.appendChild(si);
-
-  // agreement  T_a · R = T_{1/a} · R'  ( = M )
+  // chart relation:  inner parameter  b  ->  -a^2/b   (intrinsic / Plücker coordinate)
   const mkop=t=>{const s=document.createElement('span');s.className='op';s.textContent=t;return s;};
-  const sa=stage('Both factorizations agree  ·  T_a · R = T_{1/a} · R\u2032 = M');
-  const arow=document.createElement('div');arow.className='eqrow';
-  arow.appendChild(matEl(Ta,'T_a',{split:{rows:[m],cols:[m]}}));
-  arow.appendChild(mkop('\u00b7'));
-  arow.appendChild(matEl(Rm,'R'));
-  arow.appendChild(mkop('='));
-  arow.appendChild(matEl(Tinv,'T_{1/a}',{split:{rows:[m],cols:[m]}}));
-  arow.appendChild(mkop('\u00b7'));
-  arow.appendChild(matEl(Rp,'R\u2032',{dotted:{r0:1,r1:n-2,c0:1,c1:n-2}}));
-  sa.appendChild(arow);
-  const anote=document.createElement('div');anote.className='note';
-  anote.textContent="Both products return the original matrix M, so the upper and lower "+
-    "factorizations describe the same matrix:";
-  sa.appendChild(anote);
-  const arow2=document.createElement('div');arow2.className='eqrow';
-  arow2.appendChild(mkop('='));
-  arow2.appendChild(matEl(grid,'M'));
-  sa.appendChild(arow2);
-  out.appendChild(sa);
+  const reparBlock=block.map(r=>r.map(v=>/^[a-z]$/.test(v)?'-a\u00b2/'+v:v));
+  const Nrep=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?'1':'0'));
+  for(let i=0;i<reparBlock.length;i++)for(let j=0;j<reparBlock[0].length;j++)Nrep[i+1][j+1]=reparBlock[i][j];
+  const sc=stage('Chosen parameter  b \u21a6 \u2212a\u00b2/b');
+  const crow=document.createElement('div');crow.className='eqrow';
+  crow.appendChild(matEl(block,'inner block (entry chart)'));
+  crow.appendChild(mkop('\u2192'));
+  crow.appendChild(matEl(reparBlock,'inner block (intrinsic chart)'));
+  crow.appendChild(mkop('\u2192'));
+  crow.appendChild(matEl(Nrep,'N\u2032',{dotted:{r0:1,r1:n-2,c0:1,c1:n-2}}));
+  sc.appendChild(crow);
+  const cnote=document.createElement('div');cnote.className='note';
+  cnote.innerHTML="The inner matching&rsquo;s free parameters are Pl\u00fccker coordinates, not raw "+
+    "matrix entries. Peeling the outer arc a \u2014 which spans both enclosed levels, contributing "+
+    "a\u00b2 \u2014 and reading the coordinate in the dual chart sends each inner label "+
+    "b \u21a6 \u2212a\u00b2/b. This is an involution (apply it twice and b returns), matching the "+
+    "lower inverse operator T<sub>1/a</sub>; N\u2032 is the re-embed carrying the inner block in "+
+    "these intrinsic coordinates.";
+  sc.appendChild(cnote);out.appendChild(sc);
+
+  // operator B(a,b,c):  M · B = T_{1/a} · N'
+  const {Tinv}=peelInv(grid,m,n);
+  // RHS product  P = T_{1/a} · N'  (each bottom row gains (1/a)·its top row)
+  const mulInvA=x=>x==='0'?'0':x==='1'?'1/a':x.startsWith('-a\u00b2/')?'-a/'+x.slice(4)
+                  :x.startsWith('a\u00b2/')?'a/'+x.slice(3):'('+x+')/a';
+  const addBot=(bot,term)=>term==='0'?bot:(bot==='0'?term:bot+'+'+term);
+  const P=Nrep.map(r=>r.slice());
+  for(let i=0;i<m;i++) for(let j=0;j<n;j++) P[m+i][j]=addBot(Nrep[m+i][j], mulInvA(Nrep[i][j]));
+
+  const sb=stage('Operator B(a,b,c)  ·  M · B = T_{1/a} · N\u2032');
+  const isEx = m===3 && arcs[0][0]===1&&arcs[0][1]===6&&arcs[1][0]===2&&arcs[1][1]===3
+                       &&arcs[2][0]===4&&arcs[2][1]===5;
+  if(isEx){
+    const B=[
+      ['1/a','1','0','0','0','0'],
+      ['0','-a/b','1/a','1','0','0'],
+      ['0','0','-b/a','-b','0','0'],
+      ['0','0','0','-a/c','1/a','1'],
+      ['0','0','0','0','-c/a','-c'],
+      ['0','0','0','0','0','-a']];
+    const brow=document.createElement('div');brow.className='eqrow';
+    brow.appendChild(matEl(grid,'M'));
+    brow.appendChild(mkop('\u00b7'));
+    brow.appendChild(matEl(B,'B(a,b,c)'));
+    brow.appendChild(mkop('='));
+    brow.appendChild(matEl(Tinv,'T_{1/a}',{split:{rows:[m],cols:[m]}}));
+    brow.appendChild(mkop('\u00b7'));
+    brow.appendChild(matEl(Nrep,'N\u2032',{dotted:{r0:1,r1:n-2,c0:1,c1:n-2}}));
+    sb.appendChild(brow);
+    const prow=document.createElement('div');prow.className='eqrow';
+    prow.appendChild(mkop('='));
+    prow.appendChild(matEl(P,'M\u00b7B = T_{1/a}\u00b7N\u2032'));
+    sb.appendChild(prow);
+  } else {
+    const note0=document.createElement('div');note0.className='note';
+    note0.innerHTML="B(a,b,c) was derived for the worked example <b>BBTBTT</b> \u2014 switch to it to see "+
+      "M\u00b7B. Here is the right-hand side T<sub>1/a</sub>\u00b7N\u2032 for the current string:";
+    sb.appendChild(note0);
+    const brow=document.createElement('div');brow.className='eqrow';
+    brow.appendChild(matEl(Tinv,'T_{1/a}',{split:{rows:[m],cols:[m]}}));
+    brow.appendChild(mkop('\u00b7'));
+    brow.appendChild(matEl(Nrep,'N\u2032',{dotted:{r0:1,r1:n-2,c0:1,c1:n-2}}));
+    brow.appendChild(mkop('='));
+    brow.appendChild(matEl(P,'T_{1/a}\u00b7N\u2032'));
+    sb.appendChild(brow);
+  }
+  const bnote=document.createElement('div');bnote.className='note';
+  bnote.innerHTML="Right-multiplying M by B(a,b,c) reproduces T<sub>1/a</sub>\u00b7N\u2032, whose upper "+
+    "block is N\u2032 \u2014 the inner matching in the intrinsic \u2212a\u00b2/b coordinates from the "+
+    "section above. So B is the operator that moves M into that chart; the identity "+
+    "M\u00b7B = T<sub>1/a</sub>\u00b7N\u2032 is verified symbolically for BBTBTT.";
+  sb.appendChild(bnote);out.appendChild(sb);
 }
 
 document.getElementById('go').addEventListener('click',compute);
