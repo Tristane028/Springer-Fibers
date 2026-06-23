@@ -307,7 +307,7 @@ function compute(){
   rrow.appendChild(matEl(N,'N',{dotted:{r0:1,r1:n-2,c0:1,c1:n-2}}));
   sr.appendChild(rrow);out.appendChild(sr);
 
-  // chart relation:  inner parameter  b  ->  -a^2/b   (intrinsic / Plücker coordinate)
+  // chart relation:  inner parameter  x  ->  -a^2/x   (intrinsic / Plücker coordinate)
   const mkop=t=>{const s=document.createElement('span');s.className='op';s.textContent=t;return s;};
   const reparBlock=block.map(r=>r.map(v=>/^[a-z]$/.test(v)?'-a\u00b2/'+v:v));
   const Nrep=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?'1':'0'));
@@ -324,7 +324,7 @@ function compute(){
   cnote.innerHTML="The inner matching&rsquo;s free parameters are Pl\u00fccker coordinates, not raw "+
     "matrix entries. Peeling the outer arc a \u2014 which spans both enclosed levels, contributing "+
     "a\u00b2 \u2014 and reading the coordinate in the dual chart sends each inner label "+
-    "b \u21a6 \u2212a\u00b2/b. This is an involution (apply it twice and b returns), matching the "+
+    "x \u21a6 \u2212a\u00b2/x. This is an involution (apply it twice and x returns), matching the "+
     "lower inverse operator T<sub>1/a</sub>; N\u2032 is the re-embed carrying the inner block in "+
     "these intrinsic coordinates.";
   sc.appendChild(cnote);out.appendChild(sc);
@@ -377,7 +377,7 @@ function compute(){
   }
   const bnote=document.createElement('div');bnote.className='note';
   bnote.innerHTML="Right-multiplying M by B(a,b,c) reproduces T<sub>1/a</sub>\u00b7N\u2032, whose upper "+
-    "block is N\u2032 \u2014 the inner matching in the intrinsic \u2212a\u00b2/b coordinates from the "+
+    "block is N\u2032 \u2014 the inner matching in the intrinsic \u2212a\u00b2/x coordinates from the "+
     "section above. So B is the operator that moves M into that chart; the identity "+
     "M\u00b7B = T<sub>1/a</sub>\u00b7N\u2032 is verified symbolically for BBTBTT.";
   sb.appendChild(bnote);out.appendChild(sb);
