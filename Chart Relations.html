@@ -312,7 +312,7 @@ function compute(){
   const reparBlock=block.map(r=>r.map(v=>/^[a-z]$/.test(v)?'-a\u00b2/'+v:v));
   const Nrep=Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>i===j?'1':'0'));
   for(let i=0;i<reparBlock.length;i++)for(let j=0;j<reparBlock[0].length;j++)Nrep[i+1][j+1]=reparBlock[i][j];
-  const sc=stage('Chosen parameter  b \u21a6 \u2212a\u00b2/b');
+  const sc=stage('Chosen parameter  x \u21a6 \u2212a\u00b2/x');
   const crow=document.createElement('div');crow.className='eqrow';
   crow.appendChild(matEl(block,'inner block (entry chart)'));
   crow.appendChild(mkop('\u2192'));
