@@ -680,11 +680,40 @@ document.getElementById('partition-select').addEventListener('change', async e =
 });
 
 // ── Cell view ─────────────────────────────────────────────────────────────────
+
+// Lex-ordered r-subsets of {1..n}, matching the order of the stored Plücker vector.
+function subsets(n, r) {
+  const out = [], cur = [];
+  (function rec(start) {
+    if (cur.length === r) { out.push(cur.slice()); return; }
+    for (let i = start; i <= n; i++) { cur.push(i); rec(i + 1); cur.pop(); }
+  })(1);
+  return out;
+}
+
+// Stored vectors are full projective coordinates and are mostly zeros, so show only
+// the nonzero ones labelled by their index set — otherwise the card is unreadable
+// (a single level of an (8,1,1) cell is over 1000 characters of "0 : 0 : 0 : ...").
+const MAX_COORDS_SHOWN = 8;
+function formatPlucker(vec, level, n) {
+  const vals = vec.replace(/^\[|\]$/g, '').split(' : ');
+  const idx = subsets(n, level);
+  const nz = [];
+  for (let i = 0; i < vals.length; i++) {
+    // separate indices when n > 9, else "p1910" is ambiguous between {1,9,10} and {19,10}
+    if (vals[i] !== '0') nz.push(`p${idx[i].join(n > 9 ? ',' : '')}=${vals[i]}`);
+  }
+  if (!nz.length) return '(all zero)';
+  const extra = nz.length - MAX_COORDS_SHOWN;
+  return nz.slice(0, MAX_COORDS_SHOWN).join(',  ') +
+         (extra > 0 ? `  (+${extra} more)` : '') + `  [${nz.length}/${vals.length} nonzero]`;
+}
 // Describe what the closure relation imposes on the target cell.
 function edgeDescription(edge) {
   const parts = [];
   const subs = Object.entries(edge.tgtSubs || {});
-  if (edge.whole && !subs.length) parts.push('closure contains the whole target cell');
+  // No constraints on the target means the closure swallows the whole target cell.
+  if (!subs.length) parts.push('closure contains the whole target cell');
   if (subs.length) parts.push('on target: ' + subs.map(([k, v]) => `${k} = ${v}`).join(', '));
   if (edge.gens && edge.gens.length) parts.push('ideal: (' + edge.gens.join(', ') + ')');
   if (edge.limit) parts.push(edge.limit + '→∞');
@@ -699,8 +728,9 @@ function fillCellView(perm) {
     `Dimension ${cell.dim} · ${cell.free.length} free parameter${cell.free.length === 1 ? '' : 's'}: ${freeStr}`;
   document.getElementById('cell-param').textContent =
     cell.free.length ? `A^${cell.dim} with coordinates (${cell.free.join(', ')})` : 'A^0 (single point)';
+  const nRows = cell.plucker[0].replace(/^\[|\]$/g, '').split(' : ').length;
   document.getElementById('cell-plucker').innerHTML =
-    cell.plucker.map((p, i) => `lv${i+1}: ${p}`).join('<br>');
+    cell.plucker.map((p, i) => `lv${i+1}: ${formatPlucker(p, i + 1, nRows)}`).join('<br>');
 
   const outgoing = EDGES.filter(e => e.src === perm);
   const list = document.getElementById('path-list');
@@ -744,7 +774,7 @@ function buildSteps(edge) {
     steps.push({ title: 'Fix the target parameters',
                  detail: tgtSubs.map(([k, v]) => `${k} = ${v}`).join(', ') });
   }
-  if (edge.whole && !tgtSubs.length) {
+  if (!tgtSubs.length) {
     steps.push({ title: 'Whole target cell lies in the closure',
                  detail: 'the intersection ideal is (0) — no constraints imposed' });
   }
@@ -764,11 +794,11 @@ function fillTraverseView(edge) {
   document.getElementById('start-info').innerHTML =
     `<span style="color: var(--text-primary); font-weight: 500;">C_${edge.src}</span> · dim ${srcCell.dim}<br>` +
     `free: ${srcCell.free.length ? srcCell.free.join(', ') : 'none'}<br>` +
-    `lv1: ${srcCell.plucker[0] || ''}`;
+    `lv1: ${srcCell.plucker[0] ? formatPlucker(srcCell.plucker[0], 1, srcCell.plucker[0].replace(/^\[|\]$/g, '').split(' : ').length) : ''}`;
   document.getElementById('land-info').innerHTML =
     `<span style="color: var(--text-primary); font-weight: 500;">C_${edge.tgt}</span> · dim ${tgtCell.dim}<br>` +
     `free: ${tgtCell.free.length ? tgtCell.free.join(', ') : 'none'}<br>` +
-    `lv1: ${tgtCell.plucker[0] || ''}`;
+    `lv1: ${tgtCell.plucker[0] ? formatPlucker(tgtCell.plucker[0], 1, tgtCell.plucker[0].replace(/^\[|\]$/g, '').split(' : ').length) : ''}`;
   const steps = buildSteps(edge);
   const list = document.getElementById('step-list');
   list.innerHTML = '';
@@ -823,7 +853,7 @@ function startTraversal() {
   // Caption shown on the flying dot when there's no divergent limit variable.
   const subs = Object.entries(edge.tgtSubs || {});
   const caption = subs.length ? subs.map(([k, v]) => `${k} = ${v}`).join(', ')
-                              : (edge.whole ? 'whole target cell' : '');
+                              : 'whole target cell';
 
   const startTime = performance.now();
   const flowDuration = stepDuration * steps.length;
