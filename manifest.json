@@ -1,121 +1,66 @@
 [
  {
-  "key": "12",
-  "label": "1,2",
-  "cells": 3,
-  "edges": 2,
-  "hasClosureData": true
- },
- {
   "key": "22",
   "label": "2,2",
   "cells": 6,
-  "edges": 9,
-  "hasClosureData": true
- },
- {
-  "key": "23",
-  "label": "2,3",
-  "cells": 10,
-  "edges": 19,
-  "hasClosureData": true
- },
- {
-  "key": "24",
-  "label": "2,4",
-  "cells": 15,
-  "edges": 32,
   "hasClosureData": true
  },
  {
   "key": "25",
   "label": "2,5",
   "cells": 21,
-  "edges": 48,
   "hasClosureData": true
- },
- {
-  "key": "31",
-  "label": "3,1",
-  "cells": 4,
-  "edges": 0,
-  "hasClosureData": false
  },
  {
   "key": "32",
   "label": "3,2",
   "cells": 10,
-  "edges": 0,
   "hasClosureData": false
  },
  {
   "key": "33",
   "label": "3,3",
   "cells": 20,
-  "edges": 67,
   "hasClosureData": true
- },
- {
-  "key": "41",
-  "label": "4,1",
-  "cells": 5,
-  "edges": 0,
-  "hasClosureData": false
- },
- {
-  "key": "42",
-  "label": "4,2",
-  "cells": 15,
-  "edges": 0,
-  "hasClosureData": false
  },
  {
   "key": "44",
   "label": "4,4",
   "cells": 70,
-  "edges": 0,
   "hasClosureData": false
  },
  {
-  "key": "51",
-  "label": "5,1",
-  "cells": 6,
-  "edges": 0,
-  "hasClosureData": false
+  "key": "45",
+  "label": "4,5"
  },
  {
   "key": "221",
   "label": "2,2,1",
   "cells": 30,
-  "edges": 172,
   "hasClosureData": true
  },
  {
   "key": "411",
   "label": "4,1,1",
   "cells": 30,
-  "edges": 0,
   "hasClosureData": false
  },
  {
   "key": "511",
   "label": "5,1,1",
   "cells": 42,
-  "edges": 0,
   "hasClosureData": false
  },
  {
   "key": "811",
   "label": "8,1,1",
   "cells": 90,
-  "edges": 0,
   "hasClosureData": false
  },
  {
   "key": "2211",
   "label": "2,2,1,1",
   "cells": 180,
-  "edges": 0,
   "hasClosureData": false
  }
 ]
