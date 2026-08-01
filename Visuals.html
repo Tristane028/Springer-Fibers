@@ -5,9 +5,10 @@
 <title>Springer Fiber — Interactive Cell Explorer</title>
 <style>
   :root {
-    --bg-primary: #ffffff; --bg-secondary: #f6f5f0; --bg-tertiary: #f1efe8;
-    --text-primary: #1a1a1a; --text-secondary: #5f5e5a; --text-tertiary: #888780;
-    --accent: #D85A30; --border: rgba(0,0,0,0.15);
+    --bg-primary: #0e0e0f; --bg-secondary: #141416; --bg-tertiary: #000000;
+    --text-primary: #ffffff; --text-secondary: #b9b9bd; --text-tertiary: #85858c;
+    --gold: #D4AF37; --gold-dim: rgba(212,175,55,0.55);
+    --accent: #D4AF37; --border: rgba(255,255,255,0.14);
     --radius-md: 8px; --radius-lg: 12px;
     --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
     --font-mono: "SF Mono", Menlo, Consolas, monospace;
@@ -24,13 +25,13 @@
   button { font-family: inherit; font-size: 13px; background: transparent; border: .5px solid var(--border); border-radius: var(--radius-md); padding: 6px 14px; cursor: pointer; color: var(--text-primary); transition: background .15s, transform .05s; }
   button:hover { background: var(--bg-secondary); }
   button:active { transform: scale(.97); }
-  button.primary { background: var(--text-primary); color: var(--bg-primary); border-color: var(--text-primary); }
-  button.primary:hover { background: #333; }
+  button.primary { background: var(--gold); color: #000; border-color: var(--gold); font-weight: 600; }
+  button.primary:hover { background: #E8C255; }
   button:disabled { opacity: .4; cursor: not-allowed; }
-  select { font-family: inherit; font-size: 13px; padding: 6px 28px 6px 10px; border-radius: var(--radius-md); border: .5px solid var(--border); background: var(--bg-primary); color: var(--text-primary); cursor: pointer; appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><path d="M0 0l5 6 5-6z" fill="%23888"/></svg>'); background-repeat: no-repeat; background-position: right 10px center; }
-  h1 { font-size: 22px; font-weight: 500; margin: 0; }
-  h2 { font-size: 18px; font-weight: 500; margin: 2rem 0 1rem; }
-  h3 { font-size: 16px; font-weight: 500; margin: 0; }
+  select { font-family: inherit; font-size: 13px; padding: 6px 28px 6px 10px; border-radius: var(--radius-md); border: .5px solid var(--border); background: var(--bg-primary); color: var(--text-primary); cursor: pointer; appearance: none; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6"><path d="M0 0l5 6 5-6z" fill="%23bbb"/></svg>'); background-repeat: no-repeat; background-position: right 10px center; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0; color: var(--gold); letter-spacing: .01em; }
+  h2 { font-size: 18px; font-weight: 600; margin: 2rem 0 1rem; color: var(--gold); }
+  h3 { font-size: 16px; font-weight: 600; margin: 0; color: var(--gold); }
   p { margin: .5rem 0; font-size: 14px; }
   .label-uppercase { font-size: 11px; color: var(--text-tertiary); letter-spacing: .05em; text-transform: uppercase; margin: 0 0 6px; }
   .scene-wrap { position: relative; background: var(--bg-secondary); border-radius: var(--radius-lg); border: .5px solid var(--border); overflow: hidden; }
@@ -52,8 +53,8 @@
   .traversal-step.active { opacity: 1; }
   .traversal-step.done { opacity: .6; }
   .step-num { width: 22px; height: 22px; border-radius: 50%; background: var(--bg-tertiary); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; flex-shrink: 0; transition: background .3s, color .3s; }
-  .traversal-step.active .step-num { background: var(--accent); color: white; }
-  .traversal-step.done .step-num { background: var(--text-primary); color: white; }
+  .traversal-step.active .step-num { background: var(--gold); color: #000; }
+  .traversal-step.done .step-num { background: var(--gold-dim); color: #000; }
   .step-body { flex: 1; }
   .step-title { font-size: 14px; font-weight: 500; margin: 0 0 2px; }
   .step-detail { font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); margin: 0; }
@@ -63,7 +64,7 @@
   .search-row { position: relative; margin-bottom: 1rem; }
   #cell-search { width: 100%; font-family: var(--font-mono); font-size: 13px; padding: 9px 12px; border-radius: var(--radius-md); border: .5px solid var(--border); background: var(--bg-primary); color: var(--text-primary); }
   #cell-search:focus { outline: none; border-color: var(--accent); }
-  .search-results { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; background: var(--bg-primary); border: .5px solid var(--border); border-radius: var(--radius-md); margin-top: 4px; max-height: 264px; overflow-y: auto; box-shadow: 0 6px 18px rgba(0,0,0,.10); }
+  .search-results { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; background: var(--bg-primary); border: .5px solid var(--border); border-radius: var(--radius-md); margin-top: 4px; max-height: 264px; overflow-y: auto; box-shadow: 0 6px 22px rgba(0,0,0,.75); }
   .search-results:empty { display: none; }
   .search-item { padding: 8px 12px; font-family: var(--font-mono); font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; border-bottom: .5px solid var(--border); }
   .search-item:last-child { border-bottom: none; }
@@ -100,7 +101,7 @@
       <div class="legend" id="legend-overview"></div>
     </div>
     <p style="margin-top: 1rem; font-size: 13px; color: var(--text-secondary);">
-      Arrows show direct closure relations (one-way). Spheres with no outgoing arrow are at the top; the closed point is at the bottom.
+      Strands show direct closure relations, drawn undirected here. Height encodes dimension — the closed point sits at the bottom. Open a cell to see its outgoing relations as arrows.
     </p>
   </div>
 
@@ -198,10 +199,26 @@ let POSITIONS; // { perm -> {x,y,z} } algorithmically laid out
 let PART_LABEL; // display form of the partition, e.g. "2,2,1,1"
 
 // Dimensions now run 0..9, so size and colour are computed rather than looked up.
-const PALETTE = ['#888780', '#1D9E75', '#7F77DD', '#D85A30', '#4F6BD6',
-                 '#B14CCB', '#0F9BB5', '#C99A20', '#7A9A2E', '#CB4C7E'];
+// Brightened for a black background — the original mid-tones muddied out.
+const PALETTE = ['#C9C7BE', '#24C48F', '#9A92F0', '#F2703F', '#6588EE',
+                 '#C863E0', '#22BBD6', '#E3B62C', '#9BBE3A', '#E86699'];
 const dimColor  = d => PALETTE[d % PALETTE.length];
-const dimRadius = d => 0.22 + Math.min(d, 6) * 0.06;
+const dimRadius = d => 0.10 + Math.min(d, 6) * 0.022;
+
+// Deterministic per-cell jitter so the layout is a web rather than flat rings,
+// but is identical on every render/reload (no Math.random).
+function permHash(perm) {
+  let h = 2166136261;
+  for (let i = 0; i < perm.length; i++) {
+    h ^= perm.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+const jitter = (perm, salt) => {
+  const h = permHash(perm + '#' + salt);
+  return (h / 4294967295) * 2 - 1;   // in [-1, 1]
+};
 
 // ── Layout: arrange cells in 3D, stratified by dimension ─────────────────────
 function layoutCells(cells) {
@@ -212,21 +229,33 @@ function layoutCells(cells) {
     byDim[c.dim].push(c);
   });
   const maxDim = Math.max(...cells.map(c => c.dim));
-  const yMin = -1.6, yMax = 1.8;
+  // Wider vertical spread than before so strata read as distinct layers of a web
+  // instead of stacking into a blob.
+  const yMin = -3.0, yMax = 3.4;
+  const GOLDEN = Math.PI * (3 - Math.sqrt(5));   // ~2.39996 rad
   Object.keys(byDim).forEach(d => {
     const group  = byDim[d];
     const dimNum = parseInt(d);
-    const y      = maxDim === 0 ? 0 : yMin + (yMax - yMin) * (dimNum / Math.max(maxDim, 1));
-    // Big strata get split over two concentric rings so labels stay readable.
-    const ring2  = group.length > 14;
+    const yBase  = maxDim === 0 ? 0 : yMin + (yMax - yMin) * (dimNum / Math.max(maxDim, 1));
+    const count  = group.length;
+    // Radius grows with sqrt(count) so density per unit area stays roughly
+    // constant: big strata get much wider instead of packing tighter.
+    const spread = count === 1 ? 0 : 1.5 + Math.sqrt(count) * 0.95;
     group.forEach((c, i) => {
-      const inner = ring2 && i % 2 === 1;
-      const count = ring2 ? Math.ceil(group.length / 2) : group.length;
-      const idx   = ring2 ? Math.floor(i / 2) : i;
-      const base  = group.length === 1 ? 0 : 1.2 + count * 0.16;
-      const radius = inner ? base * 0.62 : base;
-      const ang = (idx / Math.max(count, 1)) * Math.PI * 2 + dimNum * 0.4 + (inner ? 0.3 : 0);
-      positions[c.perm] = { x: radius * Math.cos(ang), y: y, z: radius * Math.sin(ang) };
+      // Golden-angle placement distributes points evenly with no visible rings,
+      // and sqrt(i) radial growth fills the disc uniformly rather than a circle.
+      const ang = i * GOLDEN + dimNum * 0.7;
+      const rad = spread * Math.sqrt((i + 0.5) / Math.max(count, 1));
+      // Deterministic jitter pushes nodes off the perfect disc into a 3D web.
+      const jr = 1 + jitter(c.perm, 'r') * 0.22;
+      const jy = jitter(c.perm, 'y') * 0.62;
+      const jx = jitter(c.perm, 'x') * 0.30;
+      const jz = jitter(c.perm, 'z') * 0.30;
+      positions[c.perm] = {
+        x: rad * jr * Math.cos(ang) + jx,
+        y: yBase + jy,
+        z: rad * jr * Math.sin(ang) + jz
+      };
     });
   });
   return positions;
@@ -298,10 +327,13 @@ function makeScene(canvasId, opts) {
     rotating: !!opts.autoRotate,
     activeCell: null,
     flowAnim: null,
+    soloEdge: null,     // {src,tgt}: render ONLY this relation, enlarged
+    particles: null,    // particle stream for the traversal animation
     highlight: null,
     onClickSphere: opts.onClickSphere || null,
     showAllEdges: opts.showAllEdges !== false,
     focusMode: !!opts.focusMode,
+    outgoingOnly: !!opts.outgoingOnly,
     firstPerson: !!opts.firstPerson,
     cameraPos: null,
     spheres: []
@@ -328,7 +360,7 @@ function makeScene(canvasId, opts) {
     let z = -px*sy + pz*cy;
     let y =  py*cp - z*sp;
         z =  py*sp + z*cp;
-    const camDist = state.firstPerson ? 1.5 : 5;
+    const camDist = state.firstPerson ? 1.5 : 9;
     const f  = 320 * state.zoom;
     const dz = camDist - z;
     return {
@@ -338,14 +370,24 @@ function makeScene(canvasId, opts) {
     };
   }
 
-  const sphereRadius = (perm, proj) =>
-    Math.max(8, dimRadius(CELLS[perm].dim) * 110 * proj.scale * 0.012);
+  const sphereRadius = (perm, proj) => {
+    let r = Math.max(3, dimRadius(CELLS[perm].dim) * 110 * proj.scale * 0.020);
+    // On the single-path screen the two endpoints are the whole story, so give
+    // them real presence instead of leaving them the size of ordinary nodes.
+    if (state.soloEdge && (perm === state.soloEdge.src || perm === state.soloEdge.tgt)) {
+      r *= 2.8;
+    }
+    return r;
+  };
 
-  function drawEdge(srcPerm, tgtPerm, highlighted) {
+  // showArrow=false renders the relation as a plain undirected strand. The
+  // overview uses that (it reads as a web); drilling into a cell turns the
+  // arrowheads back on so direction is still explicit where it matters.
+  function drawEdge(srcPerm, tgtPerm, highlighted, showArrow) {
     if (!POSITIONS[srcPerm] || !POSITIONS[tgtPerm]) return;
     const p1 = project(POSITIONS[srcPerm]);
     const p2 = project(POSITIONS[tgtPerm]);
-    const stroke = highlighted ? 'rgba(216,90,48,0.85)' : 'rgba(120,120,120,0.32)';
+    const stroke = highlighted ? 'rgba(212,175,55,0.92)' : 'rgba(170,175,195,0.20)';
     ctx.strokeStyle = stroke;
     ctx.lineWidth   = highlighted ? 2 : 0.9;
     const dx = p2.x - p1.x, dy = p2.y - p1.y;
@@ -360,7 +402,8 @@ function makeScene(canvasId, opts) {
     ctx.moveTo(sx, sy);
     ctx.lineTo(ex, ey);
     ctx.stroke();
-    // Arrowhead
+    // Arrowhead (omitted on the undirected overview)
+    if (!showArrow) return;
     const headLen = highlighted ? 12 : 8;
     const headAng = 0.45;
     const ang = Math.atan2(uy, ux);
@@ -382,10 +425,16 @@ function makeScene(canvasId, opts) {
     const isHover = perm === state.highlight;
     let isNeighbor = false;
     if (state.activeCell) {
-      isNeighbor = EDGES.some(e =>
-        (e.src === state.activeCell && e.tgt === perm) ||
-        (e.tgt === state.activeCell && e.src === perm)
-      );
+      isNeighbor = state.outgoingOnly
+        ? EDGES.some(e => e.src === state.activeCell && e.tgt === perm)
+        : EDGES.some(e =>
+            (e.src === state.activeCell && e.tgt === perm) ||
+            (e.tgt === state.activeCell && e.src === perm)
+          );
+    }
+    // Single-path screen: nothing on stage but the two cells in question.
+    if (state.soloEdge && perm !== state.soloEdge.src && perm !== state.soloEdge.tgt) {
+      return null;
     }
     // Hide cells that don't connect to the active cell when in focus mode
     if (state.focusMode && state.activeCell && !isActive && !isNeighbor) {
@@ -400,17 +449,17 @@ function makeScene(canvasId, opts) {
     ctx.fill();
     if (isHit) {
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = '#D85A30';   // accent ring on search hits
+      ctx.strokeStyle = '#D4AF37';   // accent ring on search hits
       ctx.lineWidth = 2.5;
       ctx.stroke();
     } else if (isActive) {
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = '#26215C';
+      ctx.strokeStyle = '#D4AF37';
       ctx.lineWidth = 2.5;
       ctx.stroke();
     } else if (isHover) {
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
       ctx.lineWidth = 1;
       ctx.stroke();
     }
@@ -418,13 +467,102 @@ function makeScene(canvasId, opts) {
     // Labels get crowded in big partitions — show them only when they can be read.
     const showLabel = Object.keys(POSITIONS).length <= 45 || isActive || isHover || isHit;
     if (showLabel) {
-      ctx.fillStyle = 'rgba(0,0,0,0.85)';
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
       ctx.font = '500 11px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       ctx.fillText('C_' + perm, p.x, p.y + r + 4);
     }
     return { perm, x: p.x, y: p.y, r };
+  }
+
+  // ── Particle stream: a flood of dots pouring out of the source cell and
+  //    funnelling into the destination. Positions are computed in WORLD space
+  //    and then projected, so the stream stays correct while the scene rotates.
+  function hexToRgb(h) {
+    const n = parseInt(h.replace('#', ''), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function mixColor(c1, c2, k) {
+    const a = hexToRgb(c1), b = hexToRgb(c2);
+    return `rgb(${Math.round(a[0]+(b[0]-a[0])*k)},${Math.round(a[1]+(b[1]-a[1])*k)},${Math.round(a[2]+(b[2]-a[2])*k)})`;
+  }
+
+  function drawParticles() {
+    const P = state.particles;
+    if (!P || !POSITIONS[P.src] || !POSITIONS[P.tgt]) return;
+    const A = POSITIONS[P.src], B = POSITIONS[P.tgt];
+
+    // Rotation axis for the vortex (source -> target). The emission direction
+    // itself is NOT tied to this axis any more: each mote gets its own uniform
+    // direction on the sphere, so the burst leaves the cell every which way.
+    let kx = B.x - A.x, ky = B.y - A.y, kz = B.z - A.z;
+    const klen = Math.hypot(kx, ky, kz) || 1;
+    kx /= klen; ky /= klen; kz /= klen;
+
+    const cSrc = (CELLS[P.src] && CELLS[P.src].color) || '#D4AF37';
+    const cTgt = (CELLS[P.tgt] && CELLS[P.tgt].color) || '#D4AF37';
+    // Precompute a colour ramp once instead of parsing hex per mote per frame
+    // (this loop runs thousands of times each frame).
+    if (!P.ramp) {
+      P.ramp = [];
+      for (let i = 0; i < 24; i++) P.ramp.push(mixColor(cSrc, cTgt, i / 23));
+    }
+    const ramp = P.ramp;
+
+    let landed = 0;
+    for (const q of P.items) {
+      const lt = (P.t - q.delay) / q.life;
+      if (lt >= 1) { landed++; continue; }
+      if (lt <= 0) continue;
+
+      // Travel: stays near the source while the cloud blooms, then rushes in.
+      const e = Math.pow(lt, 1.85);
+      // Burst envelope: swells almost immediately, collapses to 0 at arrival.
+      const amp = q.amp * Math.sin(Math.PI * Math.pow(lt, 0.45));
+
+      // Rotate the mote's own direction about the axis (Rodrigues) for a vortex
+      // as it gets drawn in — the spin is around the axis, the spray is not.
+      const phi = lt * q.swirl;
+      const cp = Math.cos(phi), sp2 = Math.sin(phi);
+      const dx = q.dx, dy = q.dy, dz = q.dz;
+      const kd = kx*dx + ky*dy + kz*dz;
+      const rx = dx*cp + (ky*dz - kz*dy)*sp2 + kx*kd*(1 - cp);
+      const ry = dy*cp + (kz*dx - kx*dz)*sp2 + ky*kd*(1 - cp);
+      const rz = dz*cp + (kx*dy - ky*dx)*sp2 + kz*kd*(1 - cp);
+
+      const wp = {
+        x: A.x + (B.x - A.x) * e + rx * amp,
+        y: A.y + (B.y - A.y) * e + ry * amp,
+        z: A.z + (B.z - A.z) * e + rz * amp
+      };
+      const p = project(wp);
+      if (p.scale <= 0) continue;
+
+      // 10x smaller than the previous pass.
+      const rad = Math.max(0.16, q.size * p.scale * 0.042 * (1 - 0.4 * lt));
+      const fade = lt < 0.07 ? lt / 0.07 : lt > 0.88 ? Math.max(0, (1 - lt) / 0.12) : 1;
+      ctx.globalAlpha = fade;
+      ctx.fillStyle = ramp[(lt * 23) | 0];
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Absorption glow: brightens as more of the stream is swallowed.
+    if (landed > 0) {
+      const b = project(B);
+      const k = Math.min(1, landed / Math.max(1, P.items.length));
+      const gr = sphereRadius(P.tgt, b) * (1.25 + 0.9 * k);
+      const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, gr);
+      g.addColorStop(0, `rgba(212,175,55,${0.30 * k})`);
+      g.addColorStop(1, 'rgba(212,175,55,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, gr, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   function drawFlyingDot(flow) {
@@ -435,24 +573,30 @@ function makeScene(canvasId, opts) {
     const x = a.x + (b.x - a.x) * t;
     const y = a.y + (b.y - a.y) * t;
 
-    const r = 7;
-    ctx.fillStyle = '#D85A30';
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI*2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    const r = 7;   // label anchor offset (kept even when the dot isn't drawn)
+    // When the particle stream is running it carries the motion, so the single
+    // marker and its trail are suppressed — only the live label is kept.
+    const labelOnly = !!state.particles;
+    if (!labelOnly) {
+      const r0 = 7;
+      ctx.fillStyle = '#D4AF37';
+      ctx.beginPath();
+      ctx.arc(x, y, r0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
 
-    // A faint trail showing where it's been
-    ctx.strokeStyle = 'rgba(216,90,48,0.45)';
-    ctx.lineWidth = 2.5;
-    ctx.setLineDash([5, 4]);
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    ctx.setLineDash([]);
+      // A faint trail showing where it's been
+      ctx.strokeStyle = 'rgba(212,175,55,0.45)';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
 
     // Live label: the limit variable diverging, or the constraint being imposed.
     const label = flow.limitVar
@@ -469,7 +613,7 @@ function makeScene(canvasId, opts) {
     const lx = x - bw / 2;
     const ly = y - r - bh - 8;
 
-    ctx.strokeStyle = 'rgba(216,90,48,0.65)';
+    ctx.strokeStyle = 'rgba(212,175,55,0.7)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(x, ly + bh);
@@ -477,8 +621,8 @@ function makeScene(canvasId, opts) {
     ctx.stroke();
 
     const radius = 11;
-    ctx.fillStyle = 'rgba(255,255,255,0.97)';
-    ctx.strokeStyle = 'rgba(216,90,48,0.6)';
+    ctx.fillStyle = 'rgba(10,10,12,0.95)';
+    ctx.strokeStyle = 'rgba(212,175,55,0.65)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(lx + radius, ly);
@@ -494,7 +638,7 @@ function makeScene(canvasId, opts) {
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#D85A30';
+    ctx.fillStyle = '#D4AF37';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(label, x, ly + bh / 2);
@@ -511,25 +655,39 @@ function makeScene(canvasId, opts) {
     if (!CELLS) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     // Edges first
-    if (state.showAllEdges) {
-      EDGES.forEach(e => {
-        const touchesActive = state.activeCell && (e.src === state.activeCell || e.tgt === state.activeCell);
-        if (state.focusMode && state.activeCell && !touchesActive) return;
-        if (!touchesActive) drawEdge(e.src, e.tgt, false);
-      });
-      EDGES.forEach(e => {
-        const active = state.activeCell && (e.src === state.activeCell || e.tgt === state.activeCell);
-        const isFlowEdge = state.flowAnim && state.flowAnim.src === e.src && state.flowAnim.tgt === e.tgt;
-        if (active || isFlowEdge) drawEdge(e.src, e.tgt, true);
-      });
+    if (state.soloEdge) {
+      // Exactly one relation on screen: examined cell -> destination.
+      drawEdge(state.soloEdge.src, state.soloEdge.tgt, true, true);
+    } else if (state.showAllEdges) {
+      if (!state.activeCell) {
+        // Default viewport: no cell selected -> draw every relation as an
+        // undirected strand. Direction is still in the data, just not drawn.
+        EDGES.forEach(e => drawEdge(e.src, e.tgt, false, false));
+      } else {
+        // Examining a cell: only edges LEAVING it are shown, with arrowheads.
+        // Incoming edges are suppressed so the view answers "where can I go
+        // from here" without the clutter of everything pointing back in.
+        EDGES.forEach(e => {
+          const touchesActive = e.src === state.activeCell || e.tgt === state.activeCell;
+          if (state.focusMode && !touchesActive) return;
+          if (touchesActive) return;                 // drawn in the pass below
+          drawEdge(e.src, e.tgt, false, false);      // context strands stay undirected
+        });
+        EDGES.forEach(e => {
+          const outgoing   = e.src === state.activeCell;
+          const isFlowEdge = state.flowAnim && state.flowAnim.src === e.src && state.flowAnim.tgt === e.tgt;
+          if (outgoing || isFlowEdge) drawEdge(e.src, e.tgt, true, true);
+        });
+      }
     } else if (state.flowAnim) {
-      drawEdge(state.flowAnim.src, state.flowAnim.tgt, true);
+      drawEdge(state.flowAnim.src, state.flowAnim.tgt, true, true);
     }
     // Spheres back-to-front
     const order = Object.keys(POSITIONS)
       .map(p => ({ perm: p, depth: project(POSITIONS[p]).depth }))
       .sort((a, b) => a.depth - b.depth);
     state.spheres = order.map(o => drawSphere(o.perm)).filter(Boolean);
+    if (state.particles) drawParticles();
     if (state.flowAnim) drawFlyingDot(state.flowAnim);
   }
 
@@ -608,6 +766,7 @@ const sceneOverview = makeScene('scene-overview', {
 const sceneCell = makeScene('scene-cell', {
   autoRotate: true,
   focusMode: true,
+  outgoingOnly: true,
   onClickSphere: perm => goToCell(perm)
 });
 const sceneTraverse = makeScene('scene-traverse', {
@@ -634,6 +793,7 @@ function setView(name) {
     } else if (name === 'traverse') {
       sceneTraverse.resize();
       sceneTraverse.state.activeCell = currentEdge.src;
+      sceneTraverse.state.soloEdge = { src: currentEdge.src, tgt: currentEdge.tgt };
       sceneTraverse.state.flowAnim = null;
       sceneTraverse.render();
     }
@@ -833,6 +993,8 @@ function fillTraverseView(edge) {
   sceneTraverse.state.pitch = -0.15;
   sceneTraverse.state.zoom = 1.0;
   sceneTraverse.state.activeCell = edge.src;
+  sceneTraverse.state.soloEdge = { src: edge.src, tgt: edge.tgt };
+  sceneTraverse.state.particles = null;
   sceneTraverse.state.flowAnim = null;
   sceneTraverse.render();
 }
@@ -869,9 +1031,34 @@ function startTraversal() {
 
   const startTime = performance.now();
   const flowDuration = stepDuration * steps.length;
+
+  // Count is tuned to the mote size: at ~5-55px radius a few hundred motes
+  // fill the flight path without painting over the whole canvas. (When the
+  // motes were sub-pixel dust this was 2600 — density had to do the work.)
+  const COUNT = 320;
+  const items = [];
+  for (let i = 0; i < COUNT; i++) {
+    // Uniform point on the unit sphere (inverse-CDF on z, uniform azimuth) --
+    // naive angle-picking would clump the spray at the poles.
+    const u  = Math.random() * 2 - 1;
+    const th = Math.random() * Math.PI * 2;
+    const rr = Math.sqrt(Math.max(0, 1 - u * u));
+    items.push({
+      dx: rr * Math.cos(th), dy: u, dz: rr * Math.sin(th),
+      delay: Math.pow(i / COUNT, 0.85) * 0.58,          // staggered launch
+      life:  0.34 + Math.random() * 0.26,               // varied transit time
+      amp:   0.7 + Math.random() * 2.6,                 // how far the burst flies
+      swirl: (Math.random() < 0.5 ? -1 : 1) * (1.4 + Math.random() * 3.2),
+      size:  0.55 + Math.random() * 1.5
+    });
+  }
+  sceneTraverse.state.particles = { src: edge.src, tgt: edge.tgt, t: 0, items };
+
   function flightStep(now) {
     const raw = Math.min(1, (now - startTime) / flowDuration);
     const t = raw < 0.5 ? 2*raw*raw : 1 - Math.pow(-2*raw + 2, 2) / 2;
+    // Stream clock runs slightly ahead so the last dots land as raw hits 1.
+    sceneTraverse.state.particles.t = raw * 1.18;
     sceneTraverse.state.flowAnim = {
       src: edge.src, tgt: edge.tgt, t,
       limitVar: edge.limit, caption,
@@ -883,6 +1070,7 @@ function startTraversal() {
     } else {
       sceneTraverse.state.activeCell = edge.tgt;
       sceneTraverse.state.flowAnim = null;
+      sceneTraverse.state.particles = null;
       sceneTraverse.render();
       document.getElementById('traverse-hint').textContent = `arrived in C_${edge.tgt}`;
     }
