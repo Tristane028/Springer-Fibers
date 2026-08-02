@@ -90,6 +90,31 @@
   .coord-list { font-family: var(--font-math); font-size: 13px; }
   /* One flag level: a header line, then one Plucker coordinate per row with the
      '=' signs aligned in their own column so values line up down the page. */
+  .dim-card { border: .5px solid var(--border); border-radius: 8px;
+              background: var(--bg-primary); padding: 14px 16px; margin: 1rem 0 0; }
+  .dim-head { display: flex; align-items: center; justify-content: space-between;
+              margin-bottom: 10px; }
+  .mini-btn { font-size: 11.5px; padding: 3px 9px; border-radius: 5px;
+              border: .5px solid var(--border); background: transparent;
+              color: var(--text-secondary); }
+  .mini-btn:hover { color: var(--gold); border-color: var(--gold-dim); }
+  .dim-row { border-top: .5px solid var(--border); }
+  .dim-row:first-child { border-top: none; }
+  .dim-row > summary { cursor: pointer; list-style: none; padding: 7px 2px;
+                       display: flex; align-items: center; gap: 9px; font-size: 13px; }
+  .dim-row > summary::-webkit-details-marker { display: none; }
+  .dim-row > summary::before { content: '\25B8'; color: var(--text-tertiary);
+                               font-size: 10px; width: 9px; }
+  .dim-row[open] > summary::before { content: '\25BE'; }
+  .dim-row > summary:hover { color: var(--gold); }
+  .dim-swatch { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .dim-count { color: var(--text-tertiary); font-size: 12px; margin-left: auto; }
+  .dim-cells { display: flex; flex-wrap: wrap; gap: 5px; padding: 4px 0 11px 18px; }
+  .cell-chip { font-family: var(--font-math); font-size: 12.5px; padding: 2px 8px;
+               border-radius: 4px; border: .5px solid var(--border);
+               background: var(--bg-secondary); color: var(--text-primary);
+               cursor: pointer; white-space: nowrap; }
+  .cell-chip:hover { border-color: var(--gold); color: var(--gold); }
   .tableau-card { border: .5px solid var(--border); border-radius: 8px;
                   background: var(--bg-primary); padding: 14px 16px; margin: 0 0 1rem; }
   .tableau-body { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
@@ -167,6 +192,13 @@
     <p style="margin-top: 1rem; font-size: 13px; color: var(--text-secondary);">
       Strands show direct closure relations, drawn undirected here. Height encodes dimension — the closed point sits at the bottom. Open a cell to see its outgoing relations as arrows.
     </p>
+    <div class="dim-card">
+      <div class="dim-head">
+        <p class="label-uppercase" style="margin:0;">Cells by dimension</p>
+        <button id="dim-toggle-all" class="mini-btn">Expand all</button>
+      </div>
+      <div id="dim-table"></div>
+    </div>
   </div>
 
   <div class="view" id="view-cell">
@@ -389,6 +421,7 @@ async function loadPartition(name) {
   PART_LABEL = partLabel;
   document.getElementById('overview-title').textContent = `The (${partLabel}) Springer fiber`;
   renderTableau(DATA.partition || name);
+  renderDimTable(DATA.cells);
   document.getElementById('overview-summary').textContent =
     `${DATA.cells.length} Schubert cells, arranged by dimension. Click any sphere to explore that cell.`;
 
@@ -1219,6 +1252,37 @@ function partitionBlocks(key) {
   return blocks;                       // in KEY order
 }
 
+// Browsable index of every cell grouped by dimension. The 3-D view shows the
+// shape of the poset; this answers "which cells sit in dimension d" directly,
+// and each chip opens that cell.
+function renderDimTable(cells) {
+  const host = document.getElementById('dim-table');
+  if (!host) return;
+  const byDim = {};
+  cells.forEach(c => (byDim[c.dim] = byDim[c.dim] || []).push(c));
+  const dims = Object.keys(byDim).map(Number).sort((a, b) => a - b);
+  const total = cells.length;
+  // Small partitions open by default; large ones stay collapsed so the page
+  // doesn't turn into a wall of labels.
+  const openByDefault = total <= 24;
+
+  host.innerHTML = dims.map(d => {
+    const group = byDim[d].slice().sort((a, b) => a.perm.localeCompare(b.perm));
+    const chips = group.map(c =>
+      `<span class="cell-chip" data-perm="${esc(c.perm)}" title="dim ${d}`
+      + `${c.free && c.free.length ? ' \u00B7 free: ' + c.free.join(', ') : ''}">`
+      + `${mcell(c.perm)}</span>`).join('');
+    return `<details class="dim-row"${openByDefault ? ' open' : ''}>`
+         + `<summary><span class="dim-swatch" style="background:${dimColor(d)}"></span>`
+         + `<span>dimension ${d}</span>`
+         + `<span class="dim-count">${group.length} cell${group.length === 1 ? '' : 's'}</span>`
+         + `</summary><div class="dim-cells">${chips}</div></details>`;
+  }).join('');
+
+  const btn = document.getElementById('dim-toggle-all');
+  if (btn) btn.textContent = openByDefault ? 'Collapse all' : 'Expand all';
+}
+
 function renderTableau(key) {
   const diag  = document.getElementById('tableau-diagram');
   const bl    = document.getElementById('tableau-blocks');
@@ -1502,6 +1566,19 @@ function startTraversal() {
 
 document.getElementById('traverse-start').addEventListener('click', startTraversal);
 document.getElementById('traverse-recenter').addEventListener('click', recenterTraverse);
+
+document.getElementById('dim-table').addEventListener('click', ev => {
+  const chip = ev.target.closest('.cell-chip');
+  if (chip) goToCell(chip.dataset.perm);
+});
+
+document.getElementById('dim-toggle-all').addEventListener('click', () => {
+  const rows = [...document.querySelectorAll('#dim-table .dim-row')];
+  const anyClosed = rows.some(r => !r.open);
+  rows.forEach(r => { r.open = anyClosed; });
+  document.getElementById('dim-toggle-all').textContent =
+    anyClosed ? 'Collapse all' : 'Expand all';
+});
 document.getElementById('traverse-replay').addEventListener('click', () => {
   clearTimeout(traverseTimer);
   fillTraverseView(currentEdge);
