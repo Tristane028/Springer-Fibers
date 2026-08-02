@@ -112,11 +112,23 @@ Notation renders in LaTeX style throughout — italic variables with true subscr
 
 ---
 
+## Repository contents
+
+| File | What it is |
+|---|---|
+| [`Visuals.html`](https://tristane028.github.io/Springer-Fibers/Visuals.html) | Self-contained interactive explorer (all data embedded) |
+| `data_<partition>.json` | Cells, Plücker coordinates, and closure relations per partition |
+| [Note I](https://github.com/Tristane028/Springer-Fibers/blob/main/Springer_Fiber_Closure%20%282%29.pdf) | Saturation and the Rabinowitsch trick (N = 6 example) |
+| [Note II](https://github.com/Tristane028/Springer-Fibers/blob/main/Springer_Fiber_Closure%20%283%29.pdf) | Full ideal-theoretic calculation for the (4,4) fiber |
+| [GNST paper](https://github.com/Tristane028/Springer-Fibers/blob/main/Cell_Closures_for_Two-Row_Springer_Fibers.pdf) | Reference: cell closures via noncrossing matchings |
+
+---
+
 ## Working notes
 
 Two notes in this repository develop the ideal-theoretic method for computing a cell-closure intersection **exactly**, rather than certifying it pointwise. This is the natural next step beyond the current data: the computed relations answer *whether* one cell meets another's closure, but not *which subvariety* of the target that intersection is.
 
-### `Springer_Fiber_Closure__2_.pdf` — saturation and the Rabinowitsch trick
+### [Note I — saturation and the Rabinowitsch trick](https://github.com/Tristane028/Springer-Fibers/blob/main/Springer_Fiber_Closure%20%282%29.pdf)
 
 Works a small example (free variables *a*, *b*, *c*; matching {(1,6),(2,3),(4,5)}) and establishes the mechanism: saturation of an ideal *I* with respect to *f*, computed in practice via
 
@@ -124,7 +136,7 @@ $$(I : f^{\infty}) = (I + (1 - tf)) \cap R$$
 
 so that the intersection is obtained as an elimination ideal from the augmented system. It closes with the two questions that drive the second note: *which off-cell coordinates E<sub>I</sub> are needed in general, and what should one saturate by in general?*
 
-### `Springer_Fiber_Closure__3_.pdf` — the N = 8 calculation
+### [Note II — the N = 8 calculation](https://github.com/Tristane028/Springer-Fibers/blob/main/Springer_Fiber_Closure%20%283%29.pdf)
 
 A full worked calculation for the two-row (4,4) fiber, with source matching M = {(1,8),(2,7),(3,4),(5,6)} and target F = {(1,2),(3,4),(5,6),(7,8)}. The result is
 
