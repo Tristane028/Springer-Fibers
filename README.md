@@ -32,8 +32,6 @@ The partition key gives the Jordan block sizes in order, and the blocks partitio
 ▢ ▢
 ```
 
-**14 partitions · 352 cells · 1,662 closure relations.**
-
 ### Two-row partitions
 
 These are the cases covered by the noncrossing-matching theory, where each cell corresponds to a standard noncrossing matching and the closure order is combinatorially predictable.
@@ -51,8 +49,6 @@ These are the cases covered by the noncrossing-matching theory, where each cell 
 | 3,4 | ▢▢▢▢ / ▢▢▢ | { (1,2,3), (4,5,6,7) } | 35 | 146 | 3 |
 | 4,4 | ▢▢▢▢ / ▢▢▢▢ | { (1,2,3,4), (5,6,7,8) } | 70 | 473 | 4 |
 
-*10 partitions · 190 cells · 804 relations.*
-
 ### Three-row partitions
 
 Three Jordan blocks. These lie outside the noncrossing-matching theory, so there is no independent combinatorial check on their closure relations — but they reach higher dimension relative to their size, which is part of what makes them interesting.
@@ -63,8 +59,6 @@ Three Jordan blocks. These lie outside the noncrossing-matching theory, so there
 | 3,2,1 | ▢▢▢ / ▢▢ / ▢ | { (1,2,3), (4,5), (6) } | 60 | 423 | 5 |
 | 4,1,1 | ▢▢▢▢ / ▢ / ▢ | { (1,2,3,4), (5), (6) } | 30 | 106 | 3 |
 | 5,1,1 | ▢▢▢▢▢ / ▢ / ▢ | { (1,2,3,4,5), (6), (7) } | 42 | 157 | 3 |
-
-*4 partitions · 162 cells · 858 relations.*
 
 Note that (2,2,1) and (3,2,1) reach dimension 5 on only 5 and 6 boxes, while the two-row (4,4) needs 8 boxes to reach dimension 4 — the three-row fibers are considerably more intricate per box.
 
