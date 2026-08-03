@@ -32,6 +32,8 @@ The partition key gives the Jordan block sizes in order, and the blocks partitio
 ▢ ▢
 ```
 
+**40 partitions · 2,125 cells · 15,787 closure relations.**
+
 ### Two-row partitions
 
 These are the cases covered by the noncrossing-matching theory, where each cell corresponds to a standard noncrossing matching and the closure order is combinatorially predictable.
@@ -40,27 +42,64 @@ These are the cases covered by the noncrossing-matching theory, where each cell 
 |---|---|---|---:|---:|---:|
 | 1,2 | ▢▢ / ▢ | { (1), (2,3) } | 3 | 2 | 1 |
 | 1,3 | ▢▢▢ / ▢ | { (1), (2,3,4) } | 4 | 3 | 1 |
-| 1,5 | ▢▢▢▢▢ / ▢ | { (1), (2,3,4,5,6) } | 6 | 5 | 1 |
 | 2,2 | ▢▢ / ▢▢ | { (1,2), (3,4) } | 6 | 9 | 2 |
+| 1,4 | ▢▢▢▢ / ▢ | { (1), (2,3,4,5) } | 5 | 4 | 1 |
+| 2,3 | ▢▢▢ / ▢▢ | { (1,2), (3,4,5) } | 10 | 19 | 2 |
+| 1,5 | ▢▢▢▢▢ / ▢ | { (1), (2,3,4,5,6) } | 6 | 5 | 1 |
 | 2,4 | ▢▢▢▢ / ▢▢ | { (1,2), (3,4,5,6) } | 15 | 32 | 2 |
-| 2,5 | ▢▢▢▢▢ / ▢▢ | { (1,2), (3,4,5,6,7) } | 21 | 48 | 2 |
-| 3,2 | ▢▢▢ / ▢▢ | { (1,2,3), (4,5) } | 10 | 19 | 2 |
 | 3,3 | ▢▢▢ / ▢▢▢ | { (1,2,3), (4,5,6) } | 20 | 67 | 3 |
+| 1,6 | ▢▢▢▢▢▢ / ▢ | { (1), (2,3,4,5,6,7) } | 7 | 6 | 1 |
+| 2,5 | ▢▢▢▢▢ / ▢▢ | { (1,2), (3,4,5,6,7) } | 21 | 48 | 2 |
 | 3,4 | ▢▢▢▢ / ▢▢▢ | { (1,2,3), (4,5,6,7) } | 35 | 146 | 3 |
+| 1,7 | ▢▢▢▢▢▢▢ / ▢ | { (1), (2,3,4,5,6,7,8) } | 8 | 7 | 1 |
+| 2,6 | ▢▢▢▢▢▢ / ▢▢ | { (1,2), (3,4,5,6,7,8) } | 28 | 67 | 2 |
+| 3,5 | ▢▢▢▢▢ / ▢▢▢ | { (1,2,3), (4,5,6,7,8) } | 56 | 263 | 3 |
 | 4,4 | ▢▢▢▢ / ▢▢▢▢ | { (1,2,3,4), (5,6,7,8) } | 70 | 473 | 4 |
+| 1,8 | ▢▢▢▢▢▢▢▢ / ▢ | { (1), (2,3,4,5,6,7,8,9) } | 9 | 8 | 1 |
+| 2,7 | ▢▢▢▢▢▢▢ / ▢▢ | { (1,2), (3,4,5,6,7,8,9) } | 36 | 89 | 2 |
+| 3,6 | ▢▢▢▢▢▢ / ▢▢▢ | { (1,2,3), (4,5,6,7,8,9) } | 84 | 425 | 3 |
+| 4,5 | ▢▢▢▢▢ / ▢▢▢▢ | { (1,2,3,4), (5,6,7,8,9) } | 126 | 1055 | 4 |
+| 1,9 | ▢▢▢▢▢▢▢▢▢ / ▢ | { (1), (2,3,4,5,6,7,8,9,10) } | 10 | 9 | 1 |
+| 2,8 | ▢▢▢▢▢▢▢▢ / ▢▢ | { (1,2), (3,4,5,6,7,8,9,10) } | 45 | 114 | 2 |
+| 3,7 | ▢▢▢▢▢▢▢ / ▢▢▢ | { (1,2,3), (4,5,6,7,8,9,10) } | 120 | 639 | 3 |
+| 4,6 | ▢▢▢▢▢▢ / ▢▢▢▢ | { (1,2,3,4), (5,6,7,8,9,10) } | 210 | 1989 | 4 |
+| 1,10 | ▢▢▢▢▢▢▢▢▢▢ / ▢ | { (1), (2,3,4,5,6,7,8,9,10,11) } | 11 | 10 | 1 |
+| 2,9 | ▢▢▢▢▢▢▢▢▢ / ▢▢ | { (1,2), (3,4,5,6,7,8,9,10,11) } | 55 | 142 | 2 |
+
+*25 partitions, 1000 cells, 5631 relations.*
 
 ### Three-row partitions
 
-Three Jordan blocks. These lie outside the noncrossing-matching theory, so there is no independent combinatorial check on their closure relations — but they reach higher dimension relative to their size, which is part of what makes them interesting.
+Three Jordan blocks. These lie outside the noncrossing-matching theory, so there is no independent combinatorial check on their closure relations.
 
 | Partition | Shape | Blocks | Cells | Relations | Top dim |
 |---|---|---|---:|---:|---:|
-| 2,2,1 | ▢▢ / ▢▢ / ▢ | { (1,2), (3,4), (5) } | 30 | 172 | 5 |
-| 3,2,1 | ▢▢▢ / ▢▢ / ▢ | { (1,2,3), (4,5), (6) } | 60 | 423 | 5 |
+| 1,1,2 | ▢▢ / ▢ / ▢ | { (1), (2), (3,4) } | 12 | 35 | 4 |
+| 1,1,3 | ▢▢▢ / ▢ / ▢ | { (1), (2), (3,4,5) } | 20 | 67 | 4 |
+| 2,2,1 | ▢▢ / ▢▢ / ▢ | { (1,2), (3,4), (5) } | 30 | 163 | 4 |
+| 2,2,2 | ▢▢ / ▢▢ / ▢▢ | { (1,2), (3,4), (5,6) } | 90 | 1146 | 6 |
+| 3,2,1 | ▢▢▢ / ▢▢ / ▢ | { (1,2,3), (4,5), (6) } | 60 | 415 | 4 |
 | 4,1,1 | ▢▢▢▢ / ▢ / ▢ | { (1,2,3,4), (5), (6) } | 30 | 106 | 3 |
+| 4,2,1 | ▢▢▢▢ / ▢▢ / ▢ | { (1,2,3,4), (5,6), (7) } | 105 | 827 | 4 |
 | 5,1,1 | ▢▢▢▢▢ / ▢ / ▢ | { (1,2,3,4,5), (6), (7) } | 42 | 157 | 3 |
+| 5,2,1 | ▢▢▢▢▢ / ▢▢ / ▢ | { (1,2,3,4,5), (6,7), (8) } | 168 | 1439 | 4 |
+| 6,1,1 | ▢▢▢▢▢▢ / ▢ / ▢ | { (1,2,3,4,5,6), (7), (8) } | 56 | 218 | 3 |
+| 7,1,1 | ▢▢▢▢▢▢▢ / ▢ / ▢ | { (1,2,3,4,5,6,7), (8), (9) } | 72 | 289 | 3 |
+| 8,1,1 | ▢▢▢▢▢▢▢▢ / ▢ / ▢ | { (1,2,3,4,5,6,7,8), (9), (10) } | 90 | 370 | 3 |
+| 9,1,1 | ▢▢▢▢▢▢▢▢▢ / ▢ / ▢ | { (1,2,3,4,5,6,7,8,9), (10), (11) } | 110 | 461 | 3 |
 
-Note that (2,2,1) and (3,2,1) reach dimension 5 on only 5 and 6 boxes, while the two-row (4,4) needs 8 boxes to reach dimension 4 — the three-row fibers are considerably more intricate per box.
+*13 partitions, 885 cells, 5693 relations.*
+
+### Four-row partitions
+
+| Partition | Shape | Blocks | Cells | Relations | Top dim |
+|---|---|---|---:|---:|---:|
+| 2,1,1,1 | ▢▢ / ▢ / ▢ / ▢ | { (1,2), (3), (4), (5) } | 60 | 653 | 6 |
+| 2,2,1,1 | ▢▢ / ▢▢ / ▢ / ▢ | { (1,2), (3,4), (5), (6) } | 180 | 3810 | 7 |
+
+*2 partitions, 240 cells, 4463 relations.*
+
+Dimension growth is what makes the longer partitions expensive. (2,2,1,1) reaches dimension **7** on only 6 boxes and carries 3,810 relations, while the two-row (4,4) needs 8 boxes to reach dimension 4. Every extra parameter multiplies the substitution search, so the partitions with many blocks of size ≥ 2 dominate the runtime.
 
 ### Witnesses
 
@@ -77,14 +116,14 @@ C_56781234 → C_15672348
 
 For two-row partitions, Goldwasser–Nadeem–Sun–Tymoczko (Theorem 6.9) give the closure as a union of *cuts* of the source's noncrossing matching: cutting an arc swaps the letters of the associated {B,T}-word at the arc's endpoints. This gives an independent combinatorial prediction of the closure order, which we use as a regression test on the computed geometry.
 
-**All ten two-row partitions agree exactly** — every predicted relation present, no spurious extras:
+**All twenty-five two-row partitions agree exactly** — every predicted relation present, no spurious extras, across 5,631 relations:
 
-| Partition | Computed | Predicted | |
-|---|---:|---:|:--|
-| 1,2 · 1,3 · 1,5 | 2 · 3 · 5 | 2 · 3 · 5 | ✓ |
-| 2,2 · 2,4 · 2,5 | 9 · 32 · 48 | 9 · 32 · 48 | ✓ |
-| 3,2 · 3,3 · 3,4 | 19 · 67 · 146 | 19 · 67 · 146 | ✓ |
-| 4,4 | 473 | 473 | ✓ |
+| Family | Computed = Predicted | |
+|---|---|:--|
+| 1,2 … 1,10 | 2 · 3 · 4 · 5 · 6 · 7 · 8 · 9 · 10 | ✓ |
+| 2,2 … 2,9 | 9 · 19 · 32 · 48 · 67 · 89 · 114 · 142 | ✓ |
+| 3,3 … 3,7 | 67 · 146 · 263 · 425 · 639 | ✓ |
+| 4,4 … 4,6 | 473 · 1055 · 1989 | ✓ |
 
 The cell dimensions match too: dimension equals the number of arcs in the corresponding matching, confirmed for every cell of every two-row partition.
 
@@ -118,9 +157,8 @@ Notation renders in LaTeX style throughout — italic variables with true subscr
 |---|---|
 | [`Visuals.html`](https://tristane028.github.io/Springer-Fibers/Visuals.html) | Self-contained interactive explorer (all data embedded) |
 | `data_<partition>.json` | Cells, Plücker coordinates, and closure relations per partition |
-| [Note I](https://github.com/Tristane028/Springer-Fibers/blob/main/Springer_Fiber_Closure%20%282%29.pdf) | Saturation and the Rabinowitsch trick (N = 6 example) |
-| [Note II](https://github.com/Tristane028/Springer-Fibers/blob/main/Springer_Fiber_Closure%20%283%29.pdf) | Full ideal-theoretic calculation for the (4,4) fiber |
-| [GNST paper](https://github.com/Tristane028/Springer-Fibers/blob/main/Cell_Closures_for_Two-Row_Springer_Fibers.pdf) | Reference: cell closures via noncrossing matchings |
+| `Springer_Fiber_Closure (2).pdf`, `(3).pdf` | Working notes — described and linked in the next section |
+| `Cell_Closures_for_Two-Row_Springer_Fibers.pdf` | Cell Closures reference paper — see [References](#references) |
 
 ---
 
@@ -128,7 +166,9 @@ Notation renders in LaTeX style throughout — italic variables with true subscr
 
 Two notes in this repository develop the ideal-theoretic method for computing a cell-closure intersection **exactly**, rather than certifying it pointwise. This is the natural next step beyond the current data: the computed relations answer *whether* one cell meets another's closure, but not *which subvariety* of the target that intersection is.
 
-### [Note I — saturation and the Rabinowitsch trick](https://github.com/Tristane028/Springer-Fibers/blob/main/Springer_Fiber_Closure%20%282%29.pdf)
+### Note I — saturation and the Rabinowitsch trick
+
+📄 [View Note](https://docs.google.com/viewer?url=https://raw.githubusercontent.com/Tristane028/Springer-Fibers/main/Springer_Fiber_Closure%20%282%29.pdf)
 
 Works a small example (free variables *a*, *b*, *c*; matching {(1,6),(2,3),(4,5)}) and establishes the mechanism: saturation of an ideal *I* with respect to *f*, computed in practice via
 
@@ -136,7 +176,9 @@ $$(I : f^{\infty}) = (I + (1 - tf)) \cap R$$
 
 so that the intersection is obtained as an elimination ideal from the augmented system. It closes with the two questions that drive the second note: *which off-cell coordinates E<sub>I</sub> are needed in general, and what should one saturate by in general?*
 
-### [Note II — the N = 8 calculation](https://github.com/Tristane028/Springer-Fibers/blob/main/Springer_Fiber_Closure%20%283%29.pdf)
+### Note II — the N = 8 calculation
+
+📄 [View Note](https://docs.google.com/viewer?url=https://raw.githubusercontent.com/Tristane028/Springer-Fibers/main/Springer_Fiber_Closure%20%283%29.pdf)
 
 A full worked calculation for the two-row (4,4) fiber, with source matching M = {(1,8),(2,7),(3,4),(5,6)} and target F = {(1,2),(3,4),(5,6),(7,8)}. The result is
 
@@ -191,4 +233,4 @@ pip install numpy sympy python-flint
 
 ## References
 
-Talia Goldwasser, Meera Nadeem, Garcia Sun, and Julianna Tymoczko. *Cell Closures for Two-Row Springer Fibers via Noncrossing Matchings.* [arXiv:2503.03941](https://arxiv.org/abs/2503.03941) · [📄 View local copy](https://docs.google.com/viewer?url=https://raw.githubusercontent.com/Tristane028/Springer-Fibers/main/Cell_Closures_for_Two-Row_Springer_Fibers.pdf)
+Talia Goldwasser, Meera Nadeem, Garcia Sun, and Julianna Tymoczko. *Cell Closures for Two-Row Springer Fibers via Noncrossing Matchings.* [arXiv:2503.03941](https://arxiv.org/abs/2503.03941) · 📄 [View Paper](https://docs.google.com/viewer?url=https://raw.githubusercontent.com/Tristane028/Springer-Fibers/main/Cell_Closures_for_Two-Row_Springer_Fibers.pdf)
