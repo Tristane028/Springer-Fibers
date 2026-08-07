@@ -138,6 +138,11 @@
           line-height: 1.04; text-align: left; vertical-align: -.30em;
           margin-left: .5px; }
   .pidx-up, .pidx-dn { display: block; white-space: nowrap; }
+  .ideal-badge { font-family: var(--font-sans); font-size: 10.5px; padding: 1px 6px;
+                 border-radius: 4px; margin-left: 7px; vertical-align: 1px;
+                 letter-spacing: .04em; text-transform: uppercase; }
+  .ideal-badge.partial { border: .5px solid var(--gold-dim); color: var(--gold); }
+  .ideal-badge.full { border: .5px solid var(--border); color: var(--text-tertiary); }
   .prm { font-style: normal; padding-left: .5px; }
   .icon-btn { position: absolute; top: 10px; right: 10px; z-index: 5;
               width: 32px; height: 32px; padding: 0; display: flex;
@@ -240,6 +245,14 @@
       </div>
     </div>
     <div class="action-area">
+      <div class="dim-card" style="margin:0 0 1rem;">
+        <div class="dim-head">
+          <p class="label-uppercase" style="margin:0;">Closure by dimension</p>
+          <button id="closure-toggle-all" class="mini-btn">Expand all</button>
+        </div>
+        <p id="closure-note" style="margin:0 0 10px; font-size:12px; color:var(--text-tertiary);"></p>
+        <div id="closure-dim-table"></div>
+      </div>
       <p class="label-uppercase">Choose a path to another cell</p>
       <div id="path-list"></div>
     </div>
@@ -1430,6 +1443,58 @@ function renderPolyTable(cells, nRowsOf) {
   }).join('');
 }
 
+// The cells in this cell's closure, grouped by dimension exactly as the
+// overview groups the whole partition. A flat list of outgoing paths says how
+// MANY relations there are; this says how they are distributed across
+// dimensions, which is the shape of the boundary.
+function renderClosureByDim(perm, outgoing) {
+  const host = document.getElementById('closure-dim-table');
+  const note = document.getElementById('closure-note');
+  const btn  = document.getElementById('closure-toggle-all');
+  if (!host) return;
+
+  const srcDim = CELLS[perm] ? CELLS[perm].dim : null;
+  const byDim = {};
+  outgoing.forEach(e => {
+    const c = CELLS[e.tgt];
+    if (!c) return;
+    (byDim[c.dim] = byDim[c.dim] || []).push(e);
+  });
+  const dims = Object.keys(byDim).map(Number).sort((a, b) => b - a);   // high to low
+
+  if (!dims.length) {
+    note.textContent = 'Nothing lies in this cell\u2019s closure.';
+    host.innerHTML = '';
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+  if (btn) btn.style.display = '';
+
+  const total = outgoing.length;
+  // how many cells of each dimension COULD be reached, for context
+  const candidates = Object.values(CELLS)
+    .filter(c => c.dim <= srcDim).length - 1;
+  note.innerHTML = `${total} cell${total === 1 ? '' : 's'} in the closure of `
+                 + `${mcell(perm)} (dim ${srcDim}), out of ${candidates} of no `
+                 + `greater dimension. Spread over ${dims.length} dimension`
+                 + `${dims.length === 1 ? '' : 's'}:`;
+
+  const openByDefault = total <= 24;
+  host.innerHTML = dims.map(d => {
+    const group = byDim[d].slice().sort((a, b) => a.tgt.localeCompare(b.tgt));
+    const chips = group.map(e =>
+      `<span class="cell-chip" data-perm="${esc(e.tgt)}" `
+      + `title="dim ${d}">${mcell(e.tgt)}${idealBadge(e)}</span>`).join('');
+    const all = Object.values(CELLS).filter(c => c.dim === d).length;
+    return `<details class="dim-row"${openByDefault ? ' open' : ''}>`
+         + `<summary><span class="dim-swatch" style="background:${dimColor(d)}"></span>`
+         + `<span>dimension ${d}</span>`
+         + `<span class="dim-count">${group.length} of ${all} cell`
+         + `${all === 1 ? '' : 's'}</span></summary>`
+         + `<div class="dim-cells">${chips}</div></details>`;
+  }).join('');
+}
+
 function renderTableau(key) {
   const diag  = document.getElementById('tableau-diagram');
   const bl    = document.getElementById('tableau-blocks');
@@ -1495,13 +1560,60 @@ function formatPlucker(vec, level, n, compact) {
   return `<div class="lvl">${head}${body}</div>`;
 }
 // Describe what the closure relation imposes on the target cell.
+// The intersection locus, described from the edge's `gens` field. Three states,
+// and they must stay distinguishable:
+//
+//   gens = ["a1", ...]  the closure meets a PROPER subvariety of the target,
+//                       cut out by those generators
+//   gens = []           the closure meets the WHOLE target cell
+//   gens missing/null   not computed (run add_gens.py) -- NOT the same as []
+//
+// Generators live in the TARGET cell's own coordinates, so they take the prime
+// just as tgtSubs does.
+// Small marker on a path row so the proper intersections are visible without
+// opening each relation. Absent entirely when the ideal has not been computed,
+// so a missing badge never reads as "whole cell".
+function idealBadge(edge) {
+  const st = idealState(edge);
+  if (st === 'proper')
+    return ' <span class="ideal-badge partial" title="the closure meets only part '
+         + 'of this cell">partial</span>';
+  if (st === 'whole')
+    return ' <span class="ideal-badge full" title="the closure contains the whole '
+         + 'target cell">full</span>';
+  return '';
+}
+
+function idealState(edge) {
+  if (!edge || edge.gens === undefined || edge.gens === null) return 'unknown';
+  return edge.gens.length ? 'proper' : 'whole';
+}
+
+function idealText(edge) {
+  switch (idealState(edge)) {
+    case 'proper':
+      return 'meets the locus ' +
+             edge.gens.map(g => mexpr(g, true) + ' = 0').join(', ') +
+             ' inside the target';
+    case 'whole':
+      return 'meets the whole target cell';
+    default:
+      return null;
+  }
+}
+
 function edgeDescription(edge) {
   const parts = [];
   const subs = Object.entries(edge.tgtSubs || {});
-  // No constraints on the target means the closure swallows the whole target cell.
-  if (!subs.length) parts.push('closure contains the whole target cell');
-  if (subs.length) parts.push('on target: ' + subs.map(([k, v]) => massign(k, v, true)).join(', '));
-  if (edge.gens && edge.gens.length) parts.push('ideal: (' + edge.gens.map(g => mexpr(g)).join(', ') + ')');
+  const ideal = idealText(edge);
+  if (ideal) {
+    // When the intersection ideal is known it is the authoritative statement;
+    // the witness substitution is only one point of that locus.
+    parts.push(ideal);
+  } else if (!subs.length) {
+    parts.push('closure contains the whole target cell');
+  }
+  if (subs.length) parts.push('witness: ' + subs.map(([k, v]) => massign(k, v, true)).join(', '));
   if (edge.limit) parts.push(mvar(edge.limit) + ' \u2192 \u221E');
   return parts.join('  ·  ');
 }
@@ -1521,6 +1633,7 @@ function fillCellView(perm) {
     '</div>';
 
   const outgoing = EDGES.filter(e => e.src === perm);
+  renderClosureByDim(perm, outgoing);
   const list = document.getElementById('path-list');
   list.innerHTML = '';
   if (outgoing.length === 0) {
@@ -1535,7 +1648,7 @@ function fillCellView(perm) {
     row.className = 'path-row';
     row.innerHTML = `
       <div class="path-info">
-        <div class="target">\u2192 ${mcell(edge.tgt)}</div>
+        <div class="target">\u2192 ${mcell(edge.tgt)}${idealBadge(edge)}</div>
         <div>${edgeDescription(edge)}</div>
       </div>
       <button class="primary">Take this path →</button>
@@ -1554,9 +1667,15 @@ function buildSteps(edge) {
     steps.push({ title: 'Apply source substitutions',
                  detail: srcSubs.map(([k, v]) => massign(k, v)).join(', ') });
   }
-  if (edge.gens && edge.gens.length) {
+  const st = idealState(edge);
+  if (st === 'proper') {
     steps.push({ title: 'Intersect the closure with the target cell',
-                 detail: 'ideal generated by ' + edge.gens.map(g => mexpr(g)).join(', ') });
+                 detail: 'the closure meets only the locus '
+                       + edge.gens.map(g => mexpr(g, true) + ' = 0').join(', ')
+                       + ' \u2014 a proper subvariety of the target, not all of it' });
+  } else if (st === 'whole') {
+    steps.push({ title: 'Intersect the closure with the target cell',
+                 detail: 'the closure contains the entire target cell' });
   }
   if (tgtSubs.length) {
     steps.push({ title: 'Fix the target parameters',
@@ -1717,6 +1836,19 @@ document.getElementById('traverse-recenter').addEventListener('click', recenterT
 document.getElementById('dim-table').addEventListener('click', ev => {
   const chip = ev.target.closest('.cell-chip');
   if (chip) goToCell(chip.dataset.perm);
+});
+
+document.getElementById('closure-dim-table').addEventListener('click', ev => {
+  const chip = ev.target.closest('.cell-chip');
+  if (chip) goToCell(chip.dataset.perm);
+});
+
+document.getElementById('closure-toggle-all').addEventListener('click', () => {
+  const rows = [...document.querySelectorAll('#closure-dim-table .dim-row')];
+  const anyClosed = rows.some(r => !r.open);
+  rows.forEach(r => { r.open = anyClosed; });
+  document.getElementById('closure-toggle-all').textContent =
+    anyClosed ? 'Collapse all' : 'Expand all';
 });
 
 document.getElementById('poly-table').addEventListener('click', ev => {
