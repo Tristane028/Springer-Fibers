@@ -63,6 +63,40 @@
   .view.active { display: block; animation: fadeIn .25s; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
   .search-row { position: relative; margin-bottom: 1rem; }
+  .exam-row { display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px; margin: -0.4rem 0 1rem; }
+  .exam-row:has(.exam-expr:empty) { margin: 0; }
+  .exam-expr { font-family: var(--font-math); color: var(--gold); font-size: 20px;
+    line-height: 1.3; min-height: 1.3em; letter-spacing: .2px; }
+  .exam-expr:empty { display: none; }
+  .exam-expr .cap { color: var(--gold-dim); margin: 0 .34em; font-style: normal; }
+  .step-out { flex: none; font-size: 12px; padding: 5px 10px; border-radius: var(--radius-md);
+    border: .5px solid var(--gold-dim); background: transparent; color: var(--gold);
+    cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s; }
+  .step-out:hover { background: rgba(212,175,55,0.12); border-color: var(--gold); }
+  .step-out[hidden] { display: none; }
+  .orb-legend { position: absolute; top: 12px; left: 12px; z-index: 5;
+    background: rgba(14,14,15,0.72); border: .5px solid var(--border);
+    border-radius: var(--radius-md); padding: 8px 11px; font-size: 12px;
+    color: var(--text-secondary); backdrop-filter: blur(4px); max-width: 60%; }
+  .orb-legend[hidden] { display: none; }
+  .orb-legend .ol-title { font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--text-tertiary); margin-bottom: 6px; }
+  .orb-legend .ol-row { display: flex; align-items: center; gap: 7px; line-height: 1.9;
+    font-family: var(--font-math); font-size: 14px; color: var(--text-primary); }
+  .orb-legend .ol-sw { width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid; box-sizing: border-box; flex: none; }
+  .orb-legend .ol-tag { font-family: var(--font-sans); font-size: 9px; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--text-tertiary); }
+  .phase-legend .pl-row { display: flex; align-items: baseline; gap: 8px; padding: 5px 0;
+    border-bottom: .5px solid var(--border); }
+  .phase-legend .pl-row:last-child { border-bottom: none; }
+  .phase-legend .pl-num { flex: none; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--gold); color: #000; font-size: 11px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; }
+  .phase-legend .pl-body { font-size: 13px; }
+  .phase-legend .pl-trans { font-family: var(--font-math); font-size: 15px; }
+  .phase-legend .pl-limit { font-family: var(--font-math); color: var(--gold); font-size: 13px; }
   #cell-search { width: 100%; font-family: var(--font-mono); font-size: 13px; padding: 9px 12px; border-radius: var(--radius-md); border: .5px solid var(--border); background: var(--bg-primary); color: var(--text-primary); }
   #cell-search:focus { outline: none; border-color: var(--accent); }
   .search-results { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; background: var(--bg-primary); border: .5px solid var(--border); border-radius: var(--radius-md); margin-top: 4px; max-height: 264px; overflow-y: auto; box-shadow: 0 6px 22px rgba(0,0,0,.75); }
@@ -188,6 +222,11 @@
            placeholder="Find a cell — just type its numbers, e.g. 12354">
     <div class="search-results" id="search-results"></div>
   </div>
+  <div class="exam-row">
+    <div id="exam-expr" class="exam-expr"></div>
+    <button id="step-out-btn" class="step-out" type="button" hidden
+            title="Leave the innermost cell of the intersection, keeping the rest">&#8617; Step out</button>
+  </div>
 
   <div class="view active" id="view-overview">
     <h1 id="overview-title">Springer fiber</h1>
@@ -232,6 +271,7 @@
     <p id="cell-summary" style="color: var(--text-secondary);"></p>
     <div class="scene-wrap">
       <canvas id="scene-cell"></canvas>
+      <div id="orb-legend" class="orb-legend" hidden></div>
       <p class="hint">drag to rotate · scroll to zoom</p>
     </div>
     <div class="info-grid">
@@ -281,6 +321,10 @@
       <button id="traverse-start" class="primary">Begin traversal</button>
       <button id="traverse-replay">Replay</button>
       <button id="traverse-back">Back to cell</button>
+    </div>
+    <div class="traversal-panel phase-legend" id="phase-legend-panel" hidden>
+      <p class="label-uppercase">Limits taken, per phase</p>
+      <div id="phase-legend"></div>
     </div>
     <div class="traversal-panel">
       <p class="label-uppercase">Operations</p>
@@ -358,6 +402,10 @@ let PART_LABEL; // display form of the partition, e.g. "2,2,1,1"
 // Brightened for a black background — the original mid-tones muddied out.
 const PALETTE = ['#C9C7BE', '#24C48F', '#9A92F0', '#F2703F', '#6588EE',
                  '#C863E0', '#22BBD6', '#E3B62C', '#9BBE3A', '#E86699'];
+// Distinct palette for the outer "looking-through" rings, kept separate from the
+// dimension colours so two same-dimension ancestors (e.g. 3412 and 3142) still
+// read as different layers.
+const RING_PALETTE = ['#5FB3F0', '#E0729C', '#7CD6A0', '#C6A0F0', '#E8A45C', '#D9C24B'];
 const dimColor  = d => PALETTE[d % PALETTE.length];
 const dimRadius = d => 0.10 + Math.min(d, 6) * 0.022;
 
@@ -512,6 +560,13 @@ function makeScene(canvasId, opts) {
     onClickSphere: opts.onClickSphere || null,
     showAllEdges: opts.showAllEdges !== false,
     focusMode: !!opts.focusMode,
+    // Nested-closure restriction. When non-null, ONLY these perms count as
+    // neighbours of the active cell (everything else is hidden in focus mode),
+    // and only edges into this set are drawn. null = show the full closure.
+    allowedNeighbors: null,
+    // Containment orb: when set, the cell view draws the examined cell as an orb
+    // with its (nested) closure floating inside instead of arrows to neighbours.
+    contain: null,
     outgoingOnly: !!opts.outgoingOnly,
     firstPerson: !!opts.firstPerson,
     cameraPos: null,
@@ -615,12 +670,18 @@ function makeScene(canvasId, opts) {
     const isHover = perm === state.highlight;
     let isNeighbor = false;
     if (state.activeCell) {
-      isNeighbor = state.outgoingOnly
-        ? EDGES.some(e => e.src === state.activeCell && e.tgt === perm)
-        : EDGES.some(e =>
-            (e.src === state.activeCell && e.tgt === perm) ||
-            (e.tgt === state.activeCell && e.src === perm)
-          );
+      if (state.allowedNeighbors) {
+        // Nested closure: the neighbourhood is the restricted set, not every
+        // cell the active cell links to.
+        isNeighbor = state.allowedNeighbors.has(perm);
+      } else {
+        isNeighbor = state.outgoingOnly
+          ? EDGES.some(e => e.src === state.activeCell && e.tgt === perm)
+          : EDGES.some(e =>
+              (e.src === state.activeCell && e.tgt === perm) ||
+              (e.tgt === state.activeCell && e.src === perm)
+            );
+      }
     }
     // Single-path screen: nothing on stage but the two cells in question.
     if (state.soloEdge && perm !== state.soloEdge.src && perm !== state.soloEdge.tgt) {
@@ -951,6 +1012,7 @@ function makeScene(canvasId, opts) {
     if (canvas.width === 0 || canvas.height === 0) resize();
     if (!CELLS) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (state.contain) { renderContain(); return; }
     // Edges first
     if (state.soloEdge) {
       // Exactly one relation on screen: examined cell -> destination.
@@ -964,14 +1026,19 @@ function makeScene(canvasId, opts) {
         // Examining a cell: only edges LEAVING it are shown, with arrowheads.
         // Incoming edges are suppressed so the view answers "where can I go
         // from here" without the clutter of everything pointing back in.
+        const allowed = state.allowedNeighbors;
         EDGES.forEach(e => {
           const touchesActive = e.src === state.activeCell || e.tgt === state.activeCell;
           if (state.focusMode && !touchesActive) return;
           if (touchesActive) return;                 // drawn in the pass below
+          // Under a nested restriction, context strands into hidden cells would
+          // dangle at nothing, so drop them too.
+          if (allowed && (!allowed.has(e.src) || !allowed.has(e.tgt))) return;
           drawEdge(e.src, e.tgt, false, false);      // context strands stay undirected
         });
         EDGES.forEach(e => {
-          const outgoing   = e.src === state.activeCell;
+          const outgoing   = e.src === state.activeCell
+                             && (!allowed || allowed.has(e.tgt));
           const isFlowEdge = state.flowAnim && state.flowAnim.src === e.src && state.flowAnim.tgt === e.tgt;
           if (outgoing || isFlowEdge) drawEdge(e.src, e.tgt, true, true);
         });
@@ -1023,7 +1090,7 @@ function makeScene(canvasId, opts) {
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
     state.zoom *= e.deltaY > 0 ? 0.92 : 1.08;
-    state.zoom  = Math.max(0.3, Math.min(3.0, state.zoom));
+    state.zoom  = Math.max(0.3, Math.min(6.0, state.zoom));
     render();
   }, { passive: false });
   canvas.addEventListener('click', e => {
@@ -1040,7 +1107,11 @@ function makeScene(canvasId, opts) {
   window.addEventListener('resize', () => { resize(); render(); });
 
   function loop() {
-    if (state.rotating && !state.dragging) {
+    if (state.contain) {
+      // Keep rendering so the closure keeps floating; a slow camera drift adds life.
+      if (state.rotating && !state.dragging) state.yaw += 0.0016;
+      render();
+    } else if (state.rotating && !state.dragging) {
       state.yaw += 0.004;
       render();
     }
@@ -1083,7 +1154,213 @@ function makeScene(canvasId, opts) {
     state.zoom = (fracOfWidth * Wcss * camDist) / (L * 320);
   }
 
-  return { state, render, resize, frameSoloEdge };
+  // ── Containment orb ─────────────────────────────────────────────────────────
+  // The cell view no longer draws arrows from the examined cell to the cells in
+  // its closure. Instead the examined cell becomes a translucent orb and the
+  // closure cells float inside it, each on its own slow tilted orbit, to say
+  // plainly: these live in the closure. Under nesting the orb holds only the
+  // cells common to every closure in the chain.
+  const ORB_R = 3.2;                       // orb radius, world units
+  let introRAF = null, introT0 = 0, introDur = 620;
+
+  // Deterministic orbit parameters for one floating cell, from its perm hash so
+  // the swarm is stable across renders.
+  function orbitParams(perm, i, count) {
+    const rnd = (salt) => {
+      const h = permHash(perm + '#' + salt);
+      return (h % 100000) / 100000;               // 0..1
+    };
+    // A tilted orbit plane: normal n, then two orthonormal in-plane axes u,v.
+    const theta = rnd('nt') * Math.PI, phi = rnd('np') * 2 * Math.PI;
+    const n = { x: Math.sin(theta) * Math.cos(phi),
+                y: Math.cos(theta),
+                z: Math.sin(theta) * Math.sin(phi) };
+    // u = n × up (fallback if parallel), v = n × u
+    let ux = n.y * 1 - n.z * 0, uy = n.z * 0 - n.x * 0, uz = n.x * 0 - n.y * 1;
+    let ul = Math.hypot(ux, uy, uz);
+    if (ul < 1e-4) { ux = 1; uy = 0; uz = 0; ul = 1; }
+    ux /= ul; uy /= ul; uz /= ul;
+    const vx = n.y * uz - n.z * uy, vy = n.z * ux - n.x * uz, vz = n.x * uy - n.y * ux;
+    return {
+      perm,
+      u: { x: ux, y: uy, z: uz },
+      v: { x: vx, y: vy, z: vz },
+      rad:   ORB_R * (0.30 + 0.42 * rnd('r')),    // shell radius inside the orb
+      phase: rnd('ph') * 2 * Math.PI,
+      swirl: (0.05 + 0.16 * rnd('sw')) * (rnd('sg') < 0.5 ? -1 : 1),  // rad/s
+      bob:   0.5 + rnd('bf') * 1.1,               // radius-bob frequency
+      bobph: rnd('bp') * 2 * Math.PI
+    };
+  }
+
+  // World position of a floating cell at time t (seconds), inside the orb.
+  function orbitPos(o, t) {
+    const ang = o.phase + t * o.swirl;
+    const rr  = o.rad * (1 + 0.06 * Math.sin(t * o.bob + o.bobph));
+    return {
+      x: rr * (Math.cos(ang) * o.u.x + Math.sin(ang) * o.v.x),
+      y: rr * (Math.cos(ang) * o.u.y + Math.sin(ang) * o.v.y),
+      z: rr * (Math.cos(ang) * o.u.z + Math.sin(ang) * o.v.z)
+    };
+  }
+
+  // Choose a zoom that fits the orb comfortably in the canvas.
+  function fitContainZoom(ancCount) {
+    const Wcss = canvas.width / DPR, Hcss = canvas.height / DPR;
+    // Shrink the orb a touch per outer ring so the rings still fit on screen.
+    const frac = Math.max(0.24, 0.40 - 0.045 * (ancCount || 0));
+    const target = frac * Math.min(Wcss || 700, Hcss || 460);   // orb radius, px
+    // orb radius on screen at the centre ≈ ORB_R * 320 * zoom / camDist(=9)
+    return (target * 9) / (ORB_R * 320);
+  }
+
+  // Enter containment mode: the examined cell is the orb, `closure` the floats,
+  // and `ancestors` (outer cells of the intersection) become concentric rings.
+  function enterContain(focusPerm, closure, ancestors, opts) {
+    opts = opts || {};
+    state.frame = null;                    // everything is laid out around origin
+    state.contain = {
+      focus: focusPerm,
+      color: (CELLS[focusPerm] && CELLS[focusPerm].color) || '#D4AF37',
+      cells: closure.map((p, i) => orbitParams(p, i, closure.length)),
+      ancestors: ancestors || []           // [{perm, color}], outermost first
+    };
+    const fit = fitContainZoom((ancestors || []).length);
+    // A brief ease-in on the zoom so entering/drilling reads as diving inward.
+    const from = fit * 0.55, to = fit;
+    introT0 = performance.now();
+    if (introRAF) cancelAnimationFrame(introRAF);
+    state.zoom = from;
+    function step(now) {
+      const t = Math.min(1, (now - introT0) / introDur);
+      const e = 1 - Math.pow(1 - t, 3);
+      state.zoom = from + (to - from) * e;
+      render();
+      introRAF = t < 1 ? requestAnimationFrame(step) : null;
+    }
+    introRAF = requestAnimationFrame(step);
+  }
+
+  // Draw the orb and its floating closure. Also fills state.spheres so the
+  // floats stay hoverable and clickable.
+  function renderContain() {
+    const C = state.contain;
+    const t = performance.now() / 1000;
+    const centre = project({ x: 0, y: 0, z: 0 });
+    const orbScreenR = ORB_R * centre.scale;
+
+    // Orb body: soft radial fill + rim, evoking a glass sphere.
+    const [cr, cg, cb] = hexToRgb(C.color);
+    const grad = ctx.createRadialGradient(
+      centre.x - orbScreenR * 0.3, centre.y - orbScreenR * 0.3, orbScreenR * 0.1,
+      centre.x, centre.y, orbScreenR);
+    grad.addColorStop(0, `rgba(${cr},${cg},${cb},0.10)`);
+    grad.addColorStop(0.72, `rgba(${cr},${cg},${cb},0.05)`);
+    grad.addColorStop(1, `rgba(${cr},${cg},${cb},0.14)`);
+    ctx.beginPath();
+    ctx.arc(centre.x, centre.y, orbScreenR, 0, Math.PI * 2);
+    ctx.fillStyle = grad; ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = `rgba(${cr},${cg},${cb},0.5)`;
+    ctx.stroke();
+
+    // Outer rings: one per ancestor cell of the intersection, outermost = the
+    // first cell examined. They signal "we are looking through all of these."
+    const anc = C.ancestors || [];
+    if (anc.length) {
+      const Wcss = canvas.width / DPR, Hcss = canvas.height / DPR;
+      const halfMin = Math.min(Wcss, Hcss) / 2;
+      const baseGap = 9;
+      const gap = Math.max(6, Math.min(16,
+        (halfMin * 0.94 - orbScreenR - baseGap) / anc.length));
+      anc.forEach((a, j) => {
+        const rr = orbScreenR + baseGap + (anc.length - j) * gap;  // j=0 outermost
+        const [rr_, gg_, bb_] = hexToRgb(a.color);
+        ctx.beginPath();
+        ctx.arc(centre.x, centre.y, rr, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${rr_},${gg_},${bb_},0.8)`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 6]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // A small solid arc at the top as a colour anchor for the legend.
+        ctx.beginPath();
+        ctx.arc(centre.x, centre.y, rr, -Math.PI / 2 - 0.24, -Math.PI / 2 + 0.24);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = a.color;
+        ctx.stroke();
+      });
+      ctx.lineWidth = 1;
+    }
+    const floats = C.cells.map(o => {
+      const wp = orbitPos(o, t);
+      const pr = project(wp);
+      return { o, wp, pr, depth: pr.depth };
+    }).sort((a, b) => a.depth - b.depth);
+
+    const spheres = [];
+    const showAll = C.cells.length <= 16;
+    floats.forEach(({ o, pr }) => {
+      const perm = o.perm, cell = CELLS[perm];
+      if (!cell) return;
+      const isHover = perm === state.highlight;
+      // Depth cue: far side (low projected scale) dimmer and smaller.
+      const dcue = Math.max(0.45, Math.min(1.2, pr.scale / centre.scale));
+      let r = Math.max(3.5, dimRadius(cell.dim) * 150 * pr.scale * 0.02) * dcue;
+      if (isHover) r *= 1.25;
+      ctx.globalAlpha = (isHover ? 1 : 0.9) * Math.min(1, 0.5 + dcue * 0.5);
+      ctx.fillStyle = cell.color;
+      ctx.beginPath();
+      ctx.arc(pr.x, pr.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      const isHit = SEARCH_MATCHES && SEARCH_MATCHES.has(perm);
+      if (isHover || isHit) {
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#D4AF37';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      if (showAll || isHover || isHit) drawFloatLabel(perm, pr.x, pr.y, r);
+      spheres.push({ perm, x: pr.x, y: pr.y, r });
+    });
+
+    // A faint front-rim highlight, drawn over the floats to seal the glass.
+    ctx.beginPath();
+    ctx.arc(centre.x, centre.y, orbScreenR, -0.9, 1.4);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = `rgba(255,255,255,0.10)`;
+    ctx.stroke();
+
+    // Empty nested intersection: say so in the middle of the orb.
+    if (!C.cells.length) {
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = 'italic 13px "Times New Roman", serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('(nothing in the intersection)', centre.x, centre.y);
+      ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+    }
+    state.spheres = spheres;
+  }
+
+  // Label a floating cell: italic C with the permutation as a subscript.
+  function drawFloatLabel(perm, x, y, r) {
+    const serif = '"Times New Roman", Times, serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.94)';
+    ctx.font = `italic 12px ${serif}`;
+    const wC = ctx.measureText('C').width;
+    ctx.font = `9px ${serif}`;
+    const permTxt = permDisplay(perm);
+    const wSub = ctx.measureText(permTxt).width;
+    const x0 = x - (wC + wSub) / 2;
+    const yTop = y + r + 3;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.font = `italic 12px ${serif}`; ctx.fillText('C', x0, yTop);
+    ctx.font = `9px ${serif}`; ctx.fillText(permTxt, x0 + wC, yTop + 3);
+    ctx.textAlign = 'center';
+  }
+
+  return { state, render, resize, frameSoloEdge, enterContain, fitContainZoom };
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
@@ -1091,6 +1368,33 @@ const VIEWS = ['overview', 'cell', 'traverse'];
 let currentView = 'overview';
 let currentCell = null;
 let currentEdge = null;
+
+// ── Nested closure ────────────────────────────────────────────────────────────
+// An edge  src → tgt  records that the closure of C_src MEETS C_tgt. That
+// relation is NOT transitive: C_3412's closure meets C_3142, and C_3142's meets
+// C_1342, yet C_3412's closure does not meet C_1342. So "examine 3142 from 3412"
+// is exactly the intersection of the two meeting-sets.
+//
+// focusChain holds the examination path [root, …, current]. The cells on show at
+// any depth are the intersection of every chain member's meeting-set, i.e. the
+// cells that lie in ALL of their closures simultaneously.
+let focusChain = [];
+
+// Cells whose closure C_perm meets — the one-step closure neighbourhood.
+function closureSet(perm) {
+  const s = new Set();
+  for (const e of EDGES) if (e.src === perm) s.add(e.tgt);
+  return s;
+}
+// Intersection of the closure neighbourhoods of every cell in the chain.
+function nestedClosure(chain) {
+  let acc = null;
+  for (const p of chain) {
+    const s = closureSet(p);
+    acc = acc === null ? s : new Set([...acc].filter(x => s.has(x)));
+  }
+  return acc || new Set();
+}
 
 const sceneOverview = makeScene('scene-overview', {
   autoRotate: true,
@@ -1100,7 +1404,7 @@ const sceneCell = makeScene('scene-cell', {
   autoRotate: true,
   focusMode: true,
   outgoingOnly: true,
-  onClickSphere: perm => goToCell(perm)
+  onClickSphere: perm => drillInto(perm)
 });
 const sceneTraverse = makeScene('scene-traverse', {
   autoRotate: false,
@@ -1115,6 +1419,7 @@ function setView(name) {
     document.getElementById('view-' + v).classList.toggle('active', v === name);
   });
   requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (name !== 'cell') sceneCell.state.contain = null;   // stop the float loop
     if (name === 'overview') {
       sceneOverview.resize();
       sceneOverview.state.activeCell = null;
@@ -1122,24 +1427,81 @@ function setView(name) {
     } else if (name === 'cell') {
       sceneCell.resize();
       sceneCell.state.activeCell = currentCell;
-      sceneCell.render();
+      // The cells to float inside the orb: the focus cell's closure, narrowed to
+      // the nested intersection when we've drilled in.
+      const restrict = focusChain.length > 1 ? nestedClosure(focusChain) : null;
+      const closure = EDGES
+        .filter(e => e.src === currentCell && (!restrict || restrict.has(e.tgt)))
+        .map(e => e.tgt);
+      // Outer cells we're looking through become rings (outermost = first examined).
+      const ancestors = focusChain.slice(0, -1).map((p, j) => ({
+        perm: p, color: RING_PALETTE[j % RING_PALETTE.length]
+      }));
+      sceneCell.enterContain(currentCell, closure, ancestors);
     } else if (name === 'traverse') {
       sceneTraverse.resize();
-      sceneTraverse.state.activeCell = currentEdge.src;
-      sceneTraverse.state.soloEdge = { src: currentEdge.src, tgt: currentEdge.tgt };
+      const p0 = (traversePath && traversePath.phases[0]) || currentEdge;
+      sceneTraverse.state.activeCell = p0.src;
+      sceneTraverse.state.soloEdge = { src: p0.src, tgt: p0.tgt };
       sceneTraverse.state.flowAnim = null;
       recenterTraverse();
     }
   }));
   renderBreadcrumb();
+  renderExamExpr();
+  renderOrbLegend();
+}
+
+// The gold formula under the search box: the current examination cell, or the
+// running intersection when nested — C_3412 ∩ C_3142 rather than just C_3142.
+function renderExamExpr() {
+  const el = document.getElementById('exam-expr');
+  const btn = document.getElementById('step-out-btn');
+  const nested = currentView === 'cell' && focusChain.length >= 2;
+  if (btn) btn.hidden = !nested;
+  if (!el) return;
+  if (currentView !== 'cell' || !focusChain.length) { el.innerHTML = ''; return; }
+  el.innerHTML = focusChain.map(mcell).join('<span class="cap">\u2229</span>');
+}
+
+// Corner legend for the orb: which cell is the current focus (the orb) and which
+// outer cells (the rings) we're looking through. Shown only when nested.
+function renderOrbLegend() {
+  const el = document.getElementById('orb-legend');
+  if (!el) return;
+  const m = focusChain.length;
+  if (currentView !== 'cell' || m < 2) { el.hidden = true; el.innerHTML = ''; return; }
+  const focus = focusChain[m - 1];
+  let rows = '';
+  focusChain.slice(0, m - 1).forEach((p, j) => {
+    const col = RING_PALETTE[j % RING_PALETTE.length];
+    rows += `<div class="ol-row"><span class="ol-sw" style="border-color:${col}"></span>`
+          + `${mcell(p)}<span class="ol-tag">outer</span></div>`;
+  });
+  const fcol = (CELLS[focus] && CELLS[focus].color) || '#D4AF37';
+  rows += `<div class="ol-row"><span class="ol-sw ol-fill" `
+        + `style="background:${fcol};border-color:${fcol}"></span>`
+        + `${mcell(focus)}<span class="ol-tag">current</span></div>`;
+  el.innerHTML = `<div class="ol-title">Looking through</div>${rows}`;
+  el.hidden = false;
+}
+
+// Leave the innermost cell of the intersection but keep everything outside it:
+// C_A ∩ C_B ∩ C_C  →  C_A ∩ C_B. Only meaningful once we've nested at least once.
+function stepOut() {
+  if (focusChain.length >= 2) popChainTo(focusChain.length - 2);
 }
 
 function renderBreadcrumb() {
   const bc = document.getElementById('breadcrumb');
   let html = `<span class="crumb${currentView === 'overview' ? ' current' : ''}" data-go="overview">All cells (${PART_LABEL})</span>`;
-  if (currentCell && currentView !== 'overview') {
-    html += '<span class="sep">›</span>';
-    html += `<span class="crumb${currentView === 'cell' ? ' current' : ''}" data-go="cell">${mcell(currentCell)}</span>`;
+  if (currentView !== 'overview' && focusChain.length) {
+    focusChain.forEach((p, i) => {
+      const isLast = i === focusChain.length - 1;
+      const cur = currentView === 'cell' && isLast;
+      html += '<span class="sep">›</span>';
+      html += `<span class="crumb${cur ? ' current' : ''}" data-depth="${i}">${mcell(p)}</span>`;
+    });
   }
   if (currentEdge && currentView === 'traverse') {
     html += '<span class="sep">›</span>';
@@ -1147,34 +1509,88 @@ function renderBreadcrumb() {
   }
   bc.innerHTML = html;
   bc.querySelectorAll('.crumb[data-go]').forEach(el => {
-    el.addEventListener('click', () => {
-      const target = el.getAttribute('data-go');
-      if (target === 'overview') goHome();
-      else if (target === 'cell' && currentCell) goToCell(currentCell);
-    });
+    el.addEventListener('click', () => { if (el.dataset.go === 'overview') goHome(); });
+  });
+  bc.querySelectorAll('.crumb[data-depth]').forEach(el => {
+    el.addEventListener('click', () => popChainTo(parseInt(el.dataset.depth, 10)));
   });
 }
 
 function goHome() {
   currentCell = null;
   currentEdge = null;
+  focusChain = [];
   setView('overview');
 }
 
+// Fresh entry: start a brand-new examination chain at `perm` (from the overview,
+// search, or a jump that isn't a nested step).
 function goToCell(perm) {
+  focusChain = [perm];
   currentCell = perm;
   currentEdge = null;
-  fillCellView(perm);
+  fillCellView();
   setView('cell');
 }
 
-function goToTraverse(edge) {
-  currentEdge = edge;
-  fillTraverseView(edge);
+// Nested step: examine `perm` from the current cell. If `perm` lies in the
+// current nested closure we push it (the shown set shrinks to the new
+// intersection); otherwise we treat it as a fresh entry.
+function drillInto(perm) {
+  if (!focusChain.length) return goToCell(perm);
+  if (focusChain[focusChain.length - 1] === perm) return;   // already the focus
+  if (nestedClosure(focusChain).has(perm)) focusChain.push(perm);
+  else focusChain = [perm];
+  currentCell = perm;
+  currentEdge = null;
+  fillCellView();
+  setView('cell');
+}
+
+// Jump back to an earlier cell in the examination chain (breadcrumb click).
+function popChainTo(i) {
+  if (i < 0 || i >= focusChain.length) return;
+  focusChain = focusChain.slice(0, i + 1);
+  currentCell = focusChain[focusChain.length - 1];
+  currentEdge = null;
+  fillCellView();
+  setView('cell');
+}
+
+// The recorded edge between two cells, if any (src's closure meets tgt).
+function edgeBetween(a, b) {
+  return EDGES.find(e => e.src === a && e.tgt === b) || null;
+}
+
+// The path we degenerate along. Taking a path from a nested view walks the whole
+// examination chain and then the chosen destination: A → B → … → focus → dest,
+// one degeneration phase per hop. Without nesting this is just focus → dest.
+let traversePath = null;   // { perms: [...], phases: [edge, ...] }
+
+function goToTraverse(destEdge) {
+  const perms = [...focusChain, destEdge.tgt];
+  const phases = [];
+  for (let i = 0; i < perms.length - 1; i++) {
+    const e = (perms[i] === destEdge.src && perms[i + 1] === destEdge.tgt)
+      ? destEdge : edgeBetween(perms[i], perms[i + 1]);
+    if (e) phases.push(e);
+  }
+  traversePath = { perms, phases };
+  currentEdge = phases[phases.length - 1] || destEdge;   // last hop, for compat
+  fillTraverseView();
   setView('traverse');
 }
 
 document.getElementById('home-btn').addEventListener('click', goHome);
+document.getElementById('step-out-btn').addEventListener('click', stepOut);
+
+// Escape steps out one nesting level (unless you're typing in the search box,
+// where Escape already clears the query).
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (document.activeElement && document.activeElement.id === 'cell-search') return;
+  if (currentView === 'cell' && focusChain.length >= 2) { e.preventDefault(); stepOut(); }
+});
 
 // ── Partition switcher ────────────────────────────────────────────────────────
 document.getElementById('partition-select').addEventListener('change', async e => {
@@ -1463,7 +1879,10 @@ function renderClosureByDim(perm, outgoing) {
   const dims = Object.keys(byDim).map(Number).sort((a, b) => b - a);   // high to low
 
   if (!dims.length) {
-    note.textContent = 'Nothing lies in this cell\u2019s closure.';
+    note.innerHTML = focusChain.length > 1
+      ? `No cell lies in the closures of ${focusChain.map(mcell).join(', ')} `
+        + `simultaneously \u2014 the nested intersection is empty here.`
+      : 'Nothing lies in this cell\u2019s closure.';
     host.innerHTML = '';
     if (btn) btn.style.display = 'none';
     return;
@@ -1471,13 +1890,23 @@ function renderClosureByDim(perm, outgoing) {
   if (btn) btn.style.display = '';
 
   const total = outgoing.length;
-  // how many cells of each dimension COULD be reached, for context
-  const candidates = Object.values(CELLS)
-    .filter(c => c.dim <= srcDim).length - 1;
-  note.innerHTML = `${total} cell${total === 1 ? '' : 's'} in the closure of `
-                 + `${mcell(perm)} (dim ${srcDim}), out of ${candidates} of no `
-                 + `greater dimension. Spread over ${dims.length} dimension`
-                 + `${dims.length === 1 ? '' : 's'}:`;
+  if (focusChain.length > 1) {
+    // Nested view: the shown cells are the intersection of every closure in
+    // the examination chain.
+    const ancestors = focusChain.slice(0, -1).map(mcell).join(', ');
+    note.innerHTML = `${total} cell${total === 1 ? '' : 's'} in the closure of `
+                   + `${mcell(perm)} (dim ${srcDim}) that also lie in the closure of `
+                   + `${ancestors}. Spread over ${dims.length} dimension`
+                   + `${dims.length === 1 ? '' : 's'}. Click one to nest further:`;
+  } else {
+    // how many cells of each dimension COULD be reached, for context
+    const candidates = Object.values(CELLS)
+      .filter(c => c.dim <= srcDim).length - 1;
+    note.innerHTML = `${total} cell${total === 1 ? '' : 's'} in the closure of `
+                   + `${mcell(perm)} (dim ${srcDim}), out of ${candidates} of no `
+                   + `greater dimension. Spread over ${dims.length} dimension`
+                   + `${dims.length === 1 ? '' : 's'}. Click one to examine it from here:`;
+  }
 
   const openByDefault = total <= 24;
   host.innerHTML = dims.map(d => {
@@ -1618,7 +2047,8 @@ function edgeDescription(edge) {
   return parts.join('  ·  ');
 }
 
-function fillCellView(perm) {
+function fillCellView() {
+  const perm = focusChain[focusChain.length - 1];
   const cell = CELLS[perm];
   document.getElementById('cell-title').innerHTML = mcell(perm);
   const freeStr = cell.free.length ? cell.free.map(v => mvar(v)).join(', ') : 'none';
@@ -1632,7 +2062,10 @@ function fillCellView(perm) {
     cell.plucker.map((p, i) => formatPlucker(p, i + 1, nRows)).join('') +
     '</div>';
 
-  const outgoing = EDGES.filter(e => e.src === perm);
+  // Under nesting, only keep targets that also lie in every ancestor's closure.
+  const restrict = focusChain.length > 1 ? nestedClosure(focusChain) : null;
+  const outgoing = EDGES.filter(e =>
+    e.src === perm && (!restrict || restrict.has(e.tgt)));
   renderClosureByDim(perm, outgoing);
   const list = document.getElementById('path-list');
   list.innerHTML = '';
@@ -1695,39 +2128,71 @@ function buildSteps(edge) {
   return steps;
 }
 
-function fillTraverseView(edge) {
-  document.getElementById('traverse-from').innerHTML = mcell(edge.src);
-  document.getElementById('traverse-to').innerHTML = mcell(edge.tgt);
-  const srcCell = CELLS[edge.src];
-  const tgtCell = CELLS[edge.tgt];
+function fillTraverseView() {
+  const perms = traversePath.perms, phases = traversePath.phases;
+  const first = perms[0], last = perms[perms.length - 1];
+  document.getElementById('traverse-from').innerHTML = mcell(first);
+  document.getElementById('traverse-to').innerHTML = mcell(last);
+  const srcCell = CELLS[first];
+  const tgtCell = CELLS[last];
   document.getElementById('start-info').innerHTML =
-    `<span style="color: var(--text-primary); font-weight: 500;">${mcell(edge.src)}</span> \u00B7 dim ${srcCell.dim}<br>` +
+    `<span style="color: var(--text-primary); font-weight: 500;">${mcell(first)}</span> \u00B7 dim ${srcCell.dim}<br>` +
     `free: ${srcCell.free.length ? srcCell.free.map(v => mvar(v)).join(', ') : 'none'}<br>` +
     `${srcCell.plucker[0] ? formatPlucker(srcCell.plucker[0], 1, srcCell.plucker[0].replace(/^\[|\]$/g, '').split(' : ').length, true) : ''}`;
   document.getElementById('land-info').innerHTML =
-    `<span style="color: var(--text-primary); font-weight: 500;">${mcell(edge.tgt)}</span> \u00B7 dim ${tgtCell.dim}<br>` +
+    `<span style="color: var(--text-primary); font-weight: 500;">${mcell(last)}</span> \u00B7 dim ${tgtCell.dim}<br>` +
     `free: ${tgtCell.free.length ? tgtCell.free.map(v => mvar(v, true)).join(', ') : 'none'}<br>` +
     `${tgtCell.plucker[0] ? formatPlucker(tgtCell.plucker[0], 1, tgtCell.plucker[0].replace(/^\[|\]$/g, '').split(' : ').length, true) : ''}`;
-  const steps = buildSteps(edge);
+
+  // Per-phase limit legend (only meaningful when there's more than one hop).
+  const legendPanel = document.getElementById('phase-legend-panel');
+  const legend = document.getElementById('phase-legend');
+  if (phases.length > 1) {
+    legend.innerHTML = phases.map((e, i) => {
+      const lim = e.limit ? `send ${mvar(e.limit)} \u2192 \u221E`
+        : (Object.keys(e.tgtSubs || {}).length
+            ? Object.entries(e.tgtSubs).map(([k, v]) => massign(k, v, true)).join(', ')
+            : 'whole target cell');
+      return `<div class="pl-row"><span class="pl-num">${i + 1}</span>`
+           + `<div class="pl-body"><div class="pl-trans">${mcell(e.src)} \u2192 ${mcell(e.tgt)}</div>`
+           + `<div class="pl-limit">${lim}</div></div></div>`;
+    }).join('');
+    legendPanel.hidden = false;
+  } else {
+    legend.innerHTML = '';
+    legendPanel.hidden = true;
+  }
+
+  // Operations list: each phase becomes a labelled block of steps.
   const list = document.getElementById('step-list');
   list.innerHTML = '';
-  steps.forEach((s, i) => {
-    const el = document.createElement('div');
-    el.className = 'traversal-step';
-    el.innerHTML = `
-      <div class="step-num">${i + 1}</div>
-      <div class="step-body">
-        <p class="step-title">${s.title}</p>
-        <p class="step-detail">${s.detail}</p>
-      </div>
-    `;
-    list.appendChild(el);
+  phases.forEach((e, pi) => {
+    if (phases.length > 1) {
+      const head = document.createElement('p');
+      head.className = 'label-uppercase';
+      head.style.cssText = 'margin:14px 0 6px; color:var(--gold);';
+      head.innerHTML = `Phase ${pi + 1}: ${mcell(e.src)} \u2192 ${mcell(e.tgt)}`;
+      list.appendChild(head);
+    }
+    buildSteps(e).forEach((s, i) => {
+      const el = document.createElement('div');
+      el.className = 'traversal-step';
+      el.dataset.phase = pi;
+      el.innerHTML = `
+        <div class="step-num">${i + 1}</div>
+        <div class="step-body">
+          <p class="step-title">${s.title}</p>
+          <p class="step-detail">${s.detail}</p>
+        </div>`;
+      list.appendChild(el);
+    });
   });
+
   document.getElementById('traverse-hint').textContent = 'click "Begin traversal" to start';
   sceneTraverse.state.firstPerson = false;
   sceneTraverse.state.cameraPos = null;
-  sceneTraverse.state.activeCell = edge.src;
-  sceneTraverse.state.soloEdge = { src: edge.src, tgt: edge.tgt };
+  sceneTraverse.state.activeCell = phases[0] ? phases[0].src : first;
+  sceneTraverse.state.soloEdge = phases[0] ? { src: phases[0].src, tgt: phases[0].tgt } : null;
   sceneTraverse.state.particles = null;
   sceneTraverse.state.flowAnim = null;
   sceneTraverse.state.doneLabel = null;
@@ -1738,61 +2203,95 @@ function fillTraverseView(edge) {
 // centred and separated by exactly half the canvas width.
 const SOLO_SEPARATION = 0.5;
 function recenterTraverse() {
-  if (!currentEdge) return;
+  const e = (traversePath && traversePath.phases[0]) || currentEdge;
+  if (!e) return;
   sceneTraverse.resize();
-  sceneTraverse.frameSoloEdge(currentEdge.src, currentEdge.tgt, SOLO_SEPARATION);
+  sceneTraverse.frameSoloEdge(e.src, e.tgt, SOLO_SEPARATION);
   sceneTraverse.render();
 }
 
-let traverseTimer = null;
-function startTraversal() {
-  if (!currentEdge) return;
-  const edge = currentEdge;
-  const steps = document.querySelectorAll('#step-list .traversal-step');
-  steps.forEach(s => s.classList.remove('active', 'done'));
-  document.getElementById('traverse-hint').textContent = 'travelling...';
+let traverseTimer = null;   // sub-step highlighting within a phase
+let phaseTimer = null;      // pause between phases
+let traverseGen = 0;        // bumped to invalidate an in-flight animation
 
-  const stepDuration = 1000;
-  let stepIdx = 0;
+function stopTraversal() {
+  clearTimeout(traverseTimer);
+  clearTimeout(phaseTimer);
+  traverseGen++;
+}
+
+function startTraversal() {
+  if (!traversePath || !traversePath.phases.length) return;
+  stopTraversal();
+  const gen = traverseGen;
+  const phases = traversePath.phases;
+  const allSteps = Array.from(document.querySelectorAll('#step-list .traversal-step'));
+  allSteps.forEach(s => s.classList.remove('active', 'done'));
+  document.getElementById('traverse-hint').textContent = 'travelling\u2026';
+  sceneTraverse.state.firstPerson = false;
+  sceneTraverse.state.cameraPos = null;
+  sceneTraverse.state.doneLabel = null;
+
+  let pi = 0;
+  function runPhase() {
+    if (gen !== traverseGen) return;                 // superseded by a new run
+    if (pi >= phases.length) {
+      const last = traversePath.perms[traversePath.perms.length - 1];
+      document.getElementById('traverse-hint').innerHTML = `arrived in ${mcell(last)}`;
+      return;
+    }
+    const edge = phases[pi];
+    const stepEls = allSteps.filter(el => +el.dataset.phase === pi);
+    sceneTraverse.state.doneLabel = null;
+    sceneTraverse.state.activeCell = edge.src;
+    sceneTraverse.state.soloEdge = { src: edge.src, tgt: edge.tgt };
+    sceneTraverse.frameSoloEdge(edge.src, edge.tgt, SOLO_SEPARATION);
+    if (phases.length > 1) {
+      document.getElementById('traverse-hint').innerHTML =
+        `phase ${pi + 1} of ${phases.length}: ${mcell(edge.src)} \u2192 ${mcell(edge.tgt)}`;
+    }
+    animatePhase(edge, stepEls, gen, () => {
+      pi++;
+      phaseTimer = setTimeout(runPhase, phases.length > 1 ? 520 : 0);
+    });
+  }
+  runPhase();
+}
+
+// Run the degeneration animation for a single hop: stagger its operation steps,
+// spray the mote burst from src to tgt, then pin the result. Calls onDone when
+// the hop finishes (unless a newer run has superseded this one).
+function animatePhase(edge, stepEls, gen, onDone) {
+  const stepDuration = 900;
+  let sIdx = 0;
   function nextStep() {
-    if (stepIdx > 0) steps[stepIdx - 1].classList.replace('active', 'done');
-    if (stepIdx < steps.length) {
-      steps[stepIdx].classList.add('active');
-      stepIdx++;
+    if (gen !== traverseGen) return;
+    if (sIdx > 0 && stepEls[sIdx - 1]) stepEls[sIdx - 1].classList.replace('active', 'done');
+    if (sIdx < stepEls.length) {
+      stepEls[sIdx].classList.add('active');
+      sIdx++;
       traverseTimer = setTimeout(nextStep, stepDuration);
     }
   }
   nextStep();
 
-  sceneTraverse.state.firstPerson = false;
-  sceneTraverse.state.cameraPos = null;
-  sceneTraverse.state.activeCell = edge.src;
-  sceneTraverse.state.doneLabel = null;
-
-  // Caption shown on the flying dot when there's no divergent limit variable.
   const subs = Object.entries(edge.tgtSubs || {});
   const caption = subs.length ? subs.map(([k, v]) => `${k} = ${v}`).join(', ')
                               : 'whole target cell';
-
   const startTime = performance.now();
-  const flowDuration = stepDuration * steps.length;
+  const flowDuration = stepDuration * Math.max(1, stepEls.length);
 
-  // Count is tuned to the mote size: at ~5-55px radius a few hundred motes
-  // fill the flight path without painting over the whole canvas. (When the
-  // motes were sub-pixel dust this was 2600 — density had to do the work.)
   const COUNT = 320;
   const items = [];
   for (let i = 0; i < COUNT; i++) {
-    // Uniform point on the unit sphere (inverse-CDF on z, uniform azimuth) --
-    // naive angle-picking would clump the spray at the poles.
     const u  = Math.random() * 2 - 1;
     const th = Math.random() * Math.PI * 2;
     const rr = Math.sqrt(Math.max(0, 1 - u * u));
     items.push({
       dx: rr * Math.cos(th), dy: u, dz: rr * Math.sin(th),
-      delay: Math.pow(i / COUNT, 0.85) * 0.58,          // staggered launch
-      life:  0.34 + Math.random() * 0.26,               // varied transit time
-      amp:   0.7 + Math.random() * 2.6,                 // how far the burst flies
+      delay: Math.pow(i / COUNT, 0.85) * 0.58,
+      life:  0.34 + Math.random() * 0.26,
+      amp:   0.7 + Math.random() * 2.6,
       swirl: (Math.random() < 0.5 ? -1 : 1) * (1.4 + Math.random() * 3.2),
       size:  0.55 + Math.random() * 1.5
     });
@@ -1800,9 +2299,9 @@ function startTraversal() {
   sceneTraverse.state.particles = { src: edge.src, tgt: edge.tgt, t: 0, items };
 
   function flightStep(now) {
+    if (gen !== traverseGen) return;                 // superseded — stop rendering
     const raw = Math.min(1, (now - startTime) / flowDuration);
-    const t = raw < 0.5 ? 2*raw*raw : 1 - Math.pow(-2*raw + 2, 2) / 2;
-    // Stream clock runs slightly ahead so the last dots land as raw hits 1.
+    const t = raw < 0.5 ? 2 * raw * raw : 1 - Math.pow(-2 * raw + 2, 2) / 2;
     sceneTraverse.state.particles.t = raw * 1.18;
     sceneTraverse.state.flowAnim = {
       src: edge.src, tgt: edge.tgt, t,
@@ -1813,18 +2312,17 @@ function startTraversal() {
     if (raw < 1) {
       requestAnimationFrame(flightStep);
     } else {
+      stepEls.forEach(s => s.classList.replace('active', 'done'));
       sceneTraverse.state.activeCell = edge.tgt;
       sceneTraverse.state.flowAnim = null;
       sceneTraverse.state.particles = null;
-      // Pin the activated variables so the result stays readable after the
-      // animation ends, instead of the label vanishing with the last dot.
       sceneTraverse.state.doneLabel = {
         tgt: edge.tgt,
         limitVar: edge.limit,
         subs: Object.entries(edge.tgtSubs || {})
       };
       sceneTraverse.render();
-      document.getElementById('traverse-hint').innerHTML = `arrived in ${mcell(edge.tgt)}`;
+      onDone();
     }
   }
   requestAnimationFrame(flightStep);
@@ -1840,7 +2338,7 @@ document.getElementById('dim-table').addEventListener('click', ev => {
 
 document.getElementById('closure-dim-table').addEventListener('click', ev => {
   const chip = ev.target.closest('.cell-chip');
-  if (chip) goToCell(chip.dataset.perm);
+  if (chip) drillInto(chip.dataset.perm);
 });
 
 document.getElementById('closure-toggle-all').addEventListener('click', () => {
@@ -1872,13 +2370,22 @@ document.getElementById('dim-toggle-all').addEventListener('click', () => {
     anyClosed ? 'Collapse all' : 'Expand all';
 });
 document.getElementById('traverse-replay').addEventListener('click', () => {
-  clearTimeout(traverseTimer);
-  fillTraverseView(currentEdge);
+  stopTraversal();
+  fillTraverseView();
   startTraversal();
 });
 document.getElementById('traverse-back').addEventListener('click', () => {
-  clearTimeout(traverseTimer);
-  goToCell(currentEdge.src);
+  stopTraversal();
+  // The traversal was launched from the focus cell, so keep the examination
+  // chain intact rather than collapsing it back to a single cell.
+  const startCell = traversePath ? traversePath.perms[0] : (currentEdge && currentEdge.src);
+  if (focusChain.length && focusChain[focusChain.length - 1] === (currentEdge && currentEdge.src)) {
+    currentEdge = null;
+    fillCellView();
+    setView('cell');
+  } else {
+    goToCell(startCell);
+  }
 });
 
 // ── Cell search ───────────────────────────────────────────────────────────────
