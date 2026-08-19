@@ -553,6 +553,12 @@ function makeScene(canvasId, opts) {
     activeCell: null,
     flowAnim: null,
     soloEdge: null,     // {src,tgt}: render ONLY this relation, enlarged
+    // Path mode (traverse screen): show the whole chain on one stage.
+    // pathCells: ordered perms; pathPos: perm -> custom world position (a row);
+    // pathActiveHop: index of the hop currently degenerating (-1 = none).
+    pathCells: null,
+    pathPos: null,
+    pathActiveHop: -1,
     frame: null,        // {o,e1,e2,e3} local basis applied before the camera
     doneLabel: null,    // annotation kept on screen after a traversal ends
     particles: null,    // particle stream for the traversal animation
@@ -615,6 +621,10 @@ function makeScene(canvasId, opts) {
     };
   }
 
+  // Position a cell lives at. Normally the global layout, but path mode lays the
+  // traversed cells out in a custom row so the whole chain fits one stage.
+  const worldPos = perm => (state.pathPos && state.pathPos[perm]) || POSITIONS[perm];
+
   const sphereRadius = (perm, proj) => {
     let r = Math.max(3, dimRadius(CELLS[perm].dim) * 110 * proj.scale * 0.020);
     // On the single-path screen the two endpoints are the whole story, so give
@@ -622,6 +632,7 @@ function makeScene(canvasId, opts) {
     if (state.soloEdge && (perm === state.soloEdge.src || perm === state.soloEdge.tgt)) {
       r *= 2.8;
     }
+    if (state.pathCells && state.pathCells.includes(perm)) r *= 2.1;
     return r;
   };
 
@@ -629,9 +640,9 @@ function makeScene(canvasId, opts) {
   // overview uses that (it reads as a web); drilling into a cell turns the
   // arrowheads back on so direction is still explicit where it matters.
   function drawEdge(srcPerm, tgtPerm, highlighted, showArrow) {
-    if (!POSITIONS[srcPerm] || !POSITIONS[tgtPerm]) return;
-    const p1 = project(POSITIONS[srcPerm]);
-    const p2 = project(POSITIONS[tgtPerm]);
+    if (!worldPos(srcPerm) || !worldPos(tgtPerm)) return;
+    const p1 = project(worldPos(srcPerm));
+    const p2 = project(worldPos(tgtPerm));
     const stroke = highlighted ? 'rgba(212,175,55,0.92)' : 'rgba(170,175,195,0.20)';
     ctx.strokeStyle = stroke;
     ctx.lineWidth   = highlighted ? 2 : 0.9;
@@ -663,8 +674,8 @@ function makeScene(canvasId, opts) {
 
   function drawSphere(perm) {
     const cell = CELLS[perm];
-    if (!cell || !POSITIONS[perm]) return null;
-    const p = project(POSITIONS[perm]);
+    if (!cell || !worldPos(perm)) return null;
+    const p = project(worldPos(perm));
     const r = sphereRadius(perm, p);
     const isActive = perm === state.activeCell;
     const isHover = perm === state.highlight;
@@ -688,7 +699,7 @@ function makeScene(canvasId, opts) {
       return null;
     }
     // Hide cells that don't connect to the active cell when in focus mode
-    if (state.focusMode && state.activeCell && !isActive && !isNeighbor) {
+    if (state.focusMode && state.activeCell && !isActive && !isNeighbor && !state.pathCells) {
       return null;
     }
     const isHit = SEARCH_MATCHES && SEARCH_MATCHES.has(perm);
@@ -716,7 +727,7 @@ function makeScene(canvasId, opts) {
     }
     ctx.globalAlpha = 1;
     // Labels get crowded in big partitions — show them only when they can be read.
-    const showLabel = Object.keys(POSITIONS).length <= 45 || isActive || isHover || isHit;
+    const showLabel = Object.keys(POSITIONS).length <= 45 || isActive || isHover || isHit || state.pathCells;
     if (showLabel) {
       // Canvas has no rich text, so the subscript is drawn manually: italic C at
       // full size, then the permutation smaller and dropped below the baseline.
@@ -757,8 +768,8 @@ function makeScene(canvasId, opts) {
 
   function drawParticles() {
     const P = state.particles;
-    if (!P || !POSITIONS[P.src] || !POSITIONS[P.tgt]) return;
-    const A = POSITIONS[P.src], B = POSITIONS[P.tgt];
+    if (!P || !worldPos(P.src) || !worldPos(P.tgt)) return;
+    const A = worldPos(P.src), B = worldPos(P.tgt);
 
     // Rotation axis for the vortex (source -> target). The emission direction
     // itself is NOT tied to this axis any more: each mote gets its own uniform
@@ -819,7 +830,7 @@ function makeScene(canvasId, opts) {
 
     // Absorption glow: brightens as more of the stream is swallowed.
     if (landed > 0) {
-      const b = project(B);
+      const b = project(worldPos(P.tgt));
       const k = Math.min(1, landed / Math.max(1, P.items.length));
       const gr = sphereRadius(P.tgt, b) * (1.25 + 0.9 * k);
       const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, gr);
@@ -835,8 +846,8 @@ function makeScene(canvasId, opts) {
   // Persistent annotation after a traversal completes: which variables were
   // activated and which was sent to infinity. Drawn beside the target sphere.
   function drawDoneLabel(info) {
-    if (!POSITIONS[info.tgt]) return;
-    const b = project(POSITIONS[info.tgt]);
+    if (!worldPos(info.tgt)) return;
+    const b = project(worldPos(info.tgt));
     const serifF = '"Times New Roman", Times, serif';
     const lines = [];
     if (info.limitVar) {
@@ -898,9 +909,9 @@ function makeScene(canvasId, opts) {
   }
 
   function drawFlyingDot(flow) {
-    if (!POSITIONS[flow.src] || !POSITIONS[flow.tgt]) return;
-    const a = project(POSITIONS[flow.src]);
-    const b = project(POSITIONS[flow.tgt]);
+    if (!worldPos(flow.src) || !worldPos(flow.tgt)) return;
+    const a = project(worldPos(flow.src));
+    const b = project(worldPos(flow.tgt));
     const t = flow.t;
     const x = a.x + (b.x - a.x) * t;
     const y = a.y + (b.y - a.y) * t;
@@ -1013,6 +1024,7 @@ function makeScene(canvasId, opts) {
     if (!CELLS) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (state.contain) { renderContain(); return; }
+    if (state.pathCells) { renderPathStage(); return; }
     // Edges first
     if (state.soloEdge) {
       // Exactly one relation on screen: examined cell -> destination.
@@ -1056,7 +1068,129 @@ function makeScene(canvasId, opts) {
     if (state.doneLabel) drawDoneLabel(state.doneLabel);
   }
 
-  // ── Event handlers ─────────────────────────────────────────────────────────
+  // Path stage: the whole chain on one screen. Consecutive cells are joined by
+  // arrows; the hop currently degenerating (and any already done) is gold, the
+  // rest faint. The active hop's mote burst runs between its two cells.
+  // Nested-sphere path stage. The chain is drawn as concentric shells — the
+  // starting cell outermost, the destination at the core — and the degeneration
+  // runs INWARD: motes implode from each shell to the next while the camera
+  // pushes down toward the centre. (Consistent with "closure = inside".)
+  function zoomForRadius(radius) {
+    const minDim = Math.min(canvas.width, canvas.height) / DPR || 460;
+    return Math.max(0.4, Math.min(6, (0.42 * minDim * 9) / (radius * 320)));
+  }
+
+  function drawShellLabel(perm, cx, yTop, color, emphasized) {
+    const serif = '"Times New Roman", Times, serif';
+    const permTxt = permDisplay(perm);
+    ctx.font = `italic ${emphasized ? 14 : 12}px ${serif}`;
+    const wC = ctx.measureText('C').width;
+    ctx.font = `${emphasized ? 10 : 9}px ${serif}`;
+    const wSub = ctx.measureText(permTxt).width;
+    const x0 = cx - (wC + wSub) / 2;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+    ctx.globalAlpha = emphasized ? 1 : 0.85;
+    ctx.fillStyle = emphasized ? '#ffffff' : color;
+    ctx.font = `italic ${emphasized ? 14 : 12}px ${serif}`; ctx.fillText('C', x0, yTop);
+    ctx.font = `${emphasized ? 10 : 9}px ${serif}`; ctx.fillText(permTxt, x0 + wC, yTop + 2);
+    ctx.globalAlpha = 1; ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+  }
+
+  // Motes streaming radially inward from the source shell to the target shell.
+  function drawImplosion(centre, rSrc, rTgt, localT, srcColor, tgtColor) {
+    const items = state.pathImplosion.items;
+    const [sr, sg, sb] = hexToRgb(srcColor), [tr, tg, tb] = hexToRgb(tgtColor);
+    for (const it of items) {
+      const p = (localT - it.delay) / it.life;
+      if (p <= 0 || p >= 1.4) continue;
+      const e = Math.min(1, p) * Math.min(1, p);            // ease-in: accelerate inward
+      const rad = rSrc + (rTgt - rSrc) * e;
+      const pr = project({ x: it.dir.x * rad, y: it.dir.y * rad, z: it.dir.z * rad });
+      const a = Math.sin(Math.min(1, p) * Math.PI) * 0.9;
+      const mix = e;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = `rgb(${(sr + (tr - sr) * mix) | 0},${(sg + (tg - sg) * mix) | 0},${(sb + (tb - sb) * mix) | 0})`;
+      ctx.beginPath();
+      ctx.arc(pr.x, pr.y, Math.max(1, it.size * pr.scale * 0.016), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function renderPathStage() {
+    const pc = state.pathCells, radii = state.pathRadii || [];
+    const n = pc.length;
+    const centre = project({ x: 0, y: 0, z: 0 });
+    const hop = state.pathActiveHop;          // -1 static, else 0..n-2
+    const hopT = state.pathHopT || 0;         // progress of the current hop
+    const arrived = state.pathArrived;
+
+    // Camera push: while a hop runs, ease the zoom from framing the source shell
+    // to framing the (smaller) target shell, so we descend toward the core. Only
+    // while imploding, so the user can freely zoom before/after.
+    if (state.pathImplosion && hop >= 0 && hop < n - 1) {
+      const zA = zoomForRadius(radii[hop]), zB = zoomForRadius(radii[hop + 1]);
+      const e = hopT < 0.5 ? 2 * hopT * hopT : 1 - Math.pow(-2 * hopT + 2, 2) / 2;
+      state.zoom = zA + (zB - zA) * e;
+    }
+
+    // Shells, outermost first so inner ones layer on top.
+    for (let i = 0; i < n; i++) {
+      const perm = pc[i], cell = CELLS[perm];
+      if (!cell) continue;
+      const screenR = radii[i] * centre.scale;
+      const [r, g, b] = hexToRgb(cell.color);
+      const isDest = i === n - 1;
+      let rim = 0.5, fill = 0.06, lw = 1.5;
+      if (hop >= 0) {
+        if (i < hop) { rim = 0.10; fill = 0.015; lw = 1; }                    // already passed
+        else if (i === hop) { rim = 0.15 + 0.55 * (1 - hopT); fill = 0.10 * (1 - hopT); lw = 2; }   // dissolving source
+        else if (i === hop + 1) { rim = 0.55 + 0.35 * hopT; fill = 0.05 + 0.09 * hopT; lw = 2.4; }  // brightening target
+      }
+      if (isDest) { rim = Math.max(rim, arrived ? 0.95 : 0.6); fill = Math.max(fill, arrived ? 0.26 : 0.10); }
+
+      const grad = ctx.createRadialGradient(centre.x, centre.y, screenR * 0.1, centre.x, centre.y, screenR);
+      grad.addColorStop(0, `rgba(${r},${g},${b},${fill.toFixed(3)})`);
+      grad.addColorStop(1, `rgba(${r},${g},${b},${(fill * 0.35).toFixed(3)})`);
+      ctx.beginPath(); ctx.arc(centre.x, centre.y, screenR, 0, Math.PI * 2);
+      ctx.fillStyle = grad; ctx.fill();
+      ctx.lineWidth = lw; ctx.strokeStyle = `rgba(${r},${g},${b},${rim.toFixed(3)})`;
+      ctx.stroke();
+
+      if (screenR > 15 && !(hop >= 0 && i < hop)) {
+        drawShellLabel(perm, centre.x, centre.y - screenR - 4, cell.color,
+          isDest || (hop >= 0 && i === hop + 1));
+      }
+    }
+
+    // Inward mote implosion for the active hop.
+    if (state.pathImplosion && hop >= 0 && hop < n - 1) {
+      drawImplosion(centre, radii[hop], radii[hop + 1], hopT,
+        CELLS[pc[hop]].color, CELLS[pc[hop + 1]].color);
+    }
+
+    // Which variable is going to the limit in this hop, near the core.
+    if (hop >= 0 && !arrived && state.pathActiveEdge) {
+      const e = state.pathActiveEdge;
+      ctx.fillStyle = 'rgba(212,175,55,0.95)';
+      ctx.font = 'italic 14px "Times New Roman", serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(e.limit ? `send ${e.limit} \u2192 \u221E` : 'to the target cell',
+        centre.x, centre.y + 4);
+      ctx.textAlign = 'start';
+    }
+    state.spheres = [];
+  }
+
+  // Frame the whole nest: centre it and zoom to fit the outermost shell.
+  function framePathRow() {
+    state.frame = null;
+    state.yaw = 0.35; state.pitch = -0.12;
+    const radii = state.pathRadii || [];
+    state.zoom = radii.length ? zoomForRadius(radii[0]) : 1.4;
+    render();
+  }
+
   canvas.addEventListener('mousedown', e => {
     state.dragging = true;
     state.lastX = e.clientX; state.lastY = e.clientY;
@@ -1161,10 +1295,10 @@ function makeScene(canvasId, opts) {
   // plainly: these live in the closure. Under nesting the orb holds only the
   // cells common to every closure in the chain.
   const ORB_R = 3.2;                       // orb radius, world units
-  let introRAF = null, introT0 = 0, introDur = 620;
 
-  // Deterministic orbit parameters for one floating cell, from its perm hash so
-  // the swarm is stable across renders.
+  // Cinematic entry (Eyes-on-the-Solar-System style): fly the camera in on the
+  // cell drawn as a SOLID sphere, hold, then dissolve the fill to reveal the
+  // closure floating inside. renderContain drives the whole thing off the clock.
   function orbitParams(perm, i, count) {
     const rnd = (salt) => {
       const h = permHash(perm + '#' + salt);
@@ -1218,27 +1352,23 @@ function makeScene(canvasId, opts) {
   // and `ancestors` (outer cells of the intersection) become concentric rings.
   function enterContain(focusPerm, closure, ancestors, opts) {
     opts = opts || {};
+    const instant = !!opts.instant;        // arrived via an overview fly-in already
     state.frame = null;                    // everything is laid out around origin
+    const fit = fitContainZoom((ancestors || []).length);
     state.contain = {
       focus: focusPerm,
       color: (CELLS[focusPerm] && CELLS[focusPerm].color) || '#D4AF37',
       cells: closure.map((p, i) => orbitParams(p, i, closure.length)),
-      ancestors: ancestors || []           // [{perm, color}], outermost first
+      ancestors: ancestors || [],          // [{perm, color}], outermost first
+      startTime: performance.now(),
+      fitZoom: fit,
+      reveal: 0,
+      instant,
+      // phase durations (ms): fly in, hold on the solid cell, then dissolve
+      zoomDur: instant ? 0 : 900, holdDur: 1400, dissolveDur: 850
     };
-    const fit = fitContainZoom((ancestors || []).length);
-    // A brief ease-in on the zoom so entering/drilling reads as diving inward.
-    const from = fit * 0.55, to = fit;
-    introT0 = performance.now();
-    if (introRAF) cancelAnimationFrame(introRAF);
-    state.zoom = from;
-    function step(now) {
-      const t = Math.min(1, (now - introT0) / introDur);
-      const e = 1 - Math.pow(1 - t, 3);
-      state.zoom = from + (to - from) * e;
-      render();
-      introRAF = t < 1 ? requestAnimationFrame(step) : null;
-    }
-    introRAF = requestAnimationFrame(step);
+    state.zoom = instant ? fit : fit * 0.45;   // already close if flown in
+    render();
   }
 
   // Draw the orb and its floating closure. Also fills state.spheres so the
@@ -1246,23 +1376,46 @@ function makeScene(canvasId, opts) {
   function renderContain() {
     const C = state.contain;
     const t = performance.now() / 1000;
+
+    // Drive the cinematic timeline off the clock.
+    const el = performance.now() - C.startTime;
+    if (!C.instant) {
+      const zt = Math.min(1, el / C.zoomDur);
+      const ze = 1 - Math.pow(1 - zt, 3);               // easeOutCubic
+      if (el <= C.zoomDur) state.zoom = C.fitZoom * (0.45 + 0.55 * ze); // fly in, then free
+    }
+    const rRaw = Math.min(1, Math.max(0, (el - C.zoomDur - C.holdDur) / C.dissolveDur));
+    const reveal = rRaw < 0.5 ? 2 * rRaw * rRaw : 1 - Math.pow(-2 * rRaw + 2, 2) / 2;
+    C.reveal = reveal;                                  // 0 solid → 1 glass+closure
+    const solid = 1 - reveal;
+
     const centre = project({ x: 0, y: 0, z: 0 });
     const orbScreenR = ORB_R * centre.scale;
-
-    // Orb body: soft radial fill + rim, evoking a glass sphere.
     const [cr, cg, cb] = hexToRgb(C.color);
+    const light = m => `${Math.min(255, cr + (255 - cr) * m) | 0},${Math.min(255, cg + (255 - cg) * m) | 0},${Math.min(255, cb + (255 - cb) * m) | 0}`;
+    const dark  = m => `${(cr * (1 - m)) | 0},${(cg * (1 - m)) | 0},${(cb * (1 - m)) | 0}`;
+
+    // Orb body: a lit solid sphere on entry, easing toward faint glass as it
+    // dissolves. Alphas interpolate between "planet" and the old glass look.
     const grad = ctx.createRadialGradient(
-      centre.x - orbScreenR * 0.3, centre.y - orbScreenR * 0.3, orbScreenR * 0.1,
+      centre.x - orbScreenR * 0.35, centre.y - orbScreenR * 0.35, orbScreenR * 0.05,
       centre.x, centre.y, orbScreenR);
-    grad.addColorStop(0, `rgba(${cr},${cg},${cb},0.10)`);
-    grad.addColorStop(0.72, `rgba(${cr},${cg},${cb},0.05)`);
-    grad.addColorStop(1, `rgba(${cr},${cg},${cb},0.14)`);
+    grad.addColorStop(0,    `rgba(${light(0.55)},${(0.95 * solid + 0.10 * reveal).toFixed(3)})`);
+    grad.addColorStop(0.55, `rgba(${cr},${cg},${cb},${(0.82 * solid + 0.05 * reveal).toFixed(3)})`);
+    grad.addColorStop(1,    `rgba(${dark(0.45)},${(0.55 * solid + 0.14 * reveal).toFixed(3)})`);
     ctx.beginPath();
     ctx.arc(centre.x, centre.y, orbScreenR, 0, Math.PI * 2);
     ctx.fillStyle = grad; ctx.fill();
     ctx.lineWidth = 1.5;
-    ctx.strokeStyle = `rgba(${cr},${cg},${cb},0.5)`;
+    ctx.strokeStyle = `rgba(${cr},${cg},${cb},${(0.5 + 0.35 * solid).toFixed(3)})`;
     ctx.stroke();
+
+    // Focus label rides on the solid sphere and fades as the closure appears.
+    if (solid > 0.02) {
+      ctx.globalAlpha = solid;
+      drawFloatLabel(C.focus, centre.x, centre.y - orbScreenR - 6, 0);
+      ctx.globalAlpha = 1;
+    }
 
     // Outer rings: one per ancestor cell of the intersection, outermost = the
     // first cell examined. They signal "we are looking through all of these."
@@ -1308,21 +1461,23 @@ function makeScene(canvasId, opts) {
       const dcue = Math.max(0.45, Math.min(1.2, pr.scale / centre.scale));
       let r = Math.max(3.5, dimRadius(cell.dim) * 150 * pr.scale * 0.02) * dcue;
       if (isHover) r *= 1.25;
-      ctx.globalAlpha = (isHover ? 1 : 0.9) * Math.min(1, 0.5 + dcue * 0.5);
+      // The whole closure fades in only as the sphere turns transparent.
+      ctx.globalAlpha = reveal * (isHover ? 1 : 0.9) * Math.min(1, 0.5 + dcue * 0.5);
       ctx.fillStyle = cell.color;
       ctx.beginPath();
       ctx.arc(pr.x, pr.y, r, 0, Math.PI * 2);
       ctx.fill();
       const isHit = SEARCH_MATCHES && SEARCH_MATCHES.has(perm);
       if (isHover || isHit) {
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = reveal;
         ctx.strokeStyle = '#D4AF37';
         ctx.lineWidth = 2;
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
-      if (showAll || isHover || isHit) drawFloatLabel(perm, pr.x, pr.y, r);
-      spheres.push({ perm, x: pr.x, y: pr.y, r });
+      if (reveal > 0.35 && (showAll || isHover || isHit)) drawFloatLabel(perm, pr.x, pr.y, r);
+      // Only clickable once actually visible.
+      if (reveal > 0.15) spheres.push({ perm, x: pr.x, y: pr.y, r });
     });
 
     // A faint front-rim highlight, drawn over the floats to seal the glass.
@@ -1332,13 +1487,15 @@ function makeScene(canvasId, opts) {
     ctx.strokeStyle = `rgba(255,255,255,0.10)`;
     ctx.stroke();
 
-    // Empty nested intersection: say so in the middle of the orb.
-    if (!C.cells.length) {
+    // Empty nested intersection: say so in the middle of the orb, once revealed.
+    if (!C.cells.length && reveal > 0.35) {
+      ctx.globalAlpha = reveal;
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
       ctx.font = 'italic 13px "Times New Roman", serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('(nothing in the intersection)', centre.x, centre.y);
       ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+      ctx.globalAlpha = 1;
     }
     state.spheres = spheres;
   }
@@ -1360,7 +1517,35 @@ function makeScene(canvasId, opts) {
     ctx.textAlign = 'center';
   }
 
-  return { state, render, resize, frameSoloEdge, enterContain, fitContainZoom };
+  // Fly the camera from the current framing onto one cell, zooming in — the
+  // "dive from the whole layout to the chosen body" before the cell view opens.
+  let flyRAF = null;
+  function flyToCell(perm, onDone) {
+    const P = POSITIONS[perm];
+    if (!P) { if (onDone) onDone(); return; }
+    const s = state.frame ? { x: state.frame.o.x, y: state.frame.o.y, z: state.frame.o.z }
+                          : { x: 0, y: 0, z: 0 };
+    const startZoom = state.zoom;
+    const endZoom = Math.min(6.0, startZoom * 3.8);   // dive in closer before hand-off
+    const dur = 760, t0 = performance.now();
+    state.rotating = false;
+    if (flyRAF) cancelAnimationFrame(flyRAF);
+    function step(now) {
+      const t = Math.min(1, (now - t0) / dur);
+      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;  // easeInOut
+      state.frame = {
+        o:  { x: s.x + (P.x - s.x) * e, y: s.y + (P.y - s.y) * e, z: s.z + (P.z - s.z) * e },
+        e1: { x: 1, y: 0, z: 0 }, e2: { x: 0, y: 1, z: 0 }, e3: { x: 0, y: 0, z: 1 }
+      };
+      state.zoom = startZoom + (endZoom - startZoom) * e;
+      render();
+      if (t < 1) flyRAF = requestAnimationFrame(step);
+      else { flyRAF = null; if (onDone) onDone(); }
+    }
+    flyRAF = requestAnimationFrame(step);
+  }
+
+  return { state, render, resize, frameSoloEdge, enterContain, fitContainZoom, framePathRow, flyToCell };
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
@@ -1398,7 +1583,7 @@ function nestedClosure(chain) {
 
 const sceneOverview = makeScene('scene-overview', {
   autoRotate: true,
-  onClickSphere: perm => goToCell(perm)
+  onClickSphere: perm => pickFromOverview(perm)
 });
 const sceneCell = makeScene('scene-cell', {
   autoRotate: true,
@@ -1423,6 +1608,9 @@ function setView(name) {
     if (name === 'overview') {
       sceneOverview.resize();
       sceneOverview.state.activeCell = null;
+      sceneOverview.state.frame = null;      // undo any fly-in framing
+      sceneOverview.state.zoom = 1.0;
+      sceneOverview.state.rotating = true;
       sceneOverview.render();
     } else if (name === 'cell') {
       sceneCell.resize();
@@ -1437,13 +1625,21 @@ function setView(name) {
       const ancestors = focusChain.slice(0, -1).map((p, j) => ({
         perm: p, color: RING_PALETTE[j % RING_PALETTE.length]
       }));
-      sceneCell.enterContain(currentCell, closure, ancestors);
+      sceneCell.enterContain(currentCell, closure, ancestors, { instant: enterInstant });
+      enterInstant = false;
     } else if (name === 'traverse') {
       sceneTraverse.resize();
-      const p0 = (traversePath && traversePath.phases[0]) || currentEdge;
-      sceneTraverse.state.activeCell = p0.src;
-      sceneTraverse.state.soloEdge = { src: p0.src, tgt: p0.tgt };
+      const perms = (traversePath && traversePath.perms) || [];
+      sceneTraverse.state.activeCell = perms[0] || (currentEdge && currentEdge.src);
+      sceneTraverse.state.soloEdge = null;
       sceneTraverse.state.flowAnim = null;
+      sceneTraverse.state.pathCells = perms;
+      sceneTraverse.state.pathRadii = buildPathNest(perms);
+      sceneTraverse.state.pathPos = null;
+      sceneTraverse.state.pathActiveHop = -1;
+      sceneTraverse.state.pathHopT = 0;
+      sceneTraverse.state.pathArrived = false;
+      sceneTraverse.state.pathImplosion = null;
       recenterTraverse();
     }
   }));
@@ -1523,14 +1719,23 @@ function goHome() {
   setView('overview');
 }
 
-// Fresh entry: start a brand-new examination chain at `perm` (from the overview,
-// search, or a jump that isn't a nested step).
-function goToCell(perm) {
+// When true, the next cell view skips its own pull-back because an overview
+// fly-in already brought the camera in.
+let enterInstant = false;
+
+// Fresh entry: start a brand-new examination chain at `perm`.
+function goToCell(perm, opts) {
+  enterInstant = !!(opts && opts.instant);
   focusChain = [perm];
   currentCell = perm;
   currentEdge = null;
   fillCellView();
   setView('cell');
+}
+
+// From the overview: dive the camera onto the cell first, then open it.
+function pickFromOverview(perm) {
+  sceneOverview.flyToCell(perm, () => goToCell(perm, { instant: true }));
 }
 
 // Nested step: examine `perm` from the current cell. If `perm` lies in the
@@ -1562,9 +1767,10 @@ function edgeBetween(a, b) {
   return EDGES.find(e => e.src === a && e.tgt === b) || null;
 }
 
-// The path we degenerate along. Taking a path from a nested view walks the whole
-// examination chain and then the chosen destination: A → B → … → focus → dest,
-// one degeneration phase per hop. Without nesting this is just focus → dest.
+// The path we degenerate along, shown as nested shells. It is exactly the cells
+// you chose: the examination chain you nested through, then the destination. A
+// direct path (no nesting) is just the two endpoints — no intermediate cells are
+// inserted. To see intermediate degenerations, drill through those cells first.
 let traversePath = null;   // { perms: [...], phases: [edge, ...] }
 
 function goToTraverse(destEdge) {
@@ -2191,23 +2397,41 @@ function fillTraverseView() {
   document.getElementById('traverse-hint').textContent = 'click "Begin traversal" to start';
   sceneTraverse.state.firstPerson = false;
   sceneTraverse.state.cameraPos = null;
-  sceneTraverse.state.activeCell = phases[0] ? phases[0].src : first;
-  sceneTraverse.state.soloEdge = phases[0] ? { src: phases[0].src, tgt: phases[0].tgt } : null;
+  sceneTraverse.state.activeCell = first;
+  sceneTraverse.state.soloEdge = null;           // path mode replaces solo framing
   sceneTraverse.state.particles = null;
   sceneTraverse.state.flowAnim = null;
   sceneTraverse.state.doneLabel = null;
+  // Lay every cell of the path out in one horizontal row so no screen-jumping
+  // is needed between transitions.
+  sceneTraverse.state.pathCells = perms;
+  sceneTraverse.state.pathRadii = buildPathNest(perms);
+  sceneTraverse.state.pathPos = null;
+  sceneTraverse.state.pathActiveHop = -1;
+  sceneTraverse.state.pathHopT = 0;
+  sceneTraverse.state.pathArrived = false;
+  sceneTraverse.state.pathImplosion = null;
   recenterTraverse();
+}
+
+// Evenly spaced positions along the x-axis, centred on the origin.
+// Concentric radii for the path: start cell outermost, destination at the core.
+function buildPathNest(perms) {
+  const n = perms.length, Rmax = 3.4, Rmin = 1.1;
+  const radii = [];
+  for (let i = 0; i < n; i++) {
+    radii.push(n < 2 ? Rmax : Rmin + (Rmax - Rmin) * ((n - 1 - i) / (n - 1)));
+  }
+  return radii;
 }
 
 // Default single-path framing: source on the left, target on the right, the pair
 // centred and separated by exactly half the canvas width.
 const SOLO_SEPARATION = 0.5;
 function recenterTraverse() {
-  const e = (traversePath && traversePath.phases[0]) || currentEdge;
-  if (!e) return;
+  if (!traversePath || !traversePath.perms.length) return;
   sceneTraverse.resize();
-  sceneTraverse.frameSoloEdge(e.src, e.tgt, SOLO_SEPARATION);
-  sceneTraverse.render();
+  sceneTraverse.framePathRow();
 }
 
 let traverseTimer = null;   // sub-step highlighting within a phase
@@ -2231,37 +2455,45 @@ function startTraversal() {
   sceneTraverse.state.firstPerson = false;
   sceneTraverse.state.cameraPos = null;
   sceneTraverse.state.doneLabel = null;
+  sceneTraverse.state.pathArrived = false;
+  sceneTraverse.state.pathActiveHop = -1;
+  sceneTraverse.state.pathHopT = 0;
+  sceneTraverse.state.pathImplosion = null;
 
   let pi = 0;
   function runPhase() {
     if (gen !== traverseGen) return;                 // superseded by a new run
     if (pi >= phases.length) {
       const last = traversePath.perms[traversePath.perms.length - 1];
+      sceneTraverse.state.pathArrived = true;
+      sceneTraverse.state.pathActiveHop = Math.max(0, phases.length - 1);
+      sceneTraverse.state.pathHopT = 1;
+      sceneTraverse.state.pathImplosion = null;
+      sceneTraverse.state.pathActiveEdge = null;
+      sceneTraverse.render();
       document.getElementById('traverse-hint').innerHTML = `arrived in ${mcell(last)}`;
       return;
     }
     const edge = phases[pi];
     const stepEls = allSteps.filter(el => +el.dataset.phase === pi);
-    sceneTraverse.state.doneLabel = null;
-    sceneTraverse.state.activeCell = edge.src;
-    sceneTraverse.state.soloEdge = { src: edge.src, tgt: edge.tgt };
-    sceneTraverse.frameSoloEdge(edge.src, edge.tgt, SOLO_SEPARATION);
+    sceneTraverse.state.pathActiveHop = pi;
+    sceneTraverse.state.pathActiveEdge = edge;
     if (phases.length > 1) {
       document.getElementById('traverse-hint').innerHTML =
         `phase ${pi + 1} of ${phases.length}: ${mcell(edge.src)} \u2192 ${mcell(edge.tgt)}`;
     }
-    animatePhase(edge, stepEls, gen, () => {
+    animatePhase(pi, edge, stepEls, gen, () => {
       pi++;
-      phaseTimer = setTimeout(runPhase, phases.length > 1 ? 520 : 0);
+      phaseTimer = setTimeout(runPhase, phases.length > 1 ? 460 : 0);
     });
   }
   runPhase();
 }
 
-// Run the degeneration animation for a single hop: stagger its operation steps,
-// spray the mote burst from src to tgt, then pin the result. Calls onDone when
-// the hop finishes (unless a newer run has superseded this one).
-function animatePhase(edge, stepEls, gen, onDone) {
+// Run one hop of the inward degeneration: stagger its operation steps while a
+// mote burst implodes from the source shell to the next, then hand off.
+function animatePhase(pi, edge, stepEls, gen, onDone) {
+  const st = sceneTraverse.state;
   const stepDuration = 900;
   let sIdx = 0;
   function nextStep() {
@@ -2275,52 +2507,36 @@ function animatePhase(edge, stepEls, gen, onDone) {
   }
   nextStep();
 
-  const subs = Object.entries(edge.tgtSubs || {});
-  const caption = subs.length ? subs.map(([k, v]) => `${k} = ${v}`).join(', ')
-                              : 'whole target cell';
-  const startTime = performance.now();
-  const flowDuration = stepDuration * Math.max(1, stepEls.length);
-
-  const COUNT = 320;
-  const items = [];
+  // Motes spread over the whole sphere, imploding inward with a slight stagger.
+  const COUNT = 260, items = [];
   for (let i = 0; i < COUNT; i++) {
-    const u  = Math.random() * 2 - 1;
-    const th = Math.random() * Math.PI * 2;
+    const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2;
     const rr = Math.sqrt(Math.max(0, 1 - u * u));
     items.push({
-      dx: rr * Math.cos(th), dy: u, dz: rr * Math.sin(th),
-      delay: Math.pow(i / COUNT, 0.85) * 0.58,
-      life:  0.34 + Math.random() * 0.26,
-      amp:   0.7 + Math.random() * 2.6,
-      swirl: (Math.random() < 0.5 ? -1 : 1) * (1.4 + Math.random() * 3.2),
-      size:  0.55 + Math.random() * 1.5
+      dir: { x: rr * Math.cos(th), y: u, z: rr * Math.sin(th) },
+      delay: Math.pow(i / COUNT, 0.7) * 0.5,
+      life:  0.42 + Math.random() * 0.34,
+      size:  0.6 + Math.random() * 1.7
     });
   }
-  sceneTraverse.state.particles = { src: edge.src, tgt: edge.tgt, t: 0, items };
+  st.pathImplosion = { items };
+  st.pathActiveEdge = edge;
+  st.pathArrived = false;
 
+  const startTime = performance.now();
+  const dur = Math.max(1500, stepDuration * Math.max(1, stepEls.length));
   function flightStep(now) {
     if (gen !== traverseGen) return;                 // superseded — stop rendering
-    const raw = Math.min(1, (now - startTime) / flowDuration);
-    const t = raw < 0.5 ? 2 * raw * raw : 1 - Math.pow(-2 * raw + 2, 2) / 2;
-    sceneTraverse.state.particles.t = raw * 1.18;
-    sceneTraverse.state.flowAnim = {
-      src: edge.src, tgt: edge.tgt, t,
-      limitVar: edge.limit, caption,
-      srcSubs: edge.srcSubs, tgtSubs: edge.tgtSubs
-    };
+    const raw = Math.min(1, (now - startTime) / dur);
+    st.pathActiveHop = pi;
+    st.pathHopT = raw;                               // renderPathStage drives zoom + shells
     sceneTraverse.render();
     if (raw < 1) {
       requestAnimationFrame(flightStep);
     } else {
       stepEls.forEach(s => s.classList.replace('active', 'done'));
-      sceneTraverse.state.activeCell = edge.tgt;
-      sceneTraverse.state.flowAnim = null;
-      sceneTraverse.state.particles = null;
-      sceneTraverse.state.doneLabel = {
-        tgt: edge.tgt,
-        limitVar: edge.limit,
-        subs: Object.entries(edge.tgtSubs || {})
-      };
+      st.pathHopT = 1;
+      st.pathImplosion = null;
       sceneTraverse.render();
       onDone();
     }
@@ -2444,7 +2660,9 @@ function pickSearch(perm) {
   document.getElementById('search-results').innerHTML = '';
   document.getElementById('cell-search').value = perm;
   SEARCH_MATCHES = null;
-  goToCell(perm);
+  // From the overview, dive onto the cell first; from a cell view, open directly.
+  if (currentView === 'overview') pickFromOverview(perm);
+  else goToCell(perm);
 }
 
 function clearSearch() {
