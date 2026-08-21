@@ -97,6 +97,17 @@
   .phase-legend .pl-body { font-size: 13px; }
   .phase-legend .pl-trans { font-family: var(--font-math); font-size: 15px; }
   .phase-legend .pl-limit { font-family: var(--font-math); color: var(--gold); font-size: 13px; }
+  .surv-all { font-family: var(--font-math); font-size: 16px; }
+  .surv-still { color: var(--text-primary); margin: 0 0 10px; font-size: 13px; }
+  .surv-sub { display: flex; gap: 8px; align-items: baseline; margin: 4px 0; font-size: 12px;
+    font-family: var(--font-math); }
+  .surv-sub .surv-tag { font-family: var(--font-sans); font-size: 10px; letter-spacing: .04em;
+    text-transform: uppercase; flex: none; width: 92px; }
+  .surv-carried .surv-tag { color: #7CD6A0; }
+  .surv-freed   .surv-tag { color: var(--gold); }
+  .surv-consumed .surv-tag { color: var(--text-tertiary); }
+  .surv-consumed .surv-vars { color: var(--text-tertiary); text-decoration: line-through; }
+  .surv-none { color: var(--text-tertiary); font-family: var(--font-sans); }
   #cell-search { width: 100%; font-family: var(--font-mono); font-size: 13px; padding: 9px 12px; border-radius: var(--radius-md); border: .5px solid var(--border); background: var(--bg-primary); color: var(--text-primary); }
   #cell-search:focus { outline: none; border-color: var(--accent); }
   .search-results { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; background: var(--bg-primary); border: .5px solid var(--border); border-radius: var(--radius-md); margin-top: 4px; max-height: 264px; overflow-y: auto; box-shadow: 0 6px 22px rgba(0,0,0,.75); }
@@ -325,6 +336,10 @@
     <div class="traversal-panel phase-legend" id="phase-legend-panel" hidden>
       <p class="label-uppercase">Limits taken, per phase</p>
       <div id="phase-legend"></div>
+    </div>
+    <div class="traversal-panel" id="survivors-panel" hidden>
+      <p class="label-uppercase">Free variables at the destination</p>
+      <div id="survivors-body"></div>
     </div>
     <div class="traversal-panel">
       <p class="label-uppercase">Operations</p>
@@ -1117,6 +1132,33 @@ function makeScene(canvasId, opts) {
     ctx.globalAlpha = 1;
   }
 
+  // Surviving free variables drawn INSIDE the destination shell, so everything
+  // sits on one screen once we've zoomed down to the core.
+  function drawDestinationFreeVars(centre, screenR, startPerm, destPerm) {
+    if (screenR < 62) return;                       // only once zoomed in enough
+    const byIdx = (a, b) => parseInt((a.match(/\d+/) || [0])[0], 10) - parseInt((b.match(/\d+/) || [0])[0], 10);
+    const sf = new Set((CELLS[startPerm] || {}).free || []);
+    const df = ((CELLS[destPerm] || {}).free || []).slice().sort(byIdx);
+    const dSet = new Set(df);
+    const carried  = df.filter(v => sf.has(v));
+    const freed    = df.filter(v => !sf.has(v));
+    const consumed = [...sf].filter(v => !dSet.has(v)).sort(byIdx);
+    const prime = a => a.length ? a.map(v => v + '\u2032').join(', ') : '\u2014';
+    const plain = a => a.length ? a.join(', ') : '\u2014';
+    const cx = centre.x, cy = centre.y;
+    const sans = 'system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = `600 9px ${sans}`;
+    ctx.fillText('FREE VARIABLES THAT SURVIVE', cx, cy - 34);
+    ctx.fillStyle = '#ffffff'; ctx.font = 'italic 18px "Times New Roman", serif';
+    ctx.fillText(prime(df), cx, cy - 11);
+    ctx.font = `11px ${sans}`;
+    ctx.fillStyle = '#7CD6A0'; ctx.fillText('carried   ' + prime(carried), cx, cy + 14);
+    ctx.fillStyle = '#D4AF37'; ctx.fillText('newly freed   ' + prime(freed), cx, cy + 30);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillText('consumed   ' + plain(consumed), cx, cy + 46);
+    ctx.textAlign = 'start';
+  }
+
   function renderPathStage() {
     const pc = state.pathCells, radii = state.pathRadii || [];
     const n = pc.length;
@@ -1134,32 +1176,42 @@ function makeScene(canvasId, opts) {
       state.zoom = zA + (zB - zA) * e;
     }
 
+    // How "solid/present" each cell is. Every cell we descend into is drawn as a
+    // SOLID sphere (like the cell view), then dissolves as the implosion carries
+    // us inward to the next — so every cell gets the reveal, not just the first.
+    // Cells stay faintly visible throughout so the nesting is always legible.
+    function solidity(i) {
+      if (arrived)  return i === n - 1 ? 0.55 : 0.12;         // rest on the core
+      if (hop < 0)  return i === 0 ? 1 : 0.12;                // static: first cell solid
+      if (i === hop)     return Math.max(0.12, 1 - hopT);     // current: dissolving
+      if (i === hop + 1) return Math.min(1, 0.12 + hopT);     // next: materialising
+      if (i < hop)  return 0.05;                              // already passed
+      return 0.12;                                            // deeper, not yet reached
+    }
+
     // Shells, outermost first so inner ones layer on top.
     for (let i = 0; i < n; i++) {
       const perm = pc[i], cell = CELLS[perm];
       if (!cell) continue;
       const screenR = radii[i] * centre.scale;
       const [r, g, b] = hexToRgb(cell.color);
-      const isDest = i === n - 1;
-      let rim = 0.5, fill = 0.06, lw = 1.5;
-      if (hop >= 0) {
-        if (i < hop) { rim = 0.10; fill = 0.015; lw = 1; }                    // already passed
-        else if (i === hop) { rim = 0.15 + 0.55 * (1 - hopT); fill = 0.10 * (1 - hopT); lw = 2; }   // dissolving source
-        else if (i === hop + 1) { rim = 0.55 + 0.35 * hopT; fill = 0.05 + 0.09 * hopT; lw = 2.4; }  // brightening target
-      }
-      if (isDest) { rim = Math.max(rim, arrived ? 0.95 : 0.6); fill = Math.max(fill, arrived ? 0.26 : 0.10); }
-
-      const grad = ctx.createRadialGradient(centre.x, centre.y, screenR * 0.1, centre.x, centre.y, screenR);
-      grad.addColorStop(0, `rgba(${r},${g},${b},${fill.toFixed(3)})`);
-      grad.addColorStop(1, `rgba(${r},${g},${b},${(fill * 0.35).toFixed(3)})`);
+      const sol = solidity(i);
+      const light = m => `${Math.min(255, r + (255 - r) * m) | 0},${Math.min(255, g + (255 - g) * m) | 0},${Math.min(255, b + (255 - b) * m) | 0}`;
+      const dark  = m => `${(r * (1 - m)) | 0},${(g * (1 - m)) | 0},${(b * (1 - m)) | 0}`;
+      const grad = ctx.createRadialGradient(
+        centre.x - screenR * 0.32, centre.y - screenR * 0.32, screenR * 0.05,
+        centre.x, centre.y, screenR);
+      grad.addColorStop(0,   `rgba(${light(0.5)},${(0.85 * sol + 0.05).toFixed(3)})`);
+      grad.addColorStop(0.6, `rgba(${r},${g},${b},${(0.7 * sol + 0.03).toFixed(3)})`);
+      grad.addColorStop(1,   `rgba(${dark(0.4)},${(0.4 * sol + 0.05).toFixed(3)})`);
       ctx.beginPath(); ctx.arc(centre.x, centre.y, screenR, 0, Math.PI * 2);
       ctx.fillStyle = grad; ctx.fill();
-      ctx.lineWidth = lw; ctx.strokeStyle = `rgba(${r},${g},${b},${rim.toFixed(3)})`;
+      ctx.lineWidth = 1 + 1.6 * sol;
+      ctx.strokeStyle = `rgba(${r},${g},${b},${(0.3 + 0.6 * sol).toFixed(3)})`;
       ctx.stroke();
 
-      if (screenR > 15 && !(hop >= 0 && i < hop)) {
-        drawShellLabel(perm, centre.x, centre.y - screenR - 4, cell.color,
-          isDest || (hop >= 0 && i === hop + 1));
+      if (screenR > 15) {
+        drawShellLabel(perm, centre.x, centre.y - screenR - 4, cell.color, sol > 0.5);
       }
     }
 
@@ -1178,6 +1230,11 @@ function makeScene(canvasId, opts) {
       ctx.fillText(e.limit ? `send ${e.limit} \u2192 \u221E` : 'to the target cell',
         centre.x, centre.y + 4);
       ctx.textAlign = 'start';
+    }
+
+    // Surviving free variables land INSIDE the destination cell once we arrive.
+    if (arrived) {
+      drawDestinationFreeVars(centre, radii[n - 1] * centre.scale, pc[0], pc[n - 1]);
     }
     state.spheres = [];
   }
@@ -1767,6 +1824,38 @@ function edgeBetween(a, b) {
   return EDGES.find(e => e.src === a && e.tgt === b) || null;
 }
 
+// After a degeneration lands, show which coordinate positions are still free in
+// the destination cell (the survivors), split by how they relate to the start
+// cell: carried (free in both), newly freed (free only at the end), and consumed
+// (free at the start, now fixed — these include the variables sent to the limit).
+// Positions are global, so this is a well-defined comparison of free positions;
+// each cell still owns its own coordinate values (destination ones are primed).
+function renderSurvivors(startPerm, destPerm) {
+  const panel = document.getElementById('survivors-panel');
+  const body = document.getElementById('survivors-body');
+  if (!panel || !body) return;
+  const byIdx = (a, b) => (parseInt((a.match(/\d+/) || [0])[0], 10)) - (parseInt((b.match(/\d+/) || [0])[0], 10));
+  const startFree = ((CELLS[startPerm] || {}).free || []);
+  const destFree  = ((CELLS[destPerm]  || {}).free || []).slice().sort(byIdx);
+  const sSet = new Set(startFree), dSet = new Set(destFree);
+  const carried  = destFree.filter(v => sSet.has(v));
+  const freed    = destFree.filter(v => !sSet.has(v));
+  const consumed = startFree.filter(v => !dSet.has(v)).sort(byIdx);
+  const fmt = (arr, prime) => arr.length
+    ? arr.map(v => mvar(v, prime)).join(', ')
+    : '<span class="surv-none">none</span>';
+  body.innerHTML =
+    `<p class="surv-still">Still free in ${mcell(destPerm)} (${destFree.length}): ` +
+      `<span class="surv-all">${fmt(destFree, true)}</span></p>` +
+    `<p class="surv-sub surv-carried"><span class="surv-tag">carried</span>` +
+      `<span class="surv-vars">${fmt(carried, true)}</span></p>` +
+    `<p class="surv-sub surv-freed"><span class="surv-tag">newly freed</span>` +
+      `<span class="surv-vars">${fmt(freed, true)}</span></p>` +
+    `<p class="surv-sub surv-consumed"><span class="surv-tag">consumed</span>` +
+      `<span class="surv-vars">${fmt(consumed, false)}</span></p>`;
+  panel.hidden = false;
+}
+
 // The path we degenerate along, shown as nested shells. It is exactly the cells
 // you chose: the examination chain you nested through, then the destination. A
 // direct path (no nesting) is just the two endpoints — no intermediate cells are
@@ -2337,6 +2426,8 @@ function buildSteps(edge) {
 function fillTraverseView() {
   const perms = traversePath.perms, phases = traversePath.phases;
   const first = perms[0], last = perms[perms.length - 1];
+  const survPanel = document.getElementById('survivors-panel');
+  if (survPanel) survPanel.hidden = true;      // only revealed once we arrive
   document.getElementById('traverse-from').innerHTML = mcell(first);
   document.getElementById('traverse-to').innerHTML = mcell(last);
   const srcCell = CELLS[first];
@@ -2452,6 +2543,8 @@ function startTraversal() {
   const allSteps = Array.from(document.querySelectorAll('#step-list .traversal-step'));
   allSteps.forEach(s => s.classList.remove('active', 'done'));
   document.getElementById('traverse-hint').textContent = 'travelling\u2026';
+  const survPanel = document.getElementById('survivors-panel');
+  if (survPanel) survPanel.hidden = true;
   sceneTraverse.state.firstPerson = false;
   sceneTraverse.state.cameraPos = null;
   sceneTraverse.state.doneLabel = null;
