@@ -285,6 +285,14 @@
       <div id="orb-legend" class="orb-legend" hidden></div>
       <p class="hint">drag to rotate · scroll to zoom</p>
     </div>
+    <div class="dim-card" style="margin:0 0 1rem;">
+      <div class="dim-head">
+        <p class="label-uppercase" style="margin:0;">Closure by dimension</p>
+        <button id="closure-toggle-all" class="mini-btn">Expand all</button>
+      </div>
+      <p id="closure-note" style="margin:0 0 10px; font-size:12px; color:var(--text-tertiary);"></p>
+      <div id="closure-dim-table"></div>
+    </div>
     <div class="info-grid">
       <div class="info-card">
         <p class="label-uppercase">Parameter space</p>
@@ -296,14 +304,6 @@
       </div>
     </div>
     <div class="action-area">
-      <div class="dim-card" style="margin:0 0 1rem;">
-        <div class="dim-head">
-          <p class="label-uppercase" style="margin:0;">Closure by dimension</p>
-          <button id="closure-toggle-all" class="mini-btn">Expand all</button>
-        </div>
-        <p id="closure-note" style="margin:0 0 10px; font-size:12px; color:var(--text-tertiary);"></p>
-        <div id="closure-dim-table"></div>
-      </div>
       <p class="label-uppercase">Choose a path to another cell</p>
       <div id="path-list"></div>
     </div>
