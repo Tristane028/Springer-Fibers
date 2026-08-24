@@ -214,19 +214,32 @@
   .pc-more .pc-grid { margin-top: 4px; }
   /* ── Title / landing page ─────────────────────────────────────────────── */
   .title-page {
-    position: fixed; inset: 0; z-index: 2000;
+    position: fixed; inset: 0; z-index: 2000; overflow: hidden;
     display: flex; align-items: center; justify-content: center;
     background: radial-gradient(circle at 50% 38%, #17130a 0%, #0b0b0c 55%, #000 100%);
     transition: opacity .7s ease;
   }
   .title-page.hidden { opacity: 0; pointer-events: none; }
   .title-inner { text-align: center; max-width: 640px; padding: 2rem; }
-  .title-emblem { width: 168px; height: 168px; margin: 0 auto 1.6rem; display: block; }
+  .title-emblem { width: 168px; height: 168px; margin: 0 auto 1.6rem; display: block;
+    transform-origin: center; will-change: transform, opacity;
+    transition: transform .95s cubic-bezier(.55,0,.9,.9), opacity .5s ease .45s; }
   .title-emblem .ring-spin { transform-origin: 90px 90px; animation: title-spin 26s linear infinite; }
   .title-emblem .ring-spin-rev { transform-origin: 90px 90px; animation: title-spin 34s linear infinite reverse; }
   .title-emblem .core { animation: title-pulse 3.4s ease-in-out infinite; transform-origin: 90px 90px; }
   @keyframes title-spin  { to { transform: rotate(360deg); } }
   @keyframes title-pulse { 0%,100% { opacity: .85; } 50% { opacity: 1; } }
+
+  /* Explore = explode the button into yellow dots, funnel them into the emblem
+     core (black-hole style), then grow the core to fill the screen. The motion
+     itself is drawn on a full-screen canvas (#title-fx); these rules just clear
+     the static title content out of the way. */
+  #title-fx { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+  .title-page.fx-run { pointer-events: none; }
+  .title-page.fx-run .title-explore { opacity: 0; transition: opacity .12s ease; }
+  .title-page.fx-run .title-name,
+  .title-page.fx-run .title-sub,
+  .title-page.fx-run .title-hint { opacity: 0; transition: opacity .45s ease; }
   .title-name {
     font-family: var(--font-math); font-size: 62px; line-height: 1.05;
     margin: 0 0 .5rem; color: var(--text-primary); letter-spacing: .5px; font-weight: 400;
@@ -252,6 +265,7 @@
 </head>
 <body>
 <div id="title-page" class="title-page">
+  <canvas id="title-fx"></canvas>
   <div class="title-inner">
     <svg class="title-emblem" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <defs>
@@ -1942,22 +1956,172 @@ function goToTraverse(destEdge) {
 
 document.getElementById('home-btn').addEventListener('click', goHome);
 
-// Title page: fade out and drop into the default viewport (overview).
+// Title page: explode Explore into yellow dots, funnel them into the emblem
+// core like a black hole, swell the core to fill the screen, then drop into the
+// default viewport. Timeline (from the click): ~1.5s the first dots reach the
+// core, ~3.2s the funnel is done, 5s the core has filled the screen, one second
+// hold, then the explorer.
 (function wireExplore() {
   const page = document.getElementById('title-page');
   const btn = document.getElementById('explore-btn');
-  if (!btn || !page) return;
+  const fx = document.getElementById('title-fx');
+  if (!btn || !page || !fx) return;
+  let running = false;
   btn.addEventListener('click', () => {
-    page.classList.add('hidden');
-    // Make sure the default viewport is framed and rendered now that it's visible.
-    goHome();
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      sceneOverview.resize();
-      sceneOverview.render();
-    }));
-    setTimeout(() => { page.style.display = 'none'; }, 750);
+    if (running) return;
+    running = true;
+    runExploreSequence(page, btn, fx);
   });
 })();
+
+function runExploreSequence(page, btn, fx) {
+  const ctx = fx.getContext('2d');
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  fx.width  = Math.floor(window.innerWidth  * DPR);
+  fx.height = Math.floor(window.innerHeight * DPR);
+  fx.style.width = window.innerWidth + 'px';
+  fx.style.height = window.innerHeight + 'px';
+
+  const bRect = btn.getBoundingClientRect();
+  const emblem = page.querySelector('.title-emblem');
+  const eRect = emblem.getBoundingClientRect();
+  const bx = (bRect.left + bRect.width / 2) * DPR;
+  const by = (bRect.top + bRect.height / 2) * DPR;
+  const cx = (eRect.left + eRect.width / 2) * DPR;
+  const cy = (eRect.top + eRect.height / 2) * DPR;
+  const s = ((eRect.width || 168) * DPR) / 180;    // emblem viewBox(180) -> screen
+  const diag = Math.hypot(fx.width, fx.height);
+  // Zoom at which the outer ring reaches the corners (ring diagram fills screen).
+  const Zfill = (diag / 2) / (82 * s);
+
+  page.classList.add('fx-run');                    // hide button, fade the text
+  emblem.style.visibility = 'hidden';              // the canvas draws the rings now
+  goHome();                                        // ready the viewport underneath
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    sceneOverview.resize(); sceneOverview.render();
+  }));
+
+  // Dots: explode from the button, then spiral into the core and get swallowed.
+  const N = 120, dots = [];
+  for (let i = 0; i < N; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const peak = (80 + Math.random() * 220) * DPR;
+    const Px = bx + Math.cos(a) * peak;
+    const Py = by + Math.sin(a) * peak * 0.75;
+    dots.push({
+      Px, Py, Rs: Math.hypot(Px - cx, Py - cy), th0: Math.atan2(Py - cy, Px - cx),
+      tPeak: 0.35 + Math.random() * 0.30,
+      tAbs:  1.5  + Math.random() * 1.60,
+      swirl: (Math.random() < 0.5 ? -1 : 1) * (1.0 + Math.random() * 1.8),
+      size:  (1.1 + Math.random() * 2.3) * DPR
+    });
+  }
+
+  const T = { dotEnd: 3.1, ringsFill: 4.6, sphereFill: 5.6, hold: 6.6, fade: 7.3 };
+  const easeOut   = u => 1 - Math.pow(1 - u, 3);
+  const easeIn    = u => u * u * u;
+  const easeInOut = u => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2);
+
+  // Camera zoom about the core: gentle while the dots funnel in, then it rushes
+  // in so the ring diagram swells to fill the screen.
+  function camZoom(t) {
+    if (t <= T.dotEnd) return 1 + 0.6 * easeInOut(t / T.dotEnd);          // 1 -> 1.6
+    if (t <= T.ringsFill)
+      return 1.6 + (Zfill - 1.6) * easeIn((t - T.dotEnd) / (T.ringsFill - T.dotEnd));
+    return Zfill;
+  }
+
+  function ring(vbR, o) {
+    ctx.beginPath(); ctx.arc(cx, cy, vbR * s, 0, Math.PI * 2);
+    ctx.lineWidth = (o.w || 1.5) * s;
+    ctx.setLineDash((o.dash || []).map(v => v * s));
+    if (o.fill)   { ctx.fillStyle = o.fill; ctx.fill(); }
+    if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.stroke(); }
+    ctx.setLineDash([]);
+  }
+  function spun(angle, fn) {
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle); ctx.translate(-cx, -cy);
+    fn(); ctx.restore();
+  }
+
+  let rot = 0, rotRev = 0, last = performance.now();
+  const t0 = last;
+  let faded = false;
+
+  function frame(now) {
+    const t = (now - t0) / 1000;
+    let dt = (now - last) / 1000; last = now;
+    if (dt > 0.05) dt = 0.05;
+    ctx.clearRect(0, 0, fx.width, fx.height);
+
+    // absorbed fraction (drives ring speed + core glow)
+    let absorbed = 0;
+    for (const d of dots) if (t >= d.tAbs) absorbed++;
+    const frac = absorbed / N;
+
+    // dashed rings spin faster as more dots are swallowed
+    const spin = (0.6 + 6.2 * frac);
+    rot += dt * spin; rotRev -= dt * spin;
+
+    const zoom = camZoom(t);
+    ctx.save();
+    ctx.translate(cx, cy); ctx.scale(zoom, zoom); ctx.translate(-cx, -cy);
+
+    // the ring diagram (matches the title emblem)
+    spun(rot,    () => ring(82, { dash: [6, 8], stroke: 'rgba(212,175,55,0.35)' }));
+    ring(62, { stroke: 'rgba(212,175,55,0.22)' });
+    spun(rotRev, () => ring(44, { dash: [4, 7], stroke: 'rgba(95,179,240,0.5)' }));
+    ring(26, { fill: 'rgba(212,175,55,0.10)', stroke: 'rgba(212,175,55,0.55)' });
+
+    // dots
+    if (t < T.dotEnd + 0.3) {
+      ctx.fillStyle = '#FBE38C';
+      ctx.shadowColor = 'rgba(240,214,122,0.9)'; ctx.shadowBlur = 6 * DPR;
+      for (const d of dots) {
+        let x, y;
+        if (t < d.tPeak) { const u = easeOut(t / d.tPeak); x = bx + (d.Px - bx) * u; y = by + (d.Py - by) * u; }
+        else if (t < d.tAbs) {
+          const v = (t - d.tPeak) / (d.tAbs - d.tPeak), e = v * v;
+          const R = d.Rs * (1 - e), th = d.th0 + d.swirl * e;
+          x = cx + R * Math.cos(th); y = cy + R * Math.sin(th);
+        } else continue;
+        ctx.beginPath(); ctx.arc(x, y, d.size, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+    }
+
+    // core: bright gold centre + a glow that brightens as dots feed in
+    const gr = (11 * s) * (1.4 + frac * 1.6);
+    let gg = ctx.createRadialGradient(cx, cy, 0, cx, cy, gr);
+    gg.addColorStop(0, `rgba(255,244,190,${(0.55 + 0.45 * frac).toFixed(3)})`);
+    gg.addColorStop(1, 'rgba(212,175,55,0)');
+    ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(cx, cy, gr, 0, Math.PI * 2); ctx.fill();
+    let cgrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 11 * s);
+    cgrad.addColorStop(0, '#F6E29A'); cgrad.addColorStop(1, '#D4AF37');
+    ctx.fillStyle = cgrad; ctx.beginPath(); ctx.arc(cx, cy, 11 * s, 0, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
+
+    // once the rings fill the screen, flood it with the yellow sphere
+    if (t >= T.ringsFill) {
+      const st = Math.min(1, (t - T.ringsFill) / (T.sphereFill - T.ringsFill));
+      const coreScreenR = 11 * s * Zfill;
+      const R = coreScreenR + (diag - coreScreenR) * easeInOut(st);
+      const yg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+      yg.addColorStop(0, '#FFF6CE'); yg.addColorStop(0.55, '#F2D65A'); yg.addColorStop(1, '#D4AF37');
+      ctx.fillStyle = yg; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // hold on the full-yellow screen, then fade to the explorer
+    if (t >= T.hold && !faded) {
+      faded = true;
+      page.style.transition = 'opacity .7s ease'; page.style.opacity = '0';
+    }
+    if (t < T.fade) requestAnimationFrame(frame);
+    else { page.style.display = 'none'; ctx.clearRect(0, 0, fx.width, fx.height); }
+  }
+  requestAnimationFrame(frame);
+}
 document.getElementById('step-out-btn').addEventListener('click', stepOut);
 
 // Escape steps out one nesting level (unless you're typing in the search box,
