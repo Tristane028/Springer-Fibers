@@ -212,9 +212,72 @@
   .pc-more[open] > summary::before { content: '\25BE  '; }
   .pc-more > summary:hover { color: var(--gold); }
   .pc-more .pc-grid { margin-top: 4px; }
+  /* ── Title / landing page ─────────────────────────────────────────────── */
+  .title-page {
+    position: fixed; inset: 0; z-index: 2000;
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 38%, #17130a 0%, #0b0b0c 55%, #000 100%);
+    transition: opacity .7s ease;
+  }
+  .title-page.hidden { opacity: 0; pointer-events: none; }
+  .title-inner { text-align: center; max-width: 640px; padding: 2rem; }
+  .title-emblem { width: 168px; height: 168px; margin: 0 auto 1.6rem; display: block; }
+  .title-emblem .ring-spin { transform-origin: 90px 90px; animation: title-spin 26s linear infinite; }
+  .title-emblem .ring-spin-rev { transform-origin: 90px 90px; animation: title-spin 34s linear infinite reverse; }
+  .title-emblem .core { animation: title-pulse 3.4s ease-in-out infinite; transform-origin: 90px 90px; }
+  @keyframes title-spin  { to { transform: rotate(360deg); } }
+  @keyframes title-pulse { 0%,100% { opacity: .85; } 50% { opacity: 1; } }
+  .title-name {
+    font-family: var(--font-math); font-size: 62px; line-height: 1.05;
+    margin: 0 0 .5rem; color: var(--text-primary); letter-spacing: .5px; font-weight: 400;
+  }
+  .title-name .accent { color: var(--gold); font-style: italic; }
+  .title-sub {
+    font-family: var(--font-math); font-size: 18px; color: var(--text-secondary);
+    margin: 0 auto 2.2rem; max-width: 30em; line-height: 1.5;
+  }
+  .title-explore {
+    font-family: var(--font-math); font-size: 20px; letter-spacing: 1px;
+    background: var(--gold); color: #000; border: none; border-radius: 999px;
+    padding: 13px 46px; cursor: pointer; font-weight: 600;
+    box-shadow: 0 0 0 rgba(212,175,55,0); transition: transform .15s, box-shadow .3s, background .15s;
+  }
+  .title-explore:hover { transform: translateY(-1px); background: #e6c14e;
+    box-shadow: 0 8px 34px rgba(212,175,55,0.28); }
+  .title-explore:active { transform: translateY(0); }
+  .title-hint { margin-top: 1.4rem; font-size: 12px; color: var(--text-tertiary);
+    letter-spacing: .06em; text-transform: uppercase; }
+  @media (max-width: 560px) { .title-name { font-size: 44px; } .title-sub { font-size: 16px; } }
 </style>
 </head>
 <body>
+<div id="title-page" class="title-page">
+  <div class="title-inner">
+    <svg class="title-emblem" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <radialGradient id="coreGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#F0D67A"/>
+          <stop offset="100%" stop-color="#D4AF37"/>
+        </radialGradient>
+      </defs>
+      <g class="ring-spin">
+        <circle cx="90" cy="90" r="82" fill="none" stroke="rgba(212,175,55,0.35)" stroke-width="1.5" stroke-dasharray="6 8"/>
+      </g>
+      <circle cx="90" cy="90" r="62" fill="none" stroke="rgba(212,175,55,0.22)" stroke-width="1.5"/>
+      <g class="ring-spin-rev">
+        <circle cx="90" cy="90" r="44" fill="none" stroke="rgba(95,179,240,0.5)" stroke-width="1.5" stroke-dasharray="4 7"/>
+      </g>
+      <circle cx="90" cy="90" r="26" fill="rgba(212,175,55,0.10)" stroke="rgba(212,175,55,0.55)" stroke-width="1.5"/>
+      <circle class="core" cx="90" cy="90" r="11" fill="url(#coreGrad)"/>
+    </svg>
+    <h1 class="title-name">Springer <span class="accent">Fibers</span></h1>
+    <p class="title-sub">An interactive explorer for the cells of a Springer fiber — their
+      closures, nested intersections, and degenerations.</p>
+    <button id="explore-btn" class="title-explore" type="button">Explore</button>
+    <p class="title-hint">press explore to enter</p>
+  </div>
+</div>
+
 <div class="container">
 
   <div class="top-bar">
@@ -285,14 +348,6 @@
       <div id="orb-legend" class="orb-legend" hidden></div>
       <p class="hint">drag to rotate · scroll to zoom</p>
     </div>
-    <div class="dim-card" style="margin:0 0 1rem;">
-      <div class="dim-head">
-        <p class="label-uppercase" style="margin:0;">Closure by dimension</p>
-        <button id="closure-toggle-all" class="mini-btn">Expand all</button>
-      </div>
-      <p id="closure-note" style="margin:0 0 10px; font-size:12px; color:var(--text-tertiary);"></p>
-      <div id="closure-dim-table"></div>
-    </div>
     <div class="info-grid">
       <div class="info-card">
         <p class="label-uppercase">Parameter space</p>
@@ -304,6 +359,14 @@
       </div>
     </div>
     <div class="action-area">
+      <div class="dim-card" style="margin:0 0 1rem;">
+        <div class="dim-head">
+          <p class="label-uppercase" style="margin:0;">Closure by dimension</p>
+          <button id="closure-toggle-all" class="mini-btn">Expand all</button>
+        </div>
+        <p id="closure-note" style="margin:0 0 10px; font-size:12px; color:var(--text-tertiary);"></p>
+        <div id="closure-dim-table"></div>
+      </div>
       <p class="label-uppercase">Choose a path to another cell</p>
       <div id="path-list"></div>
     </div>
@@ -1877,6 +1940,23 @@ function goToTraverse(destEdge) {
 }
 
 document.getElementById('home-btn').addEventListener('click', goHome);
+
+// Title page: fade out and drop into the default viewport (overview).
+(function wireExplore() {
+  const page = document.getElementById('title-page');
+  const btn = document.getElementById('explore-btn');
+  if (!btn || !page) return;
+  btn.addEventListener('click', () => {
+    page.classList.add('hidden');
+    // Make sure the default viewport is framed and rendered now that it's visible.
+    goHome();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      sceneOverview.resize();
+      sceneOverview.render();
+    }));
+    setTimeout(() => { page.style.display = 'none'; }, 750);
+  });
+})();
 document.getElementById('step-out-btn').addEventListener('click', stepOut);
 
 // Escape steps out one nesting level (unless you're typing in the search box,
