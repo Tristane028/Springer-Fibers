@@ -190,6 +190,12 @@ details.lvl summary b { color: var(--ink); font-weight: 600; font-family: var(--
 .pl .k { color: var(--graphite); }
 .more { font-size: 13px; color: var(--graphite); margin-left: 10px; }
 
+.nest-formula { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 4px 0 8px; font-family: var(--math); font-size: 17px; }
+.nest-formula .cap { color: var(--graphite); font-size: 18px; }
+.nf-cell { border: 1px solid var(--rule); background: var(--surface); border-radius: 4px; padding: 1px 7px; cursor: pointer; font: inherit; color: var(--ink); }
+.nf-cell:hover { border-color: var(--ink); }
+.nf-cell.cur { background: var(--ink); color: var(--surface); border-color: var(--ink); cursor: default; }
+.nest-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
 .rel { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper); }
 .rel h4 { margin: 0 0 6px; font-family: var(--math); font-size: 17px; font-weight: 600; }
 .rel .go { margin: 0 0 8px; }
@@ -250,7 +256,8 @@ table.chk td.y { color: var(--green); }
       <h3>Colors</h3>
       <ul class="legend">
         <li><span class="sw" style="background:var(--ink)"></span>selected cell</li>
-        <li><span class="sw" style="background:var(--blue)"></span>met by its closure</li>
+        <li><span class="sw" style="background:var(--ink);box-shadow:0 0 0 3px var(--paper),0 0 0 4px var(--ink)"></span>numbered: the nesting chain</li>
+        <li><span class="sw" style="background:var(--blue)"></span>met by its closure (by every closure in the chain)</li>
         <li><span class="sw" style="background:var(--blue-soft)"></span>reached only through a chain (unproven)</li>
         <li><span class="sw" style="background:var(--green)"></span>its closure meets the selected cell</li>
         <li><span class="sw" style="border:2px solid var(--red)"></span>below in Bruhat order, unresolved</li>
@@ -268,7 +275,7 @@ table.chk td.y { color: var(--green); }
         <datalist id="labels"></datalist>
         <button class="icon-btn" id="focus" type="button" aria-pressed="false" title="Show only the selected cell and the cells related to it">Related cells only</button>
         <button class="icon-btn" id="fit" type="button">Fit</button>
-        <span class="hint" id="hint">Drag to pan, scroll to zoom, click a cell</span>
+        <span class="hint" id="hint">Click a cell, then click inside its closure to nest</span>
       </div>
       <div class="stage" id="stage">
         <canvas id="cv"></canvas>
@@ -563,7 +570,7 @@ function setRows(M, L, Y) {
 }
 
 /* ═════════════ app state, routing ═════════════ */
-const S = { focus: false, L: null, manifest: null, byKey: new Map(), M: null, sel: -1, rel: -1, tab: 'hasse', view: { s: 1, tx: 0, ty: 0 }, hover: -1, cache: new Map() };
+const S = { chain: [], focus: false, L: null, manifest: null, byKey: new Map(), M: null, sel: -1, rel: -1, tab: 'hasse', view: { s: 1, tx: 0, ty: 0 }, hover: -1, cache: new Map() };
 
 /* Partitions come from manifest.json when it exists; otherwise the page asks
    GitHub for the repository's file list and finds every data_*.json itself. */
@@ -610,10 +617,11 @@ const sizeText = b => b >= 1e6 ? (b / 1e6).toFixed(1) + ' MB' : Math.max(1, Math
 function route() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent).filter(Boolean);
   if (!parts.length) return showHome();
-  showPartition(parts[0], parts[1]);
+  showPartition(parts[0], parts.slice(1));
 }
-function setHash(p, cell) {
-  const h = '#/' + encodeURIComponent(p) + (cell ? '/' + encodeURIComponent(cell) : '');
+
+function setHash(p, labels) {
+  const h = '#/' + encodeURIComponent(p) + (labels || []).map(l => '/' + encodeURIComponent(l)).join('');
   if (location.hash !== h) history.replaceState(null, '', h);
 }
 
@@ -658,6 +666,7 @@ $('#catalog').addEventListener('click', ev => { const b = ev.target.closest('.pa
 
 /* ═════════════ partition page ═════════════ */
 async function showPartition(p, cellLabel) {
+  if (S.M && S.M.entry.partition === p && Array.isArray(cellLabel) && S.chain.length && cellLabel.join('/') === S.chain.map(i => S.M.cells[i].label).join('/')) return;
   $('#home').style.display = 'none'; $('#part').style.display = 'block';
   const entry = S.byKey.get(p);
   if (!entry) { $('#status').textContent = `No data for ${p}. Run build_manifest.py after adding the file.`; return; }
@@ -701,8 +710,12 @@ async function showPartition(p, cellLabel) {
     S.focus = S.M.N > 120; $('#focus').setAttribute('aria-pressed', S.focus);
     if (S.tab === 'poly') renderPolyView(); else fitView();
   }
-  const i = cellLabel ? findCell(cellLabel) : -1;
-  select(i, false);
+  // rebuild the examination chain from the URL, keeping only valid nesting steps
+  const labels = Array.isArray(cellLabel) ? cellLabel : (cellLabel ? [cellLabel] : []);
+  const ids = labels.map(findCell).filter(i => i >= 0);
+  const chain = [];
+  for (const i of ids) { if (!chain.length || nestedSet(chain).has(i)) chain.push(i); else break; }
+  setChain(chain, false);
 }
 function findCell(text) {
   const M = S.M; if (!M) return -1;
@@ -809,13 +822,17 @@ function draw() {
 function selectionSets() {
   const M = S.M, s = S.sel;
   if (s < 0) return null;
-  const down = new Uint8Array(M.N), up = new Uint8Array(M.N), miss = new Uint8Array(M.N), chain = new Uint8Array(M.N);
-  M.chainOnly(s).forEach(v => { chain[v] = 1; });
-  M.below(s).forEach(v => { down[v] = 1; });
-  M.above(s).forEach(v => { up[v] = 1; });
-  M.missing(s).forEach(v => { miss[v] = 1; });
-  return { down, up, miss, chain };
+  const down = new Uint8Array(M.N), up = new Uint8Array(M.N), miss = new Uint8Array(M.N), via = new Uint8Array(M.N), inChain = new Uint8Array(M.N);
+  S.chain.forEach(c => { inChain[c] = 1; });
+  nestedSet(S.chain).forEach(v => { down[v] = 1; });
+  if (S.chain.length === 1) {
+    M.chainOnly(s).forEach(v => { via[v] = 1; });
+    M.above(s).forEach(v => { up[v] = 1; });
+    M.missing(s).forEach(v => { miss[v] = 1; });
+  }
+  return { down, up, miss, via, inChain };
 }
+
 function drawHasse(w, h) {
   const M = S.M, L = S.L || M.full, { s, tx, ty } = S.view, xy = L.xy;
   const X = v => xy[2 * v] * s + tx, Y = v => xy[2 * v + 1] * s + ty;
@@ -840,9 +857,14 @@ function drawHasse(w, h) {
   if (sets) {
     const ok = v => L.on[v];
     ctx.lineWidth = 1.2; ctx.globalAlpha = 0.75;
-    ctx.strokeStyle = blue; ctx.beginPath(); S.M.closureOf[S.sel].forEach(t => { if (ok(t)) edgePath(S.sel, t); }); ctx.stroke();
-    ctx.strokeStyle = green; ctx.beginPath(); S.M.containers[S.sel].forEach(u => { if (ok(u)) edgePath(u, S.sel); }); ctx.stroke();
+    ctx.strokeStyle = blue; ctx.beginPath(); for (let t = 0; t < S.M.N; t++) if (sets.down[t] && ok(t)) edgePath(S.sel, t); ctx.stroke();
+    if (S.chain.length === 1) { ctx.strokeStyle = green; ctx.beginPath(); S.M.containers[S.sel].forEach(u => { if (ok(u)) edgePath(u, S.sel); }); ctx.stroke(); }
     ctx.globalAlpha = 1;
+    if (S.chain.length > 1) {      // the examination chain itself, outermost first
+      ctx.strokeStyle = ink; ctx.lineWidth = 2.4; ctx.beginPath();
+      for (let k = 0; k + 1 < S.chain.length; k++) if (ok(S.chain[k]) && ok(S.chain[k + 1])) edgePath(S.chain[k], S.chain[k + 1]);
+      ctx.stroke(); ctx.lineWidth = 1;
+    }
   }
   const r = Math.max(2.4, Math.min(6.5, L.X * s * 0.26));
   for (const v of L.nodes) {
@@ -850,10 +872,10 @@ function drawHasse(w, h) {
     if (x < -20 || x > w + 20 || y < -20 || y > h + 20) continue;
     let fill = ink, alpha = 1, ring = null;
     if (sets) {
-      if (v === S.sel) fill = ink;
+      if (v === S.sel || sets.inChain[v]) fill = ink;
       else if (sets.down[v]) fill = blue;
       else if (sets.up[v]) fill = green;
-      else if (sets.chain[v]) fill = css('--blue-soft');
+      else if (sets.via[v]) fill = css('--blue-soft');
       else { fill = faint; alpha = 0.5; }
       if (sets.miss[v]) { ring = red; alpha = 1; fill = css('--surface'); }
     }
@@ -863,6 +885,13 @@ function drawHasse(w, h) {
     if (v === S.sel) { ctx.strokeStyle = ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, r + 6, 0, 7); ctx.stroke(); }
     if (v === S.hover) { ctx.strokeStyle = ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, r + 3.5, 0, 7); ctx.stroke(); }
     ctx.globalAlpha = 1;
+  }
+  if (sets && S.chain.length > 1) {
+    ctx.font = '600 12px "Public Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    S.chain.forEach((v, k) => { if (!L.on[v]) return; const x = X(v), y = Y(v) - r - 9; const t = String(k + 1); const w2 = ctx.measureText(t).width / 2 + 5;
+      ctx.fillStyle = ink; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - w2, y - 15, w2 * 2, 16, 8) : ctx.rect(x - w2, y - 15, w2 * 2, 16); ctx.fill();
+      ctx.fillStyle = css('--surface'); ctx.fillText(t, x, y); });
+    ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
   }
   if (L.X * s > M.n * (M.n > 9 ? 9.5 : 7.2)) {
     ctx.font = '12.5px "STIX Two Text", serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = graphite;
@@ -966,7 +995,7 @@ cv.addEventListener('pointerup', e => {
   const d = drag; drag = null;
   if (!S.M || (d && d.moved > 3)) return;
   const hit = worldPick(e.offsetX, e.offsetY);
-  if (S.tab === 'hasse') select(hit);
+  if (S.tab === 'hasse') { if (hit >= 0) drill(hit); else select(-1); }
   else if (hit && hit !== -1) { select(hit.s); if (hit.s !== hit.t) openRelation(hit.t); }
 });
 cv.addEventListener('wheel', e => {
@@ -985,7 +1014,7 @@ function setTab(t) {
   $('#fit').style.display = t === 'hasse' ? '' : 'none';
   $('#focus').style.display = t === 'hasse' ? '' : 'none';
   $('#polyview').hidden = t !== 'poly';
-  $('#hint').textContent = t === 'hasse' ? 'Drag to pan, scroll to zoom, click a cell' : t === 'matrix' ? 'Row: source cell. Column: target. Click a square to inspect the pair' : 'Click a cell to open it';
+  $('#hint').textContent = t === 'hasse' ? 'Click a cell, then click inside its closure to nest' : t === 'matrix' ? 'Row: source cell. Column: target. Click a square to inspect the pair' : 'Click a cell to open it';
   if (t === 'poly') renderPolyView(); else fitView();
 }
 function renderPolyView() {
@@ -1022,8 +1051,12 @@ $('#tab-matrix').addEventListener('click', () => setTab('matrix'));
 $('#tab-poly').addEventListener('click', () => setTab('poly'));
 $('#polyview').addEventListener('change', e => { if (e.target.id === 'pv-top') { S.polyTop = e.target.checked; renderPolyView(); } });
 $('#polyview').addEventListener('click', e => { const b = e.target.closest('[data-cell]'); if (b) select(Number(b.dataset.cell)); });
-$('#find').addEventListener('change', e => { const i = findCell(e.target.value); if (i >= 0) { select(i); if (!S.focus) centerOn(i); e.target.value = ''; } });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.M && document.activeElement.tagName !== 'INPUT') select(-1); });
+$('#find').addEventListener('change', e => { const i = findCell(e.target.value); if (i >= 0) { drill(i); if (!S.focus) centerOn(i); e.target.value = ''; } });
+document.addEventListener('keydown', e => {
+  if (!S.M || document.activeElement.tagName === 'INPUT') return;
+  if (e.key === 'Escape') select(-1);
+  else if (e.key === 'Backspace' && S.chain.length > 1) { e.preventDefault(); popTo(S.chain.length - 2); }
+});
 function centerOn(i) {
   const L = S.L || (S.M && S.M.full);
   if (S.tab !== 'hasse' || !L || !L.on[i]) return;
@@ -1032,20 +1065,43 @@ function centerOn(i) {
 }
 
 /* ═════════════ selection and the cell panel ═════════════ */
-function select(i, updateHash = true) {
+/* Nested intersection. closureOf(c) = the cells the closure of C_c meets (a curve
+   was found, or the intersection report says so). That relation does not compose,
+   so examining C_B from C_A is a separate step: the cells shown are those met by
+   the closures of EVERY cell in the chain, C_A ∩ C_B ∩ … */
+function nestedSet(chain) {
+  const M = S.M; let acc = null;
+  for (const c of chain) { const s = new Set(M.closureOf[c]); acc = acc === null ? s : new Set([...acc].filter(x => s.has(x))); }
+  return acc || new Set();
+}
+function setChain(chain, updateHash = true) {
   const M = S.M;
+  S.chain = chain.slice();
+  const i = S.chain.length ? S.chain[S.chain.length - 1] : -1;
   S.sel = i; S.rel = -1;
   S._sets = selectionSets();
-  if (updateHash && M) setHash(M.entry.partition, i >= 0 ? M.cells[i].label : null);
+  if (updateHash && M) setHash(M.entry.partition, S.chain.map(c => M.cells[c].label));
   renderPanel();
   if (!M) return;
   const prev = S.L;
   if (S.focus && i >= 0) {
-    const nodes = [i]; for (let v = 0; v < M.N; v++) if (v !== i && (S._sets.down[v] || S._sets.up[v] || S._sets.miss[v] || S._sets.chain[v])) nodes.push(v);
+    const nodes = [...S.chain];
+    for (let v = 0; v < M.N; v++) if (!S.chain.includes(v) && (S._sets.down[v] || S._sets.up[v] || S._sets.miss[v] || S._sets.via[v])) nodes.push(v);
     S.L = layoutHasse(M, nodes);
   } else S.L = M.full;
   if (S.L !== prev) fitView(); else draw();
 }
+// Fresh start at cell i (or clear with -1).
+function select(i, updateHash = true) { setChain(i >= 0 ? [i] : [], updateHash); }
+// Examine cell i from the current chain: nest if it lies in the current intersection, else start over.
+function drill(i) {
+  if (i < 0) return;
+  if (!S.chain.length) return select(i);
+  if (S.chain[S.chain.length - 1] === i) return;
+  if (nestedSet(S.chain).has(i)) setChain([...S.chain, i]);
+  else select(i);
+}
+function popTo(k) { if (k >= 0 && k < S.chain.length) setChain(S.chain.slice(0, k + 1)); }
 
 function chips(list, cls, M) {
   const byDim = new Map();
@@ -1065,47 +1121,72 @@ function renderPanel() {
   if (!M) { P.innerHTML = ''; return; }
   if (S.tab === 'poly') renderPolyView();
   if (S.sel < 0) {
-    P.innerHTML = `<p class="empty">Select a cell in the diagram, the Polynomials tab, or type its permutation in the box above, to see its closure polynomial, which cells its closure meets, the curves that witness each relation, and its Plücker coordinates.</p>`;
+    P.innerHTML = `<p class="empty">Click a cell in the diagram, or type its permutation in the box above, to see which cells its closure meets. Click one of those to look at it from inside the first closure: the list narrows to the cells met by both closures, and you can keep nesting.</p>`;
     return;
   }
-  const c = M.cells[S.sel], rep = M.reportFor(S.sel);
-  const down = M.below(S.sel), up = M.above(S.sel), miss = M.missing(S.sel);
+  const c = M.cells[S.sel], rep = M.reportFor(S.sel), chain = S.chain, depth = chain.length;
+  const nested = [...nestedSet(chain)].sort((a, b) => M.cells[b].dim - M.cells[a].dim || a - b);
   const freeTxt = c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'none';
   let h = `<h2>${cellName(c)}</h2><p class="sub">Dimension ${c.dim}${c.dim === M.maxDim ? ' (its closure is an irreducible component)' : ''}. Free parameters: <span class="math">${freeTxt}</span></p>`;
-  h += `<div class="fill">${fillingSvg(c, M.rows)}</div><p class="note">The permutation written into the tableau shape, row by row.</p>`;
-  // closure polynomial
-  h += `<h3>Closure polynomial</h3>`;
+  h += `<div class="fill">${fillingSvg(c, M.rows)}</div>`;
+
+  // nested intersection: the formula, then what it contains
+  h += `<h3>${depth > 1 ? 'Nested intersection' : 'Cells its closure meets'}<span class="n">${nested.length}</span></h3>`;
+  h += `<div class="nest-formula">${chain.map((v, k) => `<button class="nf-cell${k === depth - 1 ? ' cur' : ''}" data-pop="${k}" title="${k === depth - 1 ? 'Current cell' : 'Step back out to here'}">${cellName(M.cells[v])}</button>`).join('<span class="cap">∩</span>')}</div>`;
+  if (depth > 1) h += `<div class="nest-actions"><button class="icon-btn" data-pop="${depth - 2}">Step out</button><button class="icon-btn" data-go="${S.sel}">Start over from ${cellName(c)}</button></div>`;
+  if (!nested.length) {
+    h += `<p class="note">${depth > 1 ? `No cell is met by all ${depth} of these closures: the nested intersection is empty.` : 'None: this cell is closed (its closure meets no other cell).'}</p>`;
+  } else {
+    h += `<p class="note">${depth > 1
+      ? `Cells met by the closure of every cell in the chain at once. Click one to nest further${M.rep ? '' : '; solid outline means a curve from the search reaches it from ' + cellName(c)}.`
+      : `Click one to look at it from inside this closure: the list then narrows to the cells met by both closures. Solid: a curve from the search reaches it.${rep ? ' Green outline: nonempty in the intersection report only.' : ''}`}</p>`;
+    h += chips(nested, v => M.edge.has(S.sel * M.N + v) ? 'direct' : 'up', M).replace(/data-c="/g, 'data-nest="');
+  }
+  h += `<div id="relbox"></div>`;
+
+  if (depth === 1) {
+    const chainOnly = M.chainOnly(S.sel), miss = M.missing(S.sel), up = M.above(S.sel);
+    if (chainOnly.length) h += `<h3>Reached only through chains<span class="n">${chainOnly.length}</span></h3><p class="note">No curve goes there directly, but a chain of curves does. Closure relations need not compose, so treat these as likely, not proven. Click one to see the chain.</p>${chips(chainOnly, 'implied', M)}`;
+    if (miss.length) h += `<h3>Below in Bruhat order, unresolved<span class="n">${miss.length}</span></h3><p class="note">Its closure could meet these, but no curve or chain from the search reaches them, and no intersection report settles it.</p>${chips(miss, 'missing', M)}`;
+    h += `<h3>Closures that meet it<span class="n">${up.length}</span></h3>${up.length ? chips(up, 'up', M) : `<p class="note">None.</p>`}`;
+  }
+
+  // secondary material, collapsed
+  h += `<h3>More about ${cellName(c)}</h3>`;
   if (rep && rep.poly) {
-    const v = polyVerdict(rep.poly, true), full = rep.pieces.filter(x => x.kind === 'full').length, part = rep.pieces.length - full;
-    h += `<p class="math" style="margin:4px 0">${polyHtml(rep.poly)}</p><p class="verdict-line ${v.cls}">${v.cls === 'ok' ? 'Factors as ' + v.text + '.' : v.cls === 'bad' ? 'Singular: ' + v.note + '.' : 'Palindromic, but not a product of q-integers.'}</p>`;
-    h += `<p class="note">Certified by the intersection report: ${full} whole cells and ${part} partial pieces, each an affine space; the coefficients are the Betti numbers of the closure.</p>`;
-    if (part) {
-      const parts = rep.pieces.filter(x => x.kind === 'partial').sort((a, b) => b.cellDim - a.cellDim || b.dim - a.dim);
-      h += `<details class="lvl"><summary><b>Partial pieces</b> ${part}</summary><table class="chk"><thead><tr><th>cell</th><th>piece dim</th><th>of</th><th>equations</th></tr></thead><tbody>${parts.map(x => { const t = M.idx.get(x.cell); return `<tr><td>${t !== undefined ? cellName(M.cells[t]) : esc(x.cell)}</td><td>${x.dim}</td><td>${x.cellDim}</td><td>${fmtExpr(x.ideal)}</td></tr>`; }).join('')}</tbody></table></details>`;
-    }
+    const v = polyVerdict(rep.poly, true);
+    h += `<details class="lvl"><summary><b>Closure polynomial</b> certified${v.cls === 'bad' ? ', singular' : ''}</summary><p class="math" style="margin:6px 0 2px 10px">${polyHtml(rep.poly)}</p><p class="verdict-line ${v.cls}" style="margin-left:10px">${v.cls === 'ok' ? 'Factors as ' + v.text + '.' : v.cls === 'bad' ? 'Singular: ' + v.note + '.' : 'Palindromic, not a product of q-integers.'}</p></details>`;
   } else {
     const meet = M.meetPoly(S.sel), v = polyVerdict(meet, false);
-    h += `<p class="math" style="margin:4px 0">${polyHtml(meet)}</p><p class="verdict-line ${v.cls === 'ok' ? 'ok' : ''}">${v.cls === 'ok' ? 'Palindromic; factors as ' + v.text + '.' : v.cls === 'bad' ? 'Not palindromic.' : 'Palindromic, but not a product of q-integers.'}</p>`;
-    h += `<p class="note">Estimate from the search: this cell plus every cell reached by a curve or a chain of curves, by dimension. When the closure is a union of cells this is its Poincaré polynomial (in (3,2,2) it matched the certified polynomial in every such case). When the closure only meets part of a cell, or a chain leads to a cell it does not meet, the count is off, so a non-palindromic count does not by itself mean singular.</p>`;
+    h += `<details class="lvl"><summary><b>Closure polynomial</b> estimate</summary><p class="math" style="margin:6px 0 2px 10px">${polyHtml(meet)}</p><p class="note" style="margin-left:10px">This cell plus the cells reached by curves or chains, by dimension; exact only when the closure is a union of cells.</p></details>`;
   }
-  h += `<h3>Cells its closure meets<span class="n">${down.length}</span></h3>`;
-  h += down.length ? `<p class="note">Solid: a curve from the search reaches it. ${rep ? 'Green outline: nonempty in the report, but no curve in the search grid. ' : ''}Click one to see why.</p>${chips(down, v => M.edge.has(S.sel * M.N + v) ? 'direct' : 'up', M)}` : `<p class="note">None: this cell is closed.</p>`;
-  const chainOnly = M.chainOnly(S.sel);
-  if (chainOnly.length) h += `<h3>Reached only through chains<span class="n">${chainOnly.length}</span></h3><p class="note">No curve goes there directly, but a chain of curves does. Closure relations need not compose: when a closure meets only part of a cell, it can miss what that cell's closure meets. Treat these as likely, not proven.</p>${chips(chainOnly, 'implied', M)}`;
-  if (miss.length) h += `<h3>Below in Bruhat order, unresolved<span class="n">${miss.length}</span></h3><p class="note">These lie below this cell in Bruhat order, so its closure could meet them, but no curve or chain of curves from the search reaches them, and there is no intersection report to settle it.</p>${chips(miss, 'missing', M)}`;
-  h += `<h3>Closures that meet it<span class="n">${up.length}</span></h3>${up.length ? chips(up, 'up', M) : `<p class="note">None.</p>`}`;
-  h += `<div id="relbox"></div>`;
-  h += `<h3>Plücker coordinates</h3><p class="note">Nonzero coordinates only. Level <i class="v">r</i> lists the <i class="v">r</i>×<i class="v">r</i> minors on rows <i class="v">I</i> and the first <i class="v">r</i> columns.</p>`;
   c.plucker.forEach((vec, k) => {
     const r = k + 1, vals = splitVec(vec), I = subsets(M.n, r);
     const nz = []; vals.forEach((x, j) => { if (x !== '0') nz.push([I[j], x]); });
     const shown = nz.slice(0, 120);
-    h += `<details class="lvl"${M.n <= 6 || r === 1 ? ' open' : ''}><summary><b>V<sub>${r}</sub></b> ${nz.length} of ${vals.length} nonzero</summary><div class="pl">${shown.map(([I, x]) => `<span class="k">${pName(I, M.n)}</span><span>${fmtExpr(x)}</span>`).join('')}</div>${nz.length > shown.length ? `<p class="more">and ${nz.length - shown.length} more</p>` : ''}</details>`;
+    h += `<details class="lvl"><summary><b>Plücker V<sub>${r}</sub></b> ${nz.length} of ${vals.length} nonzero</summary><div class="pl">${shown.map(([I, x]) => `<span class="k">${pName(I, M.n)}</span><span>${fmtExpr(x)}</span>`).join('')}</div>${nz.length > shown.length ? `<p class="more">and ${nz.length - shown.length} more</p>` : ''}</details>`;
   });
   P.innerHTML = h;
+  if (depth > 1) showStep(chain[depth - 2], chain[depth - 1], false);
+}
+
+/* How the closure of C_a meets C_b: the report's piece and/or the search's curve. */
+function showStep(a, b, scroll = true) {
+  const M = S.M, box = $('#relbox'); if (!box) return;
+  const r = M.reportFor(a), pc = r ? (r.pieces || []).find(x => x.cell === M.cells[b].label) : null;
+  let h = `<div class="rel"><h4>Last step: the closure of ${cellName(M.cells[a])} meets ${cellName(M.cells[b])}</h4>`;
+  if (pc) h += `<p class="note">Intersection report: ${pc.kind === 'full' ? `the whole cell (dimension ${pc.dim}) lies in the closure.` : `a piece of dimension ${pc.dim} of this ${pc.cellDim}-dimensional cell, cut out by <span class="math">${fmtExpr(pc.ideal)}</span>.`}</p>`;
+  h += M.edge.has(a * M.N + b) ? `<div id="witness"></div>` : `<p class="note">No curve in the search grid reaches it; the report settles it.</p>`;
+  box.innerHTML = h + `</div>`;
+  if (M.edge.has(a * M.N + b)) renderWitness(a, b, $('#witness'));
+  if (scroll) box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 $('#panel').addEventListener('click', e => {
+  const n = e.target.closest('[data-nest]');
+  if (n) { drill(Number(n.dataset.nest)); return; }
+  const pp = e.target.closest('[data-pop]');
+  if (pp) { popTo(Number(pp.dataset.pop)); return; }
   const b = e.target.closest('[data-c]');
   if (b) { openRelation(Number(b.dataset.c)); return; }
   const g = e.target.closest('[data-go]');
