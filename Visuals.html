@@ -1,0 +1,1209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Springer Fiber Closures</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #F4F6F8;
+  --surface: #FFFFFF;
+  --ink: #1C2533;
+  --graphite: #5E6875;
+  --faint: #9AA3AF;
+  --rule: #D7DDE5;
+  --grid: #E6EBF1;
+  --blue: #2B59C3;
+  --blue-soft: #A9BEEA;
+  --green: #2E7D5B;
+  --green-soft: #A8D5BF;
+  --red: #C2412D;
+  --red-soft: #F2C4BB;
+  --focus: #2B59C3;
+  --math: "STIX Two Text", "STIX Two Math", Cambria, Georgia, serif;
+  --ui: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #121821; --surface: #19212C; --ink: #E6EAF0; --graphite: #A3ADBA; --faint: #6B7685;
+    --rule: #2C3644; --grid: #1C2530; --blue: #7FA2F0; --blue-soft: #34508A; --green: #5DBB8E;
+    --green-soft: #2A5A45; --red: #E7735F; --red-soft: #6E3027; --focus: #7FA2F0; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #121821; --surface: #19212C; --ink: #E6EAF0; --graphite: #A3ADBA; --faint: #6B7685;
+  --rule: #2C3644; --grid: #1C2530; --blue: #7FA2F0; --blue-soft: #34508A; --green: #5DBB8E;
+  --green-soft: #2A5A45; --red: #E7735F; --red-soft: #6E3027; --focus: #7FA2F0; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--paper); color: var(--ink);
+  font: 15px/1.5 var(--ui);
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.math { font-family: var(--math); font-size: 1.06em; }
+.math i, i.v { font-style: italic; }
+sub, sup { font-size: 0.72em; line-height: 0; }
+
+/* ── Top bar ─────────────────────────────────────────── */
+.bar {
+  display: flex; align-items: center; gap: 18px;
+  padding: 12px 20px; border-bottom: 1px solid var(--rule); background: var(--surface);
+  position: sticky; top: 0; z-index: 5;
+}
+.bar .title { font-family: var(--math); font-size: 20px; font-weight: 600; text-decoration: none; color: var(--ink); white-space: nowrap; }
+.crumbs { display: flex; flex-wrap: wrap; gap: 6px; color: var(--graphite); font-size: 14px; min-width: 0; }
+.crumbs a { color: var(--graphite); text-decoration: none; }
+.crumbs a:hover { color: var(--ink); text-decoration: underline; }
+.crumbs .sep { color: var(--faint); }
+.crumbs .here { color: var(--ink); font-family: var(--math); }
+.bar .spacer { flex: 1; }
+.icon-btn {
+  border: 1px solid var(--rule); background: transparent; border-radius: 6px;
+  padding: 5px 10px; cursor: pointer; color: var(--graphite); font-size: 13px;
+}
+.icon-btn:hover { color: var(--ink); border-color: var(--graphite); }
+.icon-btn[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+
+/* ── Catalog ─────────────────────────────────────────── */
+#home { max-width: 1180px; margin: 0 auto; padding: 32px 20px 64px; }
+#home .lede { max-width: 66ch; color: var(--graphite); margin: 0 0 28px; }
+#home .lede strong { color: var(--ink); font-weight: 600; }
+.family { margin-bottom: 36px; }
+.family h2 { font-family: var(--math); font-weight: 600; font-size: 22px; margin: 0 0 4px; }
+.family .count { color: var(--graphite); font-size: 14px; margin: 0 0 12px; }
+.nrow { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--rule); }
+.nrow .nlab { font-family: var(--math); color: var(--graphite); padding-top: 6px; }
+.nrow .nlab i { color: var(--ink); }
+.parts { display: flex; flex-wrap: wrap; gap: 8px; }
+.part {
+  display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center;
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 4px;
+  padding: 8px 12px 8px 10px; cursor: pointer; text-align: left; min-width: 150px;
+}
+.part:hover { border-color: var(--blue); }
+.part svg { grid-row: span 2; }
+.part .pname { font-family: var(--math); font-size: 16px; }
+.part .pmeta { color: var(--graphite); font-size: 12.5px; }
+
+/* ── Partition view ──────────────────────────────────── */
+#part { display: none; }
+.layout {
+  display: grid; grid-template-columns: 300px minmax(0, 1fr) 400px;
+  height: calc(100vh - 57px);
+}
+.col { overflow: auto; }
+.left { border-right: 1px solid var(--rule); padding: 18px; background: var(--surface); }
+.right { border-left: 1px solid var(--rule); background: var(--surface); }
+.center { display: flex; flex-direction: column; min-width: 0; }
+
+.jcard h2, .panel h3, .left h3 { font-family: var(--math); font-weight: 600; margin: 0 0 8px; }
+.jcard h2 { font-size: 21px; }
+.jcard .shape { color: var(--graphite); font-size: 14px; margin: -4px 0 12px; }
+.jcard svg { display: block; max-width: 100%; height: auto; }
+.jcard .blocks { font-family: var(--math); font-size: 17px; margin: 12px 0 6px; overflow-wrap: anywhere; }
+.jcard p { margin: 6px 0; color: var(--graphite); font-size: 13.5px; }
+.jcard .xmat { margin-top: 12px; }
+.left h3 { font-size: 16px; margin-top: 22px; }
+.stats { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; font-size: 14px; }
+.stats dt { color: var(--graphite); }
+.stats dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+.stats dd.red { color: var(--red); }
+.profile { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 8px; align-items: center; font-size: 13px; margin-top: 4px; }
+.profile .bar-track { height: 8px; background: var(--grid); border-radius: 2px; }
+.profile .bar-fill { height: 8px; background: var(--ink); border-radius: 2px; opacity: 0.75; }
+.profile .d { color: var(--graphite); font-family: var(--math); }
+.profile .c { color: var(--graphite); font-variant-numeric: tabular-nums; text-align: right; }
+.legend { list-style: none; padding: 0; margin: 0; font-size: 13.5px; color: var(--graphite); }
+.legend li { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+.sw { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.sw.sq { border-radius: 2px; }
+
+.toolbar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--rule); background: var(--surface); flex-wrap: wrap; }
+.tabs { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.tabs button { border: 0; background: transparent; padding: 6px 14px; cursor: pointer; color: var(--graphite); }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--surface); }
+.toolbar input {
+  font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 6px;
+  background: var(--paper); color: var(--ink); width: 220px; max-width: 100%;
+}
+.toolbar .hint { color: var(--faint); font-size: 12.5px; margin-left: auto; }
+.stage { position: relative; flex: 1; min-height: 360px; background-color: var(--paper);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+#tip {
+  position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 4px; padding: 4px 8px; font-size: 13px; display: none; white-space: nowrap; z-index: 3;
+  box-shadow: 0 2px 6px rgba(20, 30, 45, 0.12);
+}
+.polyview { position: absolute; inset: 0; overflow: auto; background: var(--paper); padding: 16px 18px 40px; z-index: 2; }
+.polyview .pv-head { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: baseline; margin-bottom: 10px; }
+.polyview h3 { font-family: var(--math); font-weight: 600; font-size: 18px; margin: 0; }
+.polyview label { font-size: 13.5px; color: var(--graphite); display: inline-flex; gap: 6px; align-items: center; }
+.polyview .note { color: var(--graphite); font-size: 13.5px; max-width: 80ch; margin: 4px 0 12px; }
+.ptable { border-collapse: collapse; font-size: 13.5px; background: var(--surface); }
+.ptable th { text-align: left; font-weight: 500; color: var(--graphite); border-bottom: 1px solid var(--rule); padding: 6px 10px; position: sticky; top: -16px; background: var(--surface); }
+.ptable td { padding: 4px 10px; border-bottom: 1px solid var(--grid); font-family: var(--math); font-size: 14.5px; vertical-align: top; white-space: nowrap; }
+.ptable td.num { font-family: var(--ui); font-variant-numeric: tabular-nums; text-align: right; font-size: 13.5px; }
+.ptable .ok { color: var(--green); } .ptable .bad, .pv-sum .bad { color: var(--red); }
+.ptable button.cellbtn { border: 0; background: none; padding: 0; color: var(--blue); cursor: pointer; font: inherit; }
+.pv-sum { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; }
+.pv-sum span { border: 1px solid var(--rule); border-radius: 4px; padding: 2px 8px; background: var(--surface); font-family: var(--math); font-size: 14px; }
+.verdict-line { font-size: 14px; margin: 2px 0; }
+.verdict-line.ok { color: var(--green); } .verdict-line.bad { color: var(--red); }
+.status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--graphite); }
+
+/* ── Cell panel ──────────────────────────────────────── */
+.panel { padding: 18px 20px 40px; }
+.panel .empty { color: var(--graphite); }
+.panel h2 { font-family: var(--math); font-weight: 600; font-size: 24px; margin: 0; overflow-wrap: anywhere; }
+.panel .sub { color: var(--graphite); font-size: 14px; margin: 2px 0 14px; }
+.panel h3 { font-size: 16px; margin: 22px 0 6px; padding-top: 14px; border-top: 1px solid var(--rule); }
+.panel h3 .n { color: var(--graphite); font-family: var(--ui); font-weight: 400; font-size: 13px; margin-left: 6px; }
+.panel .note { color: var(--graphite); font-size: 13.5px; margin: 4px 0 8px; }
+.fill { margin: 6px 0 4px; }
+.dimgroup { display: grid; grid-template-columns: 48px 1fr; gap: 6px; margin: 6px 0; align-items: start; }
+.dimgroup .dl { color: var(--graphite); font-size: 13px; padding-top: 4px; font-family: var(--math); }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip {
+  border: 1px solid var(--rule); background: var(--surface); border-radius: 4px; padding: 2px 7px;
+  cursor: pointer; font-family: var(--math); font-size: 14px; line-height: 1.5;
+}
+.chip:hover { border-color: var(--ink); }
+.chip.direct { border-color: var(--blue); color: var(--blue); }
+.chip.implied { border-style: dashed; border-color: var(--blue-soft); color: var(--blue); }
+.chip.up { border-color: var(--green); color: var(--green); }
+.chip.missing { border-color: var(--red); color: var(--red); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+details.lvl { margin: 4px 0; }
+details.lvl summary { cursor: pointer; color: var(--graphite); font-size: 13.5px; }
+details.lvl summary b { color: var(--ink); font-weight: 600; font-family: var(--math); font-size: 15px; }
+.pl { display: grid; grid-template-columns: auto 1fr; gap: 1px 10px; font-family: var(--math); font-size: 14.5px; margin: 6px 0 6px 10px; }
+.pl .k { color: var(--graphite); }
+.more { font-size: 13px; color: var(--graphite); margin-left: 10px; }
+
+.rel { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper); }
+.rel h4 { margin: 0 0 6px; font-family: var(--math); font-size: 17px; font-weight: 600; }
+.rel .go { margin: 0 0 8px; }
+.rel dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 8px 0; font-size: 14px; }
+.rel dt { color: var(--graphite); }
+.rel dd { margin: 0; font-family: var(--math); font-size: 15px; }
+.verdict { margin: 8px 0; font-size: 14px; }
+.verdict.ok { color: var(--green); }
+.verdict.bad { color: var(--red); }
+table.chk { border-collapse: collapse; width: 100%; font-size: 13.5px; margin: 4px 0 8px; }
+table.chk th { text-align: left; font-weight: 500; color: var(--graphite); border-bottom: 1px solid var(--rule); padding: 3px 6px 3px 0; }
+table.chk td { padding: 2px 6px 2px 0; border-bottom: 1px solid var(--grid); font-family: var(--math); font-size: 14px; vertical-align: top; }
+table.chk td.x { color: var(--red); }
+table.chk td.y { color: var(--green); }
+.chain { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 6px 0; }
+.chain .ar { color: var(--faint); }
+
+@media (max-width: 1180px) {
+  .layout { grid-template-columns: 280px minmax(0, 1fr); height: auto; }
+  .right { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--rule); }
+  .center { height: calc(100vh - 57px); }
+}
+@media (max-width: 760px) {
+  .layout { grid-template-columns: 1fr; }
+  .left { border-right: 0; border-bottom: 1px solid var(--rule); }
+  .center { height: 70vh; }
+  .toolbar .hint { display: none; }
+  .bar { padding: 10px 16px; flex-wrap: wrap; gap: 6px 12px; }
+  .bar .spacer { display: none; }
+  .bar #theme { margin-left: auto; }
+  .crumbs { order: 3; width: 100%; font-size: 13px; }
+  #home { padding: 24px 16px 48px; }
+  .nrow { grid-template-columns: 1fr; gap: 6px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="title" href="#/">Springer fiber closures</a>
+  <nav class="crumbs" id="crumbs" aria-label="Location"></nav>
+  <span class="spacer"></span>
+  <button class="icon-btn" id="theme" type="button" title="Switch light or dark">Dark</button>
+</header>
+
+<main id="home">
+  <p class="lede" id="lede">Choose a Jordan type to see its cells, which cells lie in which closures, and the curve that witnesses each relation.</p>
+  <div id="catalog"><p class="lede">Loading the list of computed partitions…</p></div>
+</main>
+
+<main id="part">
+  <div class="layout">
+    <aside class="col left">
+      <section class="jcard" id="jcard"></section>
+      <h3>Summary</h3>
+      <dl class="stats" id="stats"></dl>
+      <div class="profile" id="profile"></div>
+      <h3>Colors</h3>
+      <ul class="legend">
+        <li><span class="sw" style="background:var(--ink)"></span>selected cell</li>
+        <li><span class="sw" style="background:var(--blue)"></span>met by its closure</li>
+        <li><span class="sw" style="background:var(--blue-soft)"></span>reached only through a chain (unproven)</li>
+        <li><span class="sw" style="background:var(--green)"></span>its closure meets the selected cell</li>
+        <li><span class="sw" style="border:2px solid var(--red)"></span>below in Bruhat order, unresolved</li>
+        <li><span class="sw sq" style="background:var(--faint);height:2px"></span>grey lines: a simplified sketch of the relations</li>
+      </ul>
+    </aside>
+    <section class="center">
+      <div class="toolbar">
+        <div class="tabs" role="tablist">
+          <button role="tab" id="tab-hasse" aria-selected="true">Hasse diagram</button>
+          <button role="tab" id="tab-matrix" aria-selected="false">Matrix</button>
+          <button role="tab" id="tab-poly" aria-selected="false">Polynomials</button>
+        </div>
+        <input id="find" list="labels" placeholder="Go to cell, e.g. 21354" autocomplete="off" aria-label="Go to cell">
+        <datalist id="labels"></datalist>
+        <button class="icon-btn" id="focus" type="button" aria-pressed="false" title="Show only the selected cell and the cells related to it">Related cells only</button>
+        <button class="icon-btn" id="fit" type="button">Fit</button>
+        <span class="hint" id="hint">Drag to pan, scroll to zoom, click a cell</span>
+      </div>
+      <div class="stage" id="stage">
+        <canvas id="cv"></canvas>
+        <div id="tip"></div>
+        <div class="status" id="status"></div>
+        <div id="polyview" class="polyview" hidden></div>
+      </div>
+    </section>
+    <aside class="col right"><div class="panel" id="panel"></div></aside>
+  </div>
+</main>
+
+<script>
+'use strict';
+/* ═════════════ helpers ═════════════ */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage unavailable */ } },
+};
+
+function rowLengths(p) { return p.includes('-') ? p.split('-').map(Number) : [...p].map(Number); }
+function shapeText(rows) { return '(' + rows.join(',') + ')'; }
+function familyName(k) { return ['', 'One row', 'Two rows', 'Three rows', 'Four rows', 'Five rows', 'Six rows'][k] || k + ' rows'; }
+
+/* Cell labels: dashed from n = 10 on; older files write 10 as "10" with no dashes. */
+function parsePerm(s) {
+  if (s.includes('-')) return s.split('-').map(Number);
+  const out = [];
+  for (let i = 0; i < s.length; i++) {
+    if (s[i + 1] === '0') { out.push(Number(s[i] + '0')); i++; } else out.push(Number(s[i]));
+  }
+  return out;
+}
+const wordText = w => w.join(w.length > 9 ? ',' : '');
+const cellName = c => `<i>C</i><sub>${wordText(c.word)}</sub>`;
+
+/* Column-first labeling: down each column, furthest-left column first. */
+function labeledTableau(rows) {
+  const t = rows.map(r => new Array(r).fill(0));
+  let k = 1;
+  for (let c = 0; c < Math.max(...rows); c++) for (const row of t) if (c < row.length) row[c] = k++;
+  return t;
+}
+
+/* Plücker index sets: combinations of {1..n} of size r, in lexicographic order. */
+const subsetCache = new Map();
+function subsets(n, r) {
+  const key = n + ',' + r;
+  if (subsetCache.has(key)) return subsetCache.get(key);
+  const out = [], cur = [];
+  (function rec(start) {
+    if (cur.length === r) { out.push(cur.slice()); return; }
+    for (let i = start; i <= n; i++) { cur.push(i); rec(i + 1); cur.pop(); }
+  })(1);
+  subsetCache.set(key, out);
+  return out;
+}
+const pName = (I, n) => `<i>p</i><sub>${I.join(n > 9 ? ',' : '')}</sub>`;
+const splitVec = s => s.replace(/^\[|\]$/g, '').split(' : ');
+
+/* sympy string -> readable math */
+function fmtExpr(s) {
+  let h = esc(s.trim());
+  h = h.replace(/([a-zA-Z])(\d+)/g, '<i>$1</i><sub>$2</sub>');
+  h = h.replace(/\*\*(\d+)/g, '<sup>$1</sup>');
+  h = h.replace(/\*/g, '');
+  h = h.replace(/ - /g, ' − ').replace(/^-/, '−').replace(/\(-/g, '(−');
+  return h;
+}
+
+/* ═════════════ exact arithmetic for witness checks ═════════════ */
+const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a; };
+function fr(n, d = 1) { if (d < 0) { n = -n; d = -d; } const g = gcd(n, d) || 1; return [n / g, d / g]; }
+const fadd = (a, b) => fr(a[0] * b[1] + b[0] * a[1], a[1] * b[1]);
+const fmul = (a, b) => fr(a[0] * b[0], a[1] * b[1]);
+const fdiv = (a, b) => fr(a[0] * b[1], a[1] * b[0]);
+const fzero = a => a[0] === 0;
+const feq = (a, b) => a[0] === b[0] && a[1] === b[1];
+function ftext(a) { const s = a[1] === 1 ? String(Math.abs(a[0])) : `${Math.abs(a[0])}/${a[1]}`; return (a[0] < 0 ? '−' : '') + s; }
+/* univariate polynomials in t: array of fractions, index = degree */
+const ptrim = p => { while (p.length && fzero(p[p.length - 1])) p.pop(); return p; };
+const pconst = c => ptrim([c]);
+function padd(a, b) { const r = []; for (let i = 0; i < Math.max(a.length, b.length); i++) r.push(fadd(a[i] || [0, 1], b[i] || [0, 1])); return ptrim(r); }
+function pmul(a, b) {
+  if (!a.length || !b.length) return [];
+  const r = Array.from({ length: a.length + b.length - 1 }, () => [0, 1]);
+  a.forEach((x, i) => b.forEach((y, j) => { r[i + j] = fadd(r[i + j], fmul(x, y)); }));
+  return ptrim(r);
+}
+const pneg = a => a.map(x => [-x[0], x[1]]);
+function ppow(a, k) { let r = pconst([1, 1]); for (let i = 0; i < k; i++) r = pmul(r, a); return r; }
+const T = [[0, 1], [1, 1]];
+
+/* Evaluate a sympy expression string to a polynomial in t, given env: var -> polynomial. */
+function evalExpr(src, env) {
+  const toks = src.match(/\*\*|\d+|[A-Za-z_]\w*|[-+*/()]/g) || [];
+  let i = 0;
+  const peek = () => toks[i], next = () => toks[i++];
+  function expr() {
+    let v = term();
+    while (peek() === '+' || peek() === '-') { const op = next(); const w = term(); v = op === '+' ? padd(v, w) : padd(v, pneg(w)); }
+    return v;
+  }
+  function term() {
+    let v = unary();
+    while (peek() === '*' || peek() === '/') {
+      const op = next(); const w = unary();
+      if (op === '*') v = pmul(v, w);
+      else { if (w.length !== 1) throw new Error('division by a non-constant'); v = v.map(x => fdiv(x, w[0])); }
+    }
+    return v;
+  }
+  function unary() {
+    if (peek() === '-') { next(); return pneg(unary()); }
+    if (peek() === '+') { next(); return unary(); }
+    return power();
+  }
+  function power() {
+    const b = atom();
+    if (peek() === '**') { next(); const e = unary(); if (e.length > 1 || (e[0] && e[0][1] !== 1)) throw new Error('bad exponent'); return ppow(b, e.length ? e[0][0] : 0); }
+    return b;
+  }
+  function atom() {
+    const t = next();
+    if (t === undefined) throw new Error('unexpected end');
+    if (t === '(') { const v = expr(); next(); return v; }
+    if (/^\d+$/.test(t)) return pconst([Number(t), 1]);
+    if (!(t in env)) throw new Error(`uses ${t}, which the witness leaves unset`);
+    return env[t];
+  }
+  const v = expr();
+  if (i !== toks.length) throw new Error('could not parse ' + src);
+  return v;
+}
+
+/* ═════════════ closure polynomials ═════════════ */
+// coefficient lists are ascending: c[k] = number of pieces of dimension k
+const isPal = c => c.every((x, k) => x === c[c.length - 1 - k]);
+function divOnes(p, k) {                       // exact division by [k] = 1 + q + ... + q^(k-1)
+  const n = p.length - 1, m = k - 1; if (n < m) return null;
+  const rem = p.slice(), qt = new Array(n - m + 1).fill(0);
+  for (let i = n - m; i >= 0; i--) { const c = rem[i + m]; qt[i] = c; if (c) for (let j = 0; j <= m; j++) rem[i + j] -= c; }
+  return rem.every(x => x === 0) ? qt : null;
+}
+function qintFactor(c) {                       // {k: multiplicity} if c is a product of [k]'s, else null
+  let p = c.slice(); while (p.length > 1 && p[p.length - 1] === 0) p.pop();
+  const mult = {};
+  for (let k = Math.min(16, p.length); k >= 2; k--) {
+    for (;;) { const r = p.length >= k ? divOnes(p, k) : null; if (!r) break; p = r; mult[k] = (mult[k] || 0) + 1; }
+  }
+  return p.length === 1 && p[0] === 1 ? mult : null;
+}
+const qintText = m => { const ks = Object.keys(m).map(Number).sort((a, b) => a - b); return ks.length ? ks.map(k => `[${k}]${m[k] > 1 ? `<sup>${m[k]}</sup>` : ''}`).join('') : '1'; };
+const qintKey = m => m ? Object.keys(m).map(Number).sort((a, b) => a - b).map(k => `[${k}]${m[k] > 1 ? '^' + m[k] : ''}`).join(' ') || '1' : 'not a product of [k]';
+function polyHtml(c) {
+  const t = [];
+  for (let k = c.length - 1; k >= 0; k--) { if (!c[k]) continue; const co = c[k] === 1 && k ? '' : String(c[k]); t.push(k > 1 ? `${co}<i>q</i><sup>${k}</sup>` : k === 1 ? `${co}<i>q</i>` : co); }
+  return t.join(' + ') || '0';
+}
+function polyVerdict(c, certified) {
+  const m = qintFactor(c), pal = isPal(c);
+  if (m) return { cls: 'ok', text: `${qintText(m)}`, note: 'palindromic, a product of q-integers' };
+  if (pal) return { cls: '', text: 'palindromic', note: 'not a product of q-integers' };
+  return { cls: 'bad', text: certified ? 'singular' : 'not palindromic', note: certified ? 'Betti numbers are not palindromic, so Poincaré duality fails' : 'often just partial intersections, see note' };
+}
+
+/* ═════════════ model of one partition ═════════════ */
+function buildModel(entry, data) {
+  const cells = data.cells.map((c, i) => ({ i, label: c.perm, word: parsePerm(c.perm), dim: c.dim, free: c.free, plucker: c.plucker }));
+  const N = cells.length, n = cells[0].word.length;
+  const idx = new Map(cells.map(c => [c.label, c.i]));
+  const succ = cells.map(() => []), pred = cells.map(() => []);
+  const edge = new Map();
+  for (const e of data.edges) {
+    const s = idx.get(e.src), t = idx.get(e.tgt);
+    if (s === undefined || t === undefined) continue;
+    succ[s].push(t); pred[t].push(s); edge.set(s * N + t, e);
+  }
+  const W = (N + 31) >>> 5;
+  const has = (bs, k) => (bs[k >>> 5] >>> (k & 31)) & 1;
+  const reach = cells.map((_, s) => {
+    const bs = new Uint32Array(W), stack = succ[s].slice();
+    while (stack.length) {
+      const v = stack.pop();
+      if (has(bs, v)) continue;
+      bs[v >>> 5] |= 1 << (v & 31);
+      for (const w of succ[v]) if (!has(bs, w)) stack.push(w);
+    }
+    return bs;
+  });
+  // covering relations: direct edges not implied through another direct edge
+  const cover = cells.map((_, s) => {
+    const R = new Uint32Array(W);
+    for (const u of succ[s]) { const ru = reach[u]; for (let k = 0; k < W; k++) R[k] |= ru[k]; }
+    return succ[s].filter(w => !has(R, w));
+  });
+  // sorted prefixes for Bruhat comparisons
+  const pre = cells.map(c => { const out = []; for (let i = 1; i <= n; i++) out.push(c.word.slice(0, i).sort((a, b) => a - b)); return out; });
+  const bruhatLE = (v, w) => {   // cell v <= cell w
+    const pv = pre[v], pw = pre[w];
+    for (let i = 0; i < n; i++) { const a = pv[i], b = pw[i]; for (let j = 0; j <= i; j++) if (a[j] > b[j]) return false; }
+    return true;
+  };
+  const maxDim = Math.max(...cells.map(c => c.dim));
+  const M = { entry, cells, N, n, idx, succ, pred, edge, reach, has, cover, bruhatLE, maxDim, rows: entry.rows, rep: null };
+  // what each closure meets: witnessed curves, or the intersection report when there is one
+  M.closureOf = cells.map((_, s) => succ[s].slice());
+  M.inReport = new Set();          // s*N+t pairs that the report lists as nonempty
+  M.attachReport = rep => {
+    M.rep = rep;
+    for (const [lab, r] of Object.entries(rep.cells || {})) {
+      const s = idx.get(lab); if (s === undefined) continue;
+      const set = new Set(succ[s]);
+      for (const pc of r.pieces || []) { const t = idx.get(pc.cell); if (t === undefined || t === s) continue; M.inReport.add(s * N + t); set.add(t); }
+      M.closureOf[s] = [...set];
+    }
+    M.status = null; buildContainers();
+  };
+  const buildContainers = () => { M.containers = cells.map(() => []); M.closureOf.forEach((ts, s) => ts.forEach(t => M.containers[t].push(s))); };
+  buildContainers();
+  M.reportFor = s => (M.rep && M.rep.cells && M.rep.cells[cells[s].label]) || null;
+  M.reachList = s => { const out = []; for (let t = 0; t < N; t++) if (t !== s && has(reach[s], t)) out.push(t); return out; };
+  // chains of witnessed curves: likely but unproven (closure relations need not compose)
+  M.chainOnly = s => { if (M.reportFor(s)) return []; const inC = new Set(M.closureOf[s]); return M.reachList(s).filter(t => !inC.has(t)); };
+  M.meetPoly = s => { const c = new Array(cells[s].dim + 1).fill(0); c[cells[s].dim]++; M.reachList(s).forEach(t => { if (cells[t].dim <= cells[s].dim) c[cells[t].dim]++; }); return c; };
+  M.below = s => M.closureOf[s].slice();
+  M.above = t => M.containers[t].slice();
+  // Bruhat-below cells with no witness; settled (not missing) when the report covers this closure
+  M.missing = s => { if (M.reportFor(s)) return []; const inC = new Set(M.closureOf[s]); const out = []; for (let t = 0; t < N; t++) if (t !== s && cells[t].dim <= cells[s].dim && !inC.has(t) && !has(reach[s], t) && bruhatLE(t, s)) out.push(t); return out; };
+  M.status = null;   // N*N grid, computed on demand
+  M.computeStatus = () => {
+    if (M.status) return M.status;
+    const st = new Uint8Array(N * N);
+    let missing = 0; M.nChain = 0;
+    for (let s = 0; s < N; s++) {
+      const settled = !!M.reportFor(s);
+      for (let t = 0; t < N; t++) {
+        if (s === t) continue;
+        if (edge.has(s * N + t)) st[s * N + t] = 1;
+        else if (M.inReport.has(s * N + t)) st[s * N + t] = 2;
+        else if (!settled && has(reach[s], t)) { st[s * N + t] = 4; M.nChain++; }
+        else if (!settled && cells[t].dim <= cells[s].dim && bruhatLE(t, s)) { st[s * N + t] = 3; missing++; }
+      }
+    }
+    M.status = st; M.nMissing = missing;
+    return st;
+  };
+  M.path = (s, t) => {        // shortest chain of direct edges s -> ... -> t
+    const prev = new Int32Array(N).fill(-1), q = [s]; prev[s] = s;
+    while (q.length) { const v = q.shift(); if (v === t) break; for (const w of succ[v]) if (prev[w] < 0) { prev[w] = v; q.push(w); } }
+    if (prev[t] < 0) return null;
+    const p = [t]; while (p[0] !== s) p.unshift(prev[p[0]]);
+    return p;
+  };
+  M.full = layoutHasse(M, M.cells.map(c => c.i));
+  return M;
+}
+
+/* layered layout: rows by dimension, order inside a row by barycenter sweeps */
+function layoutHasse(M, nodes) {
+  const on = new Uint8Array(M.N); nodes.forEach(v => { on[v] = 1; });
+  const dims = nodes.map(v => M.cells[v].dim), dmin = Math.min(...dims), dmax = Math.max(...dims);
+  const layers = Array.from({ length: dmax + 1 }, () => []);
+  nodes.forEach(v => layers[M.cells[v].dim].push(v));
+  const pos = new Float64Array(M.N);
+  layers.forEach(L => L.forEach((v, k) => { pos[v] = k / Math.max(1, L.length - 1); }));
+  const down = M.cells.map((_, v) => on[v] ? M.cover[v].filter(w => on[w]) : []), up = M.cells.map(() => []);
+  down.forEach((ts, s) => ts.forEach(t => up[t].push(s)));
+  const sweep = (L, nb) => {
+    const key = new Map(L.map(v => { const ns = nb[v].filter(w => M.cells[w].dim !== M.cells[v].dim); return [v, ns.length ? ns.reduce((a, w) => a + pos[w], 0) / ns.length : pos[v]]; }));
+    L.sort((a, b) => key.get(a) - key.get(b));
+    L.forEach((v, k) => { pos[v] = k / Math.max(1, L.length - 1); });
+  };
+  for (let it = 0; it < 6; it++) {
+    for (let d = dmax - 1; d >= dmin; d--) sweep(layers[d], up);
+    for (let d = dmin + 1; d <= dmax; d++) sweep(layers[d], down);
+  }
+  const widest = Math.max(...layers.map(L => L.length));
+  const X = widest <= 6 ? 90 : widest <= 14 ? 48 : widest <= 30 ? 34 : 26;
+  const xy = new Float64Array(M.N * 2).fill(NaN);
+  layers.forEach(L => L.forEach((v, k) => { xy[2 * v] = (k - (L.length - 1) / 2) * X; }));
+  const L = { nodes, on, xy, X, Y: 110, dmin, dmax, down };
+  setRows(M, L, 110);
+  return L;
+}
+function setRows(M, L, Y) {
+  L.Y = Y;
+  L.nodes.forEach(v => { L.xy[2 * v + 1] = (L.dmax - M.cells[v].dim) * Y; });
+}
+
+/* ═════════════ app state, routing ═════════════ */
+const S = { focus: false, L: null, manifest: null, byKey: new Map(), M: null, sel: -1, rel: -1, tab: 'hasse', view: { s: 1, tx: 0, ty: 0 }, hover: -1, cache: new Map() };
+
+/* Partitions come from manifest.json when it exists; otherwise the page asks
+   GitHub for the repository's file list and finds every data_*.json itself. */
+const REPO_FALLBACK = 'Tristane028/Springer-Fibers';
+function repoName() {
+  const h = location.hostname;
+  if (h.endsWith('.github.io')) { const seg = location.pathname.split('/').filter(Boolean)[0]; return `${h.split('.')[0]}/${seg && !seg.includes('.') ? seg : h}`; }
+  return REPO_FALLBACK;
+}
+async function discoverFromGitHub() {
+  const repo = repoName();
+  const r = await fetch(`https://api.github.com/repos/${repo}/git/trees/HEAD?recursive=1`);
+  if (!r.ok) throw new Error(`GitHub listing for ${repo} returned ${r.status}`);
+  const tree = (await r.json()).tree || [];
+  const reports = new Map(), out = [];
+  for (const f of tree) {
+    const m = f.type === 'blob' && f.path.match(/(?:^|\/)closure_([^/]+)\.json$/);
+    if (m) reports.set(m[1], f.path);
+  }
+  for (const f of tree) {
+    const m = f.type === 'blob' && f.path.match(/(?:^|\/)data_([^/]+)\.json$/);
+    if (!m) continue;
+    const rows = rowLengths(m[1]);
+    if (!rows.length || rows.some(x => !(x > 0))) continue;
+    const e = { partition: m[1], rows, n: rows.reduce((a, b) => a + b, 0), path: f.path, bytes: f.size || 0, cells: null, edges: null, maxDim: null, dimProfile: null };
+    if (reports.has(m[1])) e.report = reports.get(m[1]);
+    out.push(e);
+  }
+  out.sort((a, b) => a.rows.length - b.rows.length || a.n - b.n || a.rows.join(',').localeCompare(b.rows.join(','), undefined, { numeric: true }));
+  return out;
+}
+async function loadManifest() {
+  let list = null;
+  try {
+    const r = await fetch('manifest.json', { cache: 'no-cache' });
+    if (r.ok) list = (await r.json()).partitions;
+  } catch (e) { /* fall back below */ }
+  if (!list) list = await discoverFromGitHub();
+  S.manifest = list;
+  S.manifest.forEach(e => S.byKey.set(e.partition, e));
+}
+const sizeText = b => b >= 1e6 ? (b / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1e3)) + ' KB';
+
+function route() {
+  const parts = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent).filter(Boolean);
+  if (!parts.length) return showHome();
+  showPartition(parts[0], parts[1]);
+}
+function setHash(p, cell) {
+  const h = '#/' + encodeURIComponent(p) + (cell ? '/' + encodeURIComponent(cell) : '');
+  if (location.hash !== h) history.replaceState(null, '', h);
+}
+
+/* ═════════════ catalog ═════════════ */
+function miniDiagram(rows, box = 8) {
+  const w = Math.max(...rows) * box + 1, h = rows.length * box + 1;
+  let r = '';
+  rows.forEach((len, y) => { for (let x = 0; x < len; x++) r += `<rect x="${x * box + 0.5}" y="${y * box + 0.5}" width="${box}" height="${box}"/>`; });
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1">${r}</g></svg>`;
+}
+function showHome() {
+  $('#home').style.display = 'block'; $('#part').style.display = 'none';
+  $('#crumbs').innerHTML = '';
+  document.title = 'Springer Fiber Closures';
+  if (!S.manifest) return;
+  const fam = new Map();
+  for (const e of S.manifest) {
+    const k = e.rows.length;
+    if (!fam.has(k)) fam.set(k, new Map());
+    const byN = fam.get(k);
+    if (!byN.has(e.n)) byN.set(e.n, []);
+    byN.get(e.n).push(e);
+  }
+  const total = S.manifest.every(e => e.cells != null) ? S.manifest.reduce((a, e) => a + e.cells, 0) : null;
+  $('#lede').innerHTML = `<strong>${S.manifest.length} Jordan types</strong> computed${total != null ? `, ${total.toLocaleString()} cells in all` : ''}. Rows are listed top to bottom as the boxes are labeled, so (1,2) and (2,1) are separate entries. Choose one to see its cells, which cells each closure meets, the curve that witnesses each relation, and the closure polynomials. Types marked “certified” also have an intersection report with exact Poincaré polynomials.`;
+  let html = '';
+  for (const [k, byN] of [...fam.entries()].sort((a, b) => a[0] - b[0])) {
+    const count = [...byN.values()].reduce((a, l) => a + l.length, 0);
+    html += `<section class="family"><h2>${familyName(k)}</h2><p class="count">${count} Jordan types</p>`;
+    for (const [n, list] of [...byN.entries()].sort((a, b) => a[0] - b[0])) {
+      html += `<div class="nrow"><div class="nlab"><i>n</i> = ${n}</div><div class="parts">`;
+      for (const e of list) {
+        html += `<button class="part" data-p="${esc(e.partition)}" title="${e.edges != null ? e.edges.toLocaleString() + ' relations with a curve' : sizeText(e.bytes)}">${miniDiagram(e.rows)}<span class="pname">${shapeText(e.rows)}</span><span class="pmeta">${e.cells != null ? `${e.cells.toLocaleString()} cells, dim ${e.maxDim}` : sizeText(e.bytes)}${e.report ? ', certified' : ''}</span></button>`;
+      }
+      html += `</div></div>`;
+    }
+    html += `</section>`;
+  }
+  $('#catalog').innerHTML = html;
+}
+$('#catalog').addEventListener('click', ev => { const b = ev.target.closest('.part'); if (b) location.hash = '#/' + encodeURIComponent(b.dataset.p); });
+
+/* ═════════════ partition page ═════════════ */
+async function showPartition(p, cellLabel) {
+  $('#home').style.display = 'none'; $('#part').style.display = 'block';
+  const entry = S.byKey.get(p);
+  if (!entry) { $('#status').textContent = `No data for ${p}. Run build_manifest.py after adding the file.`; return; }
+  $('#crumbs').innerHTML = `<a href="#/">All Jordan types</a><span class="sep">/</span><span>${familyName(entry.rows.length)}</span><span class="sep">/</span><span><i>n</i> = ${entry.n}</span><span class="sep">/</span><span class="here">${shapeText(entry.rows)}</span>`;
+  document.title = `${shapeText(entry.rows)} Springer fiber`;
+  renderJordan(entry.rows);
+  if (!S.M || S.M.entry !== entry) {
+    S.M = null; S.sel = -1; S.rel = -1;
+    $('#panel').innerHTML = '';
+    $('#stats').innerHTML = ''; $('#profile').innerHTML = '';
+    $('#status').textContent = `Loading ${shapeText(entry.rows)}, ${entry.bytes >= 1e6 ? (entry.bytes / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(entry.bytes / 1e3)) + ' KB'}…`;
+    $('#status').style.display = 'flex';
+    clearCanvas();
+    try {
+      let data = S.cache.get(p);
+      if (!data) {
+        const r = await fetch(entry.path.split('/').map(encodeURIComponent).join('/'));
+        if (!r.ok) throw new Error(`${entry.path} returned ${r.status}`);
+        data = await r.json(); S.cache.clear(); S.cache.set(p, data);
+      }
+      if (location.hash.split('/')[1] !== encodeURIComponent(p)) return;   // navigated away meanwhile
+      if (entry.cells == null) {
+        const dims = data.cells.map(c => c.dim), mx = Math.max(...dims);
+        Object.assign(entry, { cells: data.cells.length, edges: data.edges.length, maxDim: mx, dimProfile: Array.from({ length: mx + 1 }, (_, k) => dims.filter(x => x === k).length) });
+      }
+      S.M = buildModel(entry, data);
+      if (entry.report) {
+        try {
+          const rr = await fetch(entry.report.split('/').map(encodeURIComponent).join('/'));
+          if (rr.ok) S.M.attachReport(await rr.json());
+        } catch (e) { /* the viewer works without the report */ }
+      }
+    } catch (err) {
+      $('#status').textContent = `Could not load ${entry.path}: ${err.message}`;
+      return;
+    }
+    $('#status').style.display = 'none';
+    $('#labels').innerHTML = S.M.cells.map(c => `<option value="${esc(wordText(c.word))}">`).join('');
+    renderStats();
+    S.L = S.M.full;
+    S.focus = S.M.N > 120; $('#focus').setAttribute('aria-pressed', S.focus);
+    if (S.tab === 'poly') renderPolyView(); else fitView();
+  }
+  const i = cellLabel ? findCell(cellLabel) : -1;
+  select(i, false);
+}
+function findCell(text) {
+  const M = S.M; if (!M) return -1;
+  const t = String(text).trim().replace(/[\sC_]/g, '');
+  if (M.idx.has(t)) return M.idx.get(t);
+  const w = t.includes(',') ? t.split(',').map(Number) : t.includes('-') ? t.split('-').map(Number) : parsePerm(t);
+  const c = M.cells.find(c => c.word.length === w.length && c.word.every((x, k) => x === w[k]));
+  return c ? c.i : -1;
+}
+
+/* Jordan block card: the kept feature, drawn as the labeled tableau with X's arrows */
+function renderJordan(rows) {
+  const t = labeledTableau(rows), n = rows.reduce((a, b) => a + b, 0);
+  const B = 34, G = 22, padL = 30, padT = 6;
+  const W = padL + Math.max(...rows) * (B + G) - G + 2, H = padT + rows.length * (B + 10) - 10 + 4;
+  let s = '';
+  t.forEach((row, r) => row.forEach((v, c) => {
+    const x = padL + c * (B + G), y = padT + r * (B + 10);
+    s += `<rect x="${x}" y="${y}" width="${B}" height="${B}" rx="2" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.2"/>`;
+    s += `<text x="${x + B / 2}" y="${y + B / 2 + 6}" text-anchor="middle" font-family="STIX Two Text, serif" font-size="17" fill="var(--ink)">${v}</text>`;
+    const ay = y + B / 2;
+    if (c > 0) s += `<line x1="${x - 3}" y1="${ay}" x2="${x - G + 5}" y2="${ay}" stroke="var(--blue)" stroke-width="1.3" marker-end="url(#ah)"/>`;
+    else s += `<line x1="${x - 3}" y1="${ay}" x2="${x - 16}" y2="${ay}" stroke="var(--faint)" stroke-width="1.1" marker-end="url(#ah0)"/><text x="${x - 24}" y="${ay + 4.5}" text-anchor="middle" font-family="STIX Two Text, serif" font-size="13" fill="var(--faint)">0</text>`;
+  }));
+  const defs = `<defs><marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--blue)"/></marker><marker id="ah0" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--faint)"/></marker></defs>`;
+  const blocks = t.map(row => '(' + row.join(' ') + ')').join('');
+  let xmat = '';
+  if (n <= 12) {
+    const c = n <= 6 ? 14 : n <= 9 ? 11 : 9, w = n * c;
+    let d = '';
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const one = t.some(row => row.some((v, k) => k > 0 && row[k - 1] === i + 1 && v === j + 1));
+      d += one ? `<rect x="${j * c + 1.5}" y="${i * c + 1.5}" width="${c - 3}" height="${c - 3}" fill="var(--blue)"/>` : `<circle cx="${j * c + c / 2}" cy="${i * c + c / 2}" r="0.9" fill="var(--faint)"/>`;
+    }
+    xmat = `<div class="xmat"><p>The matrix of <i class="v">X</i> (rows <i class="v">i</i>, columns <i class="v">j</i>; a square means <i class="v">Xe<sub>j</sub></i> = <i class="v">e<sub>i</sub></i>):</p><svg width="${w + 2}" height="${w + 2}" viewBox="-1 -1 ${w + 2} ${w + 2}" role="img" aria-label="nilpotent matrix"><rect x="-0.5" y="-0.5" width="${w + 1}" height="${w + 1}" fill="none" stroke="var(--rule)"/>${d}</svg></div>`;
+  }
+  $('#jcard').innerHTML = `<h2>Jordan blocks</h2><p class="shape">Shape ${shapeText(rows)} acting on <span class="math">ℂ<sup>${n}</sup></span></p>
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="labeled tableau">${defs}${s}</svg>
+    <div class="blocks">${blocks}</div>
+    <p>Boxes are numbered down each column, leftmost column first. <i class="v">X</i> sends each box to the box on its left; the first column goes to 0.</p>
+    <p>Cells are indexed by permutations of 1,…,${n} in which each row's numbers appear in increasing order.</p>${xmat}`;
+}
+
+function renderStats() {
+  const M = S.M, e = M.entry;
+  M.computeStatus();
+  const tops = M.cells.filter(c => c.dim === M.maxDim).map(c => c.i);
+  const palTop = tops.filter(i => isPal(M.meetPoly(i))).length;
+  let h = `<dt>Cells</dt><dd>${e.cells.toLocaleString()}</dd>
+    <dt>Relations with a curve</dt><dd>${e.edges.toLocaleString()}</dd>
+    <dt>Components (top cells)</dt><dd>${tops.length}</dd>
+    <dt>Components, palindromic count</dt><dd>${palTop}</dd>`;
+  if (M.rep) {
+    const certified = M.cells.filter(c => M.reportFor(c.i) && M.reportFor(c.i).poly);
+    const sing = certified.filter(c => !isPal(M.reportFor(c.i).poly));
+    const singTop = sing.filter(c => c.dim === M.maxDim).length;
+    const extra = [...M.inReport].filter(k => !M.edge.has(k)).length;
+    h += `<dt>Certified closures</dt><dd>${certified.length}</dd>
+      <dt>Singular closures</dt><dd class="${sing.length ? 'red' : ''}">${sing.length}</dd>
+      <dt>Singular components</dt><dd class="${singTop ? 'red' : ''}">${singTop}</dd>
+      <dt>Meetings with no curve found</dt><dd>${extra.toLocaleString()}</dd>`;
+  } else {
+    h += `<dt>Pairs reached only through chains</dt><dd>${M.nChain.toLocaleString()}</dd>
+      <dt>Bruhat-below, unresolved</dt><dd class="${M.nMissing ? 'red' : ''}">${M.nMissing.toLocaleString()}</dd>`;
+  }
+  $('#stats').innerHTML = h;
+  const mx = Math.max(...e.dimProfile);
+  $('#profile').innerHTML = e.dimProfile.map((c, d) => `<span class="d">dim ${d}</span><span class="bar-track"><span class="bar-fill" style="display:block;width:${(100 * c / mx).toFixed(1)}%"></span></span><span class="c">${c}</span>`).reverse().join('');
+}
+
+/* ═════════════ canvas: Hasse diagram and matrix ═════════════ */
+const cv = $('#cv'), ctx = cv.getContext('2d');
+function sizeCanvas() {
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  return { w: r.width, h: r.height, dpr };
+}
+function clearCanvas() { const { dpr } = sizeCanvas(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); }
+function fitView() {
+  const M = S.M; if (!M) return;
+  const { w, h } = sizeCanvas();
+  if (S.tab === 'hasse') {
+    const L = S.L || M.full;
+    let x0 = Infinity, x1 = -Infinity;
+    L.nodes.forEach(v => { x0 = Math.min(x0, L.xy[2 * v]); x1 = Math.max(x1, L.xy[2 * v]); });
+    const bw = Math.max(x1 - x0, 1) + 80;
+    const s = Math.min((w - 70) / bw, 2.2);
+    const span = L.dmax - L.dmin;
+    // stretch the rows apart so the diagram uses the full height at this zoom
+    if (span > 0) setRows(M, L, Math.max(40, Math.min(180 / s, (h - 90) / (span * s))));
+    S.view = { s, tx: 70 + (w - 70) / 2 - ((x0 + x1) / 2) * s, ty: h / 2 - (span * L.Y / 2) * s };
+  }
+  draw();
+}
+
+function draw() {
+  const M = S.M; if (!M) return;
+  const { w, h, dpr } = sizeCanvas();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  if (S.tab === 'hasse') drawHasse(w, h); else drawMatrix(w, h);
+}
+function selectionSets() {
+  const M = S.M, s = S.sel;
+  if (s < 0) return null;
+  const down = new Uint8Array(M.N), up = new Uint8Array(M.N), miss = new Uint8Array(M.N), chain = new Uint8Array(M.N);
+  M.chainOnly(s).forEach(v => { chain[v] = 1; });
+  M.below(s).forEach(v => { down[v] = 1; });
+  M.above(s).forEach(v => { up[v] = 1; });
+  M.missing(s).forEach(v => { miss[v] = 1; });
+  return { down, up, miss, chain };
+}
+function drawHasse(w, h) {
+  const M = S.M, L = S.L || M.full, { s, tx, ty } = S.view, xy = L.xy;
+  const X = v => xy[2 * v] * s + tx, Y = v => xy[2 * v + 1] * s + ty;
+  const sets = S._sets;
+  const ink = css('--ink'), blue = css('--blue'), green = css('--green'), red = css('--red'), faint = css('--faint'), rule = css('--rule'), graphite = css('--graphite'), paper = css('--paper');
+  for (let d = L.dmin; d <= L.dmax; d++) {
+    const y = (L.dmax - d) * L.Y * s + ty;
+    if (y < -10 || y > h + 10) continue;
+    ctx.strokeStyle = rule; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
+    ctx.beginPath(); ctx.moveTo(58, y); ctx.lineTo(w, y); ctx.stroke(); ctx.setLineDash([]);
+  }
+  const edgePath = (a, b) => {
+    const x1 = X(a), y1 = Y(a), x2 = X(b), y2 = Y(b);
+    ctx.moveTo(x1, y1);
+    if (Math.abs(y1 - y2) < 1) ctx.quadraticCurveTo((x1 + x2) / 2, y1 - Math.min(26, Math.abs(x2 - x1) * 0.25 + 8), x2, y2);
+    else ctx.lineTo(x2, y2);
+  };
+  const E = L.down;
+  const base = sets ? 0.13 : (L.nodes.length > 200 ? 0.22 : 0.45);
+  ctx.lineWidth = 1; ctx.strokeStyle = faint; ctx.globalAlpha = base; ctx.beginPath();
+  E.forEach((ts, a) => ts.forEach(b => edgePath(a, b))); ctx.stroke(); ctx.globalAlpha = 1;
+  if (sets) {
+    const ok = v => L.on[v];
+    ctx.lineWidth = 1.2; ctx.globalAlpha = 0.75;
+    ctx.strokeStyle = blue; ctx.beginPath(); S.M.closureOf[S.sel].forEach(t => { if (ok(t)) edgePath(S.sel, t); }); ctx.stroke();
+    ctx.strokeStyle = green; ctx.beginPath(); S.M.containers[S.sel].forEach(u => { if (ok(u)) edgePath(u, S.sel); }); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  const r = Math.max(2.4, Math.min(6.5, L.X * s * 0.26));
+  for (const v of L.nodes) {
+    const x = X(v), y = Y(v);
+    if (x < -20 || x > w + 20 || y < -20 || y > h + 20) continue;
+    let fill = ink, alpha = 1, ring = null;
+    if (sets) {
+      if (v === S.sel) fill = ink;
+      else if (sets.down[v]) fill = blue;
+      else if (sets.up[v]) fill = green;
+      else if (sets.chain[v]) fill = css('--blue-soft');
+      else { fill = faint; alpha = 0.5; }
+      if (sets.miss[v]) { ring = red; alpha = 1; fill = css('--surface'); }
+    }
+    ctx.globalAlpha = alpha; ctx.fillStyle = fill;
+    ctx.beginPath(); ctx.arc(x, y, v === S.sel ? r + 2.5 : r, 0, 7); ctx.fill();
+    if (ring) { ctx.strokeStyle = ring; ctx.lineWidth = 2; ctx.stroke(); }
+    if (v === S.sel) { ctx.strokeStyle = ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, r + 6, 0, 7); ctx.stroke(); }
+    if (v === S.hover) { ctx.strokeStyle = ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, r + 3.5, 0, 7); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+  if (L.X * s > M.n * (M.n > 9 ? 9.5 : 7.2)) {
+    ctx.font = '12.5px "STIX Two Text", serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = graphite;
+    for (const v of L.nodes) { const x = X(v), y = Y(v); if (x > -60 && x < w + 60 && y > -20 && y < h + 20) ctx.fillText(wordText(M.cells[v].word), x, y + r + 4); }
+    ctx.textAlign = 'start';
+  }
+  // dimension labels on a paper strip so edges never run through them
+  ctx.fillStyle = paper; ctx.globalAlpha = 0.92; ctx.fillRect(0, 0, 56, h); ctx.globalAlpha = 1;
+  ctx.font = '13px "STIX Two Text", serif'; ctx.fillStyle = graphite; ctx.textBaseline = 'middle';
+  for (let d = L.dmin; d <= L.dmax; d++) { const y = (L.dmax - d) * L.Y * s + ty; if (y > -10 && y < h + 10) ctx.fillText('dim ' + d, 10, y); }
+}
+
+function drawMatrix(w, h) {
+  const M = S.M, st = M.computeStatus(), N = M.N;
+  const order = M.cells.map(c => c.i).sort((a, b) => M.cells[b].dim - M.cells[a].dim || a - b);
+  S._order = order;
+  const pad = 52;
+  const size = Math.max(40, Math.min(w - pad - 14, h - pad - 40));
+  const cs = size / N;
+  S._mat = { x0: pad, y0: pad, cs, order };
+  // pixels
+  const img = ctx.createImageData(N, N);
+  const hex = s => { s = s.replace('#', ''); return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)]; };
+  const col = [hex(css('--surface')), hex(css('--blue')), hex(css('--green')), hex(css('--red')), hex(css('--blue-soft'))];
+  for (let a = 0; a < N; a++) for (let b = 0; b < N; b++) {
+    const k = st[order[a] * N + order[b]], c = a === b ? hex(css('--rule')) : col[k], p = 4 * (a * N + b);
+    img.data[p] = c[0]; img.data[p + 1] = c[1]; img.data[p + 2] = c[2]; img.data[p + 3] = 255;
+  }
+  const off = document.createElement('canvas'); off.width = N; off.height = N; off.getContext('2d').putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(off, pad, pad, size, size);
+  ctx.strokeStyle = css('--rule'); ctx.lineWidth = 1; ctx.strokeRect(pad - 0.5, pad - 0.5, size + 1, size + 1);
+  // dimension blocks
+  ctx.strokeStyle = css('--graphite'); ctx.fillStyle = css('--graphite'); ctx.font = '12px "STIX Two Text", serif';
+  let k = 0;
+  for (let d = M.maxDim; d >= 0; d--) {
+    const cnt = M.cells.filter(c => c.dim === d).length; if (!cnt) continue;
+    const a = pad + k * cs, b = pad + (k + cnt) * cs;
+    ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.moveTo(pad, b); ctx.lineTo(pad + size, b); ctx.moveTo(b, pad); ctx.lineTo(b, pad + size); ctx.stroke(); ctx.globalAlpha = 1;
+    if (b - a > 12) { ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(String(d), pad - 6, (a + b) / 2); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(String(d), (a + b) / 2, pad - 4); }
+    k += cnt;
+  }
+  ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+  // missing pairs drawn at a visible minimum size
+  const m = Math.max(cs, 3), pos = new Int32Array(N); order.forEach((v, k) => { pos[v] = k; });
+  ctx.fillStyle = css('--red');
+  for (let s2 = 0; s2 < N; s2++) for (let t = 0; t < N; t++) if (st[s2 * N + t] === 3) ctx.fillRect(pad + pos[t] * cs + cs / 2 - m / 2, pad + pos[s2] * cs + cs / 2 - m / 2, m, m);
+  // key
+  const ky = Math.min(pad + size + 22, h - 8);
+  let kx = pad;
+  [['--blue', 'curve found'], ['--blue-soft', 'only through a chain of curves'], ['--green', 'nonempty in report only'], ['--red', 'Bruhat-below, unresolved']].forEach(([c, t]) => {
+    ctx.fillStyle = css(c); ctx.fillRect(kx, ky - 9, 10, 10);
+    ctx.fillStyle = css('--graphite'); ctx.font = '13px "Public Sans", sans-serif'; ctx.fillText(t, kx + 15, ky);
+    kx += 22 + ctx.measureText(t).width + 14;
+  });
+  ctx.font = '12px "STIX Two Text", serif'; ctx.fillStyle = css('--graphite');
+  ctx.save(); ctx.translate(pad - 22, pad + size / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillText('source cell, by dimension', 0, 0); ctx.restore();
+  ctx.textAlign = 'center'; ctx.fillText('target cell, by dimension', pad + size / 2, pad - 18); ctx.textAlign = 'start';
+  if (S.sel >= 0) {
+    const a = order.indexOf(S.sel);
+    ctx.strokeStyle = css('--ink'); ctx.lineWidth = 1.5; ctx.strokeRect(pad, pad + a * cs, size, Math.max(cs, 1.5));
+  }
+}
+
+/* interaction */
+let drag = null;
+function worldPick(px, py) {
+  const M = S.M; if (!M) return -1;
+  if (S.tab === 'hasse') {
+    const L = S.L || M.full, { s, tx, ty } = S.view; let best = -1, bd = Math.max(10, L.X * s * 0.5) ** 2;
+    for (const v of L.nodes) { const dx = L.xy[2 * v] * s + tx - px, dy = L.xy[2 * v + 1] * s + ty - py, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = v; } }
+    return best;
+  }
+  const m = S._mat; if (!m) return -1;
+  const a = Math.floor((py - m.y0) / m.cs), b = Math.floor((px - m.x0) / m.cs);
+  if (a < 0 || b < 0 || a >= M.N || b >= M.N) return -1;
+  return { s: m.order[a], t: m.order[b] };
+}
+
+cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); drag = { x: e.offsetX, y: e.offsetY, tx: S.view.tx, ty: S.view.ty, moved: 0 }; });
+cv.addEventListener('pointermove', e => {
+  const M = S.M; if (!M) return;
+  if (drag && S.tab === 'hasse') {
+    const dx = e.offsetX - drag.x, dy = e.offsetY - drag.y; drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy));
+    if (drag.moved > 3) { S.view.tx = drag.tx + dx; S.view.ty = drag.ty + dy; draw(); }
+    return;
+  }
+  const hit = worldPick(e.offsetX, e.offsetY), tip = $('#tip');
+  if (S.tab === 'hasse') {
+    if (hit !== S.hover) { S.hover = hit; draw(); }
+    if (hit >= 0) { const c = M.cells[hit]; tip.innerHTML = `<span class="math">${cellName(c)}</span>, dim ${c.dim}`; showTip(e); } else tip.style.display = 'none';
+  } else if (hit && hit !== -1) {
+    const st = M.computeStatus()[hit.s * M.N + hit.t];
+    const what = hit.s === hit.t ? 'same cell' : ['closure does not meet it', 'curve found by the search', 'nonempty in the intersection report', 'below in Bruhat order, unresolved', 'reached only through a chain of curves (unproven)'][st];
+    tip.innerHTML = `<span class="math">${cellName(M.cells[hit.t])}</span> vs closure of <span class="math">${cellName(M.cells[hit.s])}</span>: ${what}`; showTip(e);
+  } else tip.style.display = 'none';
+});
+function showTip(e) { const tip = $('#tip'); tip.style.display = 'block'; const r = $('#stage').getBoundingClientRect(); let x = e.offsetX + 14, y = e.offsetY + 14; if (x + tip.offsetWidth > r.width) x = e.offsetX - tip.offsetWidth - 10; tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
+cv.addEventListener('pointerleave', () => { $('#tip').style.display = 'none'; if (S.hover >= 0) { S.hover = -1; draw(); } });
+cv.addEventListener('pointerup', e => {
+  const d = drag; drag = null;
+  if (!S.M || (d && d.moved > 3)) return;
+  const hit = worldPick(e.offsetX, e.offsetY);
+  if (S.tab === 'hasse') select(hit);
+  else if (hit && hit !== -1) { select(hit.s); if (hit.s !== hit.t) openRelation(hit.t); }
+});
+cv.addEventListener('wheel', e => {
+  if (S.tab !== 'hasse' || !S.M) return;
+  e.preventDefault();
+  const f = Math.exp(-e.deltaY * 0.0015), v = S.view, ns = Math.min(8, Math.max(0.02, v.s * f));
+  v.tx = e.offsetX - (e.offsetX - v.tx) * (ns / v.s); v.ty = e.offsetY - (e.offsetY - v.ty) * (ns / v.s); v.s = ns; draw();
+}, { passive: false });
+window.addEventListener('resize', () => draw());
+$('#fit').addEventListener('click', fitView);
+function setFocus(on) { S.focus = on; $('#focus').setAttribute('aria-pressed', on); if (S.M) select(S.sel, false); }
+$('#focus').addEventListener('click', () => setFocus(!S.focus));
+function setTab(t) {
+  S.tab = t;
+  ['hasse', 'matrix', 'poly'].forEach(k => $('#tab-' + k).setAttribute('aria-selected', t === k));
+  $('#fit').style.display = t === 'hasse' ? '' : 'none';
+  $('#focus').style.display = t === 'hasse' ? '' : 'none';
+  $('#polyview').hidden = t !== 'poly';
+  $('#hint').textContent = t === 'hasse' ? 'Drag to pan, scroll to zoom, click a cell' : t === 'matrix' ? 'Row: source cell. Column: target. Click a square to inspect the pair' : 'Click a cell to open it';
+  if (t === 'poly') renderPolyView(); else fitView();
+}
+function renderPolyView() {
+  const M = S.M, el = $('#polyview'); if (!M) return;
+  const topOnly = S.polyTop !== false;
+  const list = M.cells.filter(c => !topOnly || c.dim === M.maxDim).map(c => c.i);
+  const rows = list.map(i => {
+    const meet = M.meetPoly(i), r = M.reportFor(i);
+    return { i, meet, mv: polyVerdict(meet, false), cert: r && r.poly, cv: r && r.poly ? polyVerdict(r.poly, true) : null };
+  });
+  const estKey = c => { const m = qintFactor(c); return m ? qintKey(m) : isPal(c) ? 'palindromic, not a product of [k]' : 'not palindromic'; };
+  const keyOf = r => r.cv ? (r.cv.cls === 'bad' ? 'singular' : estKey(r.cert)) : estKey(r.meet);
+  rows.sort((a, b) => M.cells[b.i].dim - M.cells[a.i].dim || keyOf(a).localeCompare(keyOf(b)) || a.i - b.i);
+  const tally = new Map(); rows.forEach(r => tally.set(keyOf(r), (tally.get(keyOf(r)) || 0) + 1));
+  const hasRep = !!M.rep;
+  let h = `<div class="pv-head"><h3>${topOnly ? 'Components' : 'All closures'}</h3><label><input type="checkbox" id="pv-top"${topOnly ? ' checked' : ''}> top-dimensional cells only</label></div>`;
+  h += `<p class="note">${hasRep
+    ? 'This Jordan type has an intersection report, so each closure has a certified Poincaré polynomial: the number of affine pieces of each dimension, whole cells and partial intersections. Those are Betti numbers; when they are not palindromic the closure is singular.'
+    : 'Estimate from the search: each cell plus the cells reached by a curve or a chain of curves, counted by dimension. It equals the Poincaré polynomial when the closure is a union of cells; otherwise it can be off, so "not palindromic" here does not mean singular. An intersection report (closure_*.json, from parse_closure_report.py) gives certified polynomials.'}</p>`;
+  h += `<div class="pv-sum">${[...tally.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `<span class="${k === 'singular' ? 'bad' : ''}">${esc(k)} ×${v}</span>`).join('')}</div>`;
+  h += `<table class="ptable"><thead><tr><th>Cell</th><th>dim</th>${hasRep ? '<th>Certified Poincaré polynomial</th><th>Factorization</th>' : ''}<th>Estimate from the search</th><th>Factorization</th></tr></thead><tbody>`;
+  for (const r of rows) {
+    const c = M.cells[r.i];
+    h += `<tr><td><button class="cellbtn" data-cell="${r.i}">${cellName(c)}</button></td><td class="num">${c.dim}</td>`;
+    if (hasRep) h += r.cv ? `<td>${polyHtml(r.cert)}</td><td class="${r.cv.cls}">${r.cv.text}</td>` : '<td>—</td><td></td>';
+    h += `<td>${polyHtml(r.meet)}</td><td class="${r.mv.cls === 'ok' ? 'ok' : ''}">${r.mv.cls === 'ok' ? r.mv.text : r.mv.text}</td></tr>`;
+  }
+  h += `</tbody></table>`;
+  el.innerHTML = h;
+}
+
+$('#tab-hasse').addEventListener('click', () => setTab('hasse'));
+$('#tab-matrix').addEventListener('click', () => setTab('matrix'));
+$('#tab-poly').addEventListener('click', () => setTab('poly'));
+$('#polyview').addEventListener('change', e => { if (e.target.id === 'pv-top') { S.polyTop = e.target.checked; renderPolyView(); } });
+$('#polyview').addEventListener('click', e => { const b = e.target.closest('[data-cell]'); if (b) select(Number(b.dataset.cell)); });
+$('#find').addEventListener('change', e => { const i = findCell(e.target.value); if (i >= 0) { select(i); if (!S.focus) centerOn(i); e.target.value = ''; } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.M && document.activeElement.tagName !== 'INPUT') select(-1); });
+function centerOn(i) {
+  const L = S.L || (S.M && S.M.full);
+  if (S.tab !== 'hasse' || !L || !L.on[i]) return;
+  const { w, h } = sizeCanvas(), v = S.view;
+  v.tx = w / 2 - L.xy[2 * i] * v.s; v.ty = h / 2 - L.xy[2 * i + 1] * v.s; draw();
+}
+
+/* ═════════════ selection and the cell panel ═════════════ */
+function select(i, updateHash = true) {
+  const M = S.M;
+  S.sel = i; S.rel = -1;
+  S._sets = selectionSets();
+  if (updateHash && M) setHash(M.entry.partition, i >= 0 ? M.cells[i].label : null);
+  renderPanel();
+  if (!M) return;
+  const prev = S.L;
+  if (S.focus && i >= 0) {
+    const nodes = [i]; for (let v = 0; v < M.N; v++) if (v !== i && (S._sets.down[v] || S._sets.up[v] || S._sets.miss[v] || S._sets.chain[v])) nodes.push(v);
+    S.L = layoutHasse(M, nodes);
+  } else S.L = M.full;
+  if (S.L !== prev) fitView(); else draw();
+}
+
+function chips(list, cls, M) {
+  const byDim = new Map();
+  list.forEach(v => { const d = M.cells[v].dim; if (!byDim.has(d)) byDim.set(d, []); byDim.get(d).push(v); });
+  return [...byDim.entries()].sort((a, b) => b[0] - a[0]).map(([d, vs]) =>
+    `<div class="dimgroup"><span class="dl">dim ${d}</span><div class="chips">${vs.map(v => `<button class="chip ${typeof cls === 'function' ? cls(v) : cls}" data-c="${v}">${cellName(M.cells[v])}</button>`).join('')}</div></div>`).join('');
+}
+function fillingSvg(c, rows) {
+  const B = 26, G = 3;
+  let s = '', k = 0;
+  rows.forEach((len, r) => { for (let x = 0; x < len; x++) { const v = c.word[k++]; const X = x * (B + G), Y = r * (B + G); s += `<rect x="${X + 0.5}" y="${Y + 0.5}" width="${B}" height="${B}" fill="var(--surface)" stroke="var(--ink)"/><text x="${X + B / 2}" y="${Y + B / 2 + 5}" text-anchor="middle" font-family="STIX Two Text, serif" font-size="14" fill="var(--ink)">${v}</text>`; } });
+  const W = Math.max(...rows) * (B + G), H = rows.length * (B + G);
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="permutation in the tableau shape">${s}</svg>`;
+}
+function renderPanel() {
+  const M = S.M, P = $('#panel');
+  if (!M) { P.innerHTML = ''; return; }
+  if (S.tab === 'poly') renderPolyView();
+  if (S.sel < 0) {
+    P.innerHTML = `<p class="empty">Select a cell in the diagram, the Polynomials tab, or type its permutation in the box above, to see its closure polynomial, which cells its closure meets, the curves that witness each relation, and its Plücker coordinates.</p>`;
+    return;
+  }
+  const c = M.cells[S.sel], rep = M.reportFor(S.sel);
+  const down = M.below(S.sel), up = M.above(S.sel), miss = M.missing(S.sel);
+  const freeTxt = c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'none';
+  let h = `<h2>${cellName(c)}</h2><p class="sub">Dimension ${c.dim}${c.dim === M.maxDim ? ' (its closure is an irreducible component)' : ''}. Free parameters: <span class="math">${freeTxt}</span></p>`;
+  h += `<div class="fill">${fillingSvg(c, M.rows)}</div><p class="note">The permutation written into the tableau shape, row by row.</p>`;
+  // closure polynomial
+  h += `<h3>Closure polynomial</h3>`;
+  if (rep && rep.poly) {
+    const v = polyVerdict(rep.poly, true), full = rep.pieces.filter(x => x.kind === 'full').length, part = rep.pieces.length - full;
+    h += `<p class="math" style="margin:4px 0">${polyHtml(rep.poly)}</p><p class="verdict-line ${v.cls}">${v.cls === 'ok' ? 'Factors as ' + v.text + '.' : v.cls === 'bad' ? 'Singular: ' + v.note + '.' : 'Palindromic, but not a product of q-integers.'}</p>`;
+    h += `<p class="note">Certified by the intersection report: ${full} whole cells and ${part} partial pieces, each an affine space; the coefficients are the Betti numbers of the closure.</p>`;
+    if (part) {
+      const parts = rep.pieces.filter(x => x.kind === 'partial').sort((a, b) => b.cellDim - a.cellDim || b.dim - a.dim);
+      h += `<details class="lvl"><summary><b>Partial pieces</b> ${part}</summary><table class="chk"><thead><tr><th>cell</th><th>piece dim</th><th>of</th><th>equations</th></tr></thead><tbody>${parts.map(x => { const t = M.idx.get(x.cell); return `<tr><td>${t !== undefined ? cellName(M.cells[t]) : esc(x.cell)}</td><td>${x.dim}</td><td>${x.cellDim}</td><td>${fmtExpr(x.ideal)}</td></tr>`; }).join('')}</tbody></table></details>`;
+    }
+  } else {
+    const meet = M.meetPoly(S.sel), v = polyVerdict(meet, false);
+    h += `<p class="math" style="margin:4px 0">${polyHtml(meet)}</p><p class="verdict-line ${v.cls === 'ok' ? 'ok' : ''}">${v.cls === 'ok' ? 'Palindromic; factors as ' + v.text + '.' : v.cls === 'bad' ? 'Not palindromic.' : 'Palindromic, but not a product of q-integers.'}</p>`;
+    h += `<p class="note">Estimate from the search: this cell plus every cell reached by a curve or a chain of curves, by dimension. When the closure is a union of cells this is its Poincaré polynomial (in (3,2,2) it matched the certified polynomial in every such case). When the closure only meets part of a cell, or a chain leads to a cell it does not meet, the count is off, so a non-palindromic count does not by itself mean singular.</p>`;
+  }
+  h += `<h3>Cells its closure meets<span class="n">${down.length}</span></h3>`;
+  h += down.length ? `<p class="note">Solid: a curve from the search reaches it. ${rep ? 'Green outline: nonempty in the report, but no curve in the search grid. ' : ''}Click one to see why.</p>${chips(down, v => M.edge.has(S.sel * M.N + v) ? 'direct' : 'up', M)}` : `<p class="note">None: this cell is closed.</p>`;
+  const chainOnly = M.chainOnly(S.sel);
+  if (chainOnly.length) h += `<h3>Reached only through chains<span class="n">${chainOnly.length}</span></h3><p class="note">No curve goes there directly, but a chain of curves does. Closure relations need not compose: when a closure meets only part of a cell, it can miss what that cell's closure meets. Treat these as likely, not proven.</p>${chips(chainOnly, 'implied', M)}`;
+  if (miss.length) h += `<h3>Below in Bruhat order, unresolved<span class="n">${miss.length}</span></h3><p class="note">These lie below this cell in Bruhat order, so its closure could meet them, but no curve or chain of curves from the search reaches them, and there is no intersection report to settle it.</p>${chips(miss, 'missing', M)}`;
+  h += `<h3>Closures that meet it<span class="n">${up.length}</span></h3>${up.length ? chips(up, 'up', M) : `<p class="note">None.</p>`}`;
+  h += `<div id="relbox"></div>`;
+  h += `<h3>Plücker coordinates</h3><p class="note">Nonzero coordinates only. Level <i class="v">r</i> lists the <i class="v">r</i>×<i class="v">r</i> minors on rows <i class="v">I</i> and the first <i class="v">r</i> columns.</p>`;
+  c.plucker.forEach((vec, k) => {
+    const r = k + 1, vals = splitVec(vec), I = subsets(M.n, r);
+    const nz = []; vals.forEach((x, j) => { if (x !== '0') nz.push([I[j], x]); });
+    const shown = nz.slice(0, 120);
+    h += `<details class="lvl"${M.n <= 6 || r === 1 ? ' open' : ''}><summary><b>V<sub>${r}</sub></b> ${nz.length} of ${vals.length} nonzero</summary><div class="pl">${shown.map(([I, x]) => `<span class="k">${pName(I, M.n)}</span><span>${fmtExpr(x)}</span>`).join('')}</div>${nz.length > shown.length ? `<p class="more">and ${nz.length - shown.length} more</p>` : ''}</details>`;
+  });
+  P.innerHTML = h;
+}
+
+$('#panel').addEventListener('click', e => {
+  const b = e.target.closest('[data-c]');
+  if (b) { openRelation(Number(b.dataset.c)); return; }
+  const g = e.target.closest('[data-go]');
+  if (g) { const i = Number(g.dataset.go); select(i); if (!S.focus) centerOn(i); return; }
+  const w = e.target.closest('[data-edge]');
+  if (w) { const [a, t] = w.dataset.edge.split(',').map(Number); renderWitness(a, t, $('#witness')); }
+});
+
+/* Why is t related to the selected cell? */
+function openRelation(t) {
+  const M = S.M, s = S.sel; if (s < 0) return;
+  document.querySelectorAll('#panel .chip[aria-pressed]').forEach(b => b.removeAttribute('aria-pressed'));
+  document.querySelectorAll(`#panel .chip[data-c="${t}"]`).forEach(b => b.setAttribute('aria-pressed', 'true'));
+  const box = $('#relbox'); if (!box) return;
+  const go = `<button class="icon-btn go" data-go="${t}">Open ${cellName(M.cells[t])}</button>`;
+  const piece = (a, b) => { const r = M.reportFor(a); return r ? (r.pieces || []).find(x => x.cell === M.cells[b].label) : null; };
+  const describe = (a, b) => {   // closure of a meets cell b
+    let h = `<div class="rel"><h4>The closure of ${cellName(M.cells[a])} meets ${cellName(M.cells[b])}</h4>${go}`;
+    const pc = piece(a, b);
+    if (pc) h += `<p class="note">Intersection report: ${pc.kind === 'full' ? `the whole cell (dimension ${pc.dim}) lies in the closure.` : `a piece of dimension ${pc.dim} of this ${pc.cellDim}-dimensional cell, cut out by <span class="math">${fmtExpr(pc.ideal)}</span>.`}</p>`;
+    if (M.edge.has(a * M.N + b)) h += `<div id="witness"></div>`;
+    else h += `<p class="note">No curve in the search grid reaches it; the report settles it.</p>`;
+    return h + `</div>`;
+  };
+  if (M.closureOf[s].includes(t)) { box.innerHTML = describe(s, t); if (M.edge.has(s * M.N + t)) renderWitness(s, t, $('#witness')); }
+  else if (M.closureOf[t].includes(s)) { box.innerHTML = describe(t, s); if (M.edge.has(t * M.N + s)) renderWitness(t, s, $('#witness')); }
+  else if (M.chainOnly(s).includes(t) || M.chainOnly(t).includes(s)) {
+    const [a, b] = M.chainOnly(s).includes(t) ? [s, t] : [t, s];
+    const path = M.path(a, b);
+    let h = `<div class="rel"><h4>${cellName(M.cells[b])}: reached from ${cellName(M.cells[a])} only through a chain</h4>${go}<p class="note">Each step has a curve. Whether the closure of ${cellName(M.cells[a])} itself meets ${cellName(M.cells[b])} is not proven. Click a step to check its curve.</p><div class="chain"><span class="math">${cellName(M.cells[path[0]])}</span>`;
+    for (let k = 0; k + 1 < path.length; k++) h += `<span class="ar">→</span><button class="chip direct" data-edge="${path[k]},${path[k + 1]}">${cellName(M.cells[path[k + 1]])}</button>`;
+    box.innerHTML = h + `</div><div id="witness"></div></div>`;
+    renderWitness(path[0], path[1], $('#witness'));
+  }
+  else {
+    box.innerHTML = `<div class="rel"><h4>${cellName(M.cells[t])} and ${cellName(M.cells[s])}</h4>${go}<p class="note">${cellName(M.cells[t])} is below ${cellName(M.cells[s])} in Bruhat order, but the search found no curve from ${cellName(M.cells[s])} reaching it, and no intersection report covers this pair. Substitutions tried: 0, ±1, ±<i class="v">t</i>, ±<i class="v">t</i><sup>2</sup>, ±<i class="v">t</i><sup>3</sup>, one parameter as <i class="v">t</i> → ∞.</p></div>`;
+  }
+  box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+/* The curve for a direct edge, and an exact check that its limit is the target point. */
+function renderWitness(s, t, el) {
+  const M = S.M, e = M.edge.get(s * M.N + t), src = M.cells[s], tgt = M.cells[t];
+  if (!e || !el) return;
+  const lv = e.limit;
+  const asT = v => (lv ? fmtExpr(v.replace(new RegExp('\\b' + lv + '\\b', 'g'), 't')).replace(/\bt\b/g, '<i>t</i>') : fmtExpr(v));
+  const sub = (o) => Object.entries(o).map(([k, v]) => `${fmtExpr(k)} ↦ ${asT(v)}`).join(',&ensp;') || 'none';
+  let h = `<p class="note">Curve from ${cellName(src)} to ${cellName(tgt)}:</p><dl>
+    <dt>Parameter sent to ∞</dt><dd>${lv ? `${fmtExpr(lv)} = <i>t</i>, <i>t</i> → ∞` : 'none (a constant point)'}</dd>
+    <dt>Other source parameters</dt><dd>${sub(e.srcSubs)}</dd>
+    <dt>Target point</dt><dd>${sub(e.tgtSubs)}</dd></dl>`;
+  // exact check
+  try {
+    const envS = {}, envT = {};
+    if (lv) { envS[lv] = T; envT[lv] = T; }
+    for (const [k, v] of Object.entries(e.srcSubs)) envS[k] = evalExpr(v, lv ? { [lv]: T } : {});
+    for (const [k, v] of Object.entries(e.tgtSubs)) envT[k] = evalExpr(v, lv ? { [lv]: T } : {});
+    let allOk = true, body = '';
+    src.plucker.forEach((vec, k) => {
+      const r = k + 1, I = subsets(M.n, r);
+      const sp = splitVec(vec).map(x => evalExpr(x, envS));
+      const tp = splitVec(tgt.plucker[k]).map(x => evalExpr(x, envT));
+      const d = Math.max(...sp.map(p => p.length - 1));
+      const lead = sp.map(p => (p.length - 1 === d ? p[d] : [0, 1]));
+      if (tp.some(p => p.length > 1)) throw new Error(`the target point at level ${r} depends on t`);
+      const tv = tp.map(p => (p.length ? p[0] : [0, 1]));
+      const norm = v => { const f = v.find(x => !fzero(x)); return f ? v.map(x => fdiv(x, f)) : v; };
+      const a = norm(lead), b = norm(tv);
+      const ok = a.every((x, j) => feq(x, b[j]));
+      allOk = allOk && ok;
+      const rows = [];
+      a.forEach((x, j) => { if (!fzero(x) || !fzero(b[j])) rows.push(`<tr><td>${pName(I[j], M.n)}</td><td>${ftext(lead[j])}${d > 0 && !fzero(lead[j]) ? ` <i>t</i>${d > 1 ? `<sup>${d}</sup>` : ''}` : ''}</td><td>${ftext(x)}</td><td class="${feq(x, b[j]) ? '' : 'x'}">${ftext(b[j])}</td></tr>`); });
+      body += `<details class="lvl"${ok ? '' : ' open'}><summary><b>V<sub>${r}</sub></b> ${ok ? 'limit equals target' : 'mismatch'}</summary><table class="chk"><thead><tr><th>coord.</th><th>leading term</th><th>limit</th><th>target</th></tr></thead><tbody>${rows.join('')}</tbody></table></details>`;
+    });
+    h += `<p class="verdict ${allOk ? 'ok' : 'bad'}">${allOk ? `Checked: at every level the leading terms of ${cellName(src)} along the curve are proportional to the Plücker coordinates of the target point.` : 'The limit does not match the target point at the level marked below.'}</p>`;
+    h += `<p class="note">Each level is compared up to scale, after dividing by its first nonzero coordinate.</p>${body}`;
+  } catch (err) {
+    h += `<p class="verdict bad">Could not check this curve automatically: ${esc(err.message)}.</p>`;
+  }
+  el.innerHTML = h;
+}
+
+/* ═════════════ theme, start ═════════════ */
+function applyTheme(t) {
+  if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme');
+  const dark = t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  $('#theme').textContent = dark ? 'Light' : 'Dark';
+  draw();
+}
+$('#theme').addEventListener('click', () => {
+  const cur = document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  const t = cur === 'dark' ? 'light' : 'dark'; store.set('theme', t); applyTheme(t);
+});
+applyTheme(store.get('theme'));
+window.addEventListener('hashchange', route);
+loadManifest().then(route).catch(err => {
+  $('#catalog').innerHTML = `<p class="lede">Could not find the data: ${esc(err.message)}. Open this page through GitHub Pages (or a local web server), not as a file. Adding manifest.json from build_manifest.py also works without GitHub's file listing.</p>`;
+});
+</script>
+</body>
+</html>
