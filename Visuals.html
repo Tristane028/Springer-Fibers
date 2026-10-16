@@ -279,16 +279,18 @@ table.chk td.y { color: var(--green); }
     <section class="center">
       <div class="toolbar">
         <div class="tabs" role="tablist">
-          <button role="tab" id="tab-hasse" aria-selected="true">Hasse diagram</button>
+          <button role="tab" id="tab-hasse" aria-selected="true">Diagram</button>
           <button role="tab" id="tab-matrix" aria-selected="false">Matrix</button>
           <button role="tab" id="tab-poly" aria-selected="false">Polynomials</button>
         </div>
         <input id="find" list="labels" placeholder="Go to cell, e.g. 21354" autocomplete="off" aria-label="Go to cell">
         <datalist id="labels"></datalist>
         <button class="icon-btn" id="focus" type="button" aria-pressed="false" title="Show only the selected cell and the cells related to it">Related cells only</button>
+        <button class="icon-btn" id="spinbtn" type="button" aria-pressed="true" title="Rotate the 3D diagram">Pause rotation</button>
+        <button class="icon-btn" id="flat" type="button" title="Switch between the rotating 3D diagram and the flat layered diagram">Flat view</button>
         <button class="icon-btn" id="fit" type="button">Fit</button>
         <span class="pairq" id="pairq" hidden>Does the closure of <input id="pair-s" list="labels" placeholder="cell" autocomplete="off" aria-label="Closure of"> meet <input id="pair-t" list="labels" placeholder="cell" autocomplete="off" aria-label="Meets"> ?</span>
-        <span class="hint" id="hint">Click a cell, then click inside its closure to nest</span>
+        <span class="hint" id="hint">Drag to turn, scroll to zoom. Click a cell, then a cell in its closure to nest</span>
       </div>
       <div class="stage" id="stage">
         <canvas id="cv"></canvas>
@@ -607,6 +609,7 @@ function layoutHasse(M, nodes) {
   layers.forEach(L => L.forEach((v, k) => { xy[2 * v] = (k - (L.length - 1) / 2) * X; }));
   const L = { nodes, on, xy, X, Y: 110, dmin, dmax, down };
   setRows(M, L, 110);
+  layout3D(M, L, layers);
   return L;
 }
 function setRows(M, L, Y) {
@@ -614,8 +617,42 @@ function setRows(M, L, Y) {
   L.nodes.forEach(v => { L.xy[2 * v + 1] = (L.dmax - M.cells[v].dim) * Y; });
 }
 
+/* Rotating 3D layout, as in the earlier visuals: each dimension is a horizontal
+   disc, stacked by height (dimension 0 at the bottom); cells sit on a golden-angle
+   spiral so a disc fills evenly, and its radius grows with the number of cells. */
+function layout3D(M, L, layers) {
+  const GOLDEN = Math.PI * (3 - Math.sqrt(5));
+  const maxCount = Math.max(...layers.map(l => l.length));
+  const span = Math.max(1, L.dmax - L.dmin);
+  L.p3 = new Float64Array(M.N * 3).fill(NaN);
+  L.discR = [];
+  layers.forEach((Ly, d) => {
+    if (!Ly.length) return;
+    const R = Ly.length === 1 ? 0 : 0.18 + 1.12 * Math.sqrt(Ly.length / maxCount);
+    L.discR[d] = R;
+    const y = L.dmax === L.dmin ? 0 : -1.5 + 3.0 * (d - L.dmin) / span;
+    Ly.forEach((v, i) => {
+      const ang = i * GOLDEN + d * 0.7, rad = R * Math.sqrt((i + 0.5) / Ly.length);
+      L.p3[3 * v] = rad * Math.cos(ang); L.p3[3 * v + 1] = y; L.p3[3 * v + 2] = rad * Math.sin(ang);
+    });
+    L.discY = L.discY || []; L.discY[d] = y;
+  });
+}
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function project3(L, v, w, h) {
+  const V = S.view3, x0 = L.p3[3 * v], y0 = L.p3[3 * v + 1], z0 = L.p3[3 * v + 2];
+  return projectXYZ(x0, y0, z0, w, h);
+}
+function projectXYZ(x0, y0, z0, w, h) {
+  const V = S.view3, cy = Math.cos(V.yaw), sy = Math.sin(V.yaw), cp = Math.cos(V.pitch), sp = Math.sin(V.pitch);
+  const x = x0 * cy + z0 * sy; let z = -x0 * sy + z0 * cy;
+  const y = y0 * cp - z * sp; z = y0 * sp + z * cp;
+  const f = Math.min(w - 80, h * 1.1) * 0.5 * V.zoom, d = 4.6 - z;
+  return { x: 40 + (w - 40) / 2 + x * f * 4.6 / d / 1.75, y: h / 2 - y * f * 4.6 / d / 1.75, depth: z, k: 4.6 / d };
+}
+
 /* ═════════════ app state, routing ═════════════ */
-const S = { chain: [], focus: false, L: null, manifest: null, byKey: new Map(), M: null, sel: -1, rel: -1, tab: 'hasse', view: { s: 1, tx: 0, ty: 0 }, hover: -1, cache: new Map() };
+const S = { mode3d: true, view3: { yaw: 0.6, pitch: 0.26, zoom: 1, auto: !matchMedia('(prefers-reduced-motion: reduce)').matches }, chain: [], focus: false, L: null, manifest: null, byKey: new Map(), M: null, sel: -1, rel: -1, tab: 'hasse', view: { s: 1, tx: 0, ty: 0 }, hover: -1, cache: new Map() };
 
 /* Partitions come from manifest.json when it exists; otherwise the page asks
    GitHub for the repository's file list and finds every data_*.json itself. */
@@ -849,6 +886,7 @@ function clearCanvas() { const { dpr } = sizeCanvas(); ctx.setTransform(dpr, 0, 
 function fitView() {
   const M = S.M; if (!M) return;
   const { w, h } = sizeCanvas();
+  if (S.tab === 'hasse' && S.mode3d) { S.view3.zoom = 1; draw(); return; }
   if (S.tab === 'hasse') {
     const L = S.L || M.full;
     let x0 = Infinity, x1 = -Infinity;
@@ -868,7 +906,7 @@ function draw() {
   const { w, h, dpr } = sizeCanvas();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
-  if (S.tab === 'hasse') drawHasse(w, h); else drawMatrix(w, h);
+  if (S.tab === 'hasse') (S.mode3d ? drawHasse3D : drawHasse)(w, h); else drawMatrix(w, h);
 }
 function selectionSets() {
   const M = S.M, s = S.sel;
@@ -960,6 +998,84 @@ function matrixOrder() {
   let ids = (S.focus && S.sel >= 0 && S.L && S.L !== M.full) ? S.L.nodes.slice() : M.cells.map(c => c.i);
   if (S.matPair) for (const v of [S.matPair.s, S.matPair.t]) if (!ids.includes(v)) ids.push(v);
   return ids.sort((a, b) => M.cells[b].dim - M.cells[a].dim || a - b);
+}
+function drawHasse3D(w, h) {
+  const M = S.M, L = S.L || M.full, sets = S._sets;
+  const ink = css('--ink'), graphite = css('--graphite'), faint = css('--faint'), red = css('--red'), rule = css('--rule'), paper = css('--paper'), surface = css('--surface');
+  const P = new Map(); for (const v of L.nodes) P.set(v, project3(L, v, w, h));
+  // dimension discs: a faint ellipse per layer, labelled at the left
+  for (let d = L.dmin; d <= L.dmax; d++) {
+    const R = L.discR[d]; if (R === undefined) continue;
+    const y = L.discY[d];
+    ctx.strokeStyle = rule; ctx.lineWidth = 1; ctx.globalAlpha = 0.9; ctx.beginPath();
+    for (let k = 0; k <= 64; k++) { const a = k / 64 * 2 * Math.PI, q = projectXYZ((R + 0.08) * Math.cos(a), y, (R + 0.08) * Math.sin(a), w, h); k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); }
+    ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  // edges
+  const line = (a, b) => { const p = P.get(a), q = P.get(b); if (p && q) { ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); } };
+  ctx.lineWidth = 1; ctx.strokeStyle = faint; ctx.globalAlpha = sets ? 0.08 : (L.nodes.length > 200 ? 0.16 : 0.35); ctx.beginPath();
+  L.down.forEach((ts, a) => ts.forEach(b => line(a, b))); ctx.stroke(); ctx.globalAlpha = 1;
+  if (sets) {
+    ctx.globalAlpha = 0.75; ctx.lineWidth = 1.1;
+    ctx.strokeStyle = graphite; ctx.beginPath(); for (const t of L.nodes) if (sets.down[t]) line(S.sel, t); ctx.stroke();
+    if (S.chain.length === 1) { ctx.setLineDash([4, 3]); ctx.beginPath(); M.containers[S.sel].forEach(u => { if (L.on[u]) line(u, S.sel); }); ctx.stroke(); ctx.setLineDash([]); }
+    ctx.globalAlpha = 1;
+    if (S.chain.length > 1) { ctx.strokeStyle = ink; ctx.lineWidth = 2.4; ctx.beginPath(); for (let k = 0; k + 1 < S.chain.length; k++) line(S.chain[k], S.chain[k + 1]); ctx.stroke(); ctx.lineWidth = 1; }
+  }
+  // nodes, far to near
+  const base = Math.max(2.6, Math.min(7.5, 150 / Math.sqrt(L.nodes.length)));
+  const order = [...L.nodes].sort((a, b) => P.get(a).depth - P.get(b).depth);
+  S._proj = [];
+  for (const v of order) {
+    const p = P.get(v), r = base * p.k;
+    let fill = dimColor(M.cells[v].dim), alpha = 1, ring = null, dash = null;
+    if (sets) {
+      if (v === S.sel || sets.inChain[v] || sets.down[v]) { /* full color */ }
+      else if (sets.up[v]) ring = ink;
+      else if (sets.via[v]) { ring = ink; dash = [2, 2]; }
+      else if (sets.miss[v]) { ring = red; fill = surface; }
+      else alpha = 0.12;
+    }
+    ctx.globalAlpha = alpha; ctx.fillStyle = fill;
+    ctx.beginPath(); ctx.arc(p.x, p.y, v === S.sel ? r + 2.5 : r, 0, 7); ctx.fill();
+    if (ring) { ctx.strokeStyle = ring; ctx.lineWidth = 2; if (dash) ctx.setLineDash(dash); ctx.beginPath(); ctx.arc(p.x, p.y, r + 2.5, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+    if (sets && sets.inChain[v] && v !== S.sel) { ctx.strokeStyle = ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(p.x, p.y, r + 3, 0, 7); ctx.stroke(); }
+    if (v === S.sel) { ctx.strokeStyle = ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(p.x, p.y, r + 6, 0, 7); ctx.stroke(); }
+    if (v === S.hover) { ctx.strokeStyle = ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(p.x, p.y, r + 4, 0, 7); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    if (alpha > 0.5) S._proj.push({ v, x: p.x, y: p.y, r: r + 4, depth: p.depth });
+  }
+  // names: every cell when there are few, otherwise the selected cell, the chain and the hovered cell
+  ctx.font = '12px "STIX Two Text", serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = graphite;
+  const named = L.nodes.length <= 40 ? L.nodes : [...new Set([S.sel, ...S.chain, S.hover].filter(v => v >= 0 && L.on[v]))];
+  for (const v of named) { const p = P.get(v); ctx.fillText(wordText(M.cells[v].word), p.x, p.y + base * p.k + 5); }
+  if (sets && S.chain.length > 1) {
+    ctx.font = '600 12px "Public Sans", sans-serif'; ctx.textBaseline = 'bottom';
+    S.chain.forEach((v, k) => { const p = P.get(v); if (!p) return; const t = String(k + 1), w2 = ctx.measureText(t).width / 2 + 5, y = p.y - base * p.k - 8;
+      ctx.fillStyle = ink; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(p.x - w2, y - 15, w2 * 2, 16, 8) : ctx.rect(p.x - w2, y - 15, w2 * 2, 16); ctx.fill(); ctx.fillStyle = surface; ctx.fillText(t, p.x, y); });
+  }
+  ctx.textAlign = 'start';
+  // dimension key on the left, at each disc's height
+  ctx.font = '13px "STIX Two Text", serif'; ctx.textBaseline = 'middle';
+  for (let d = L.dmin; d <= L.dmax; d++) {
+    if (L.discY[d] === undefined) continue;
+    const q = projectXYZ(0, L.discY[d], 0, w, h);
+    ctx.fillStyle = paper; ctx.globalAlpha = 0.85; ctx.fillRect(4, q.y - 9, 60, 18); ctx.globalAlpha = 1;
+    ctx.fillStyle = dimColor(d); ctx.beginPath(); ctx.arc(14, q.y, 5, 0, 7); ctx.fill();
+    ctx.fillStyle = graphite; ctx.fillText('dim ' + d, 24, q.y);
+  }
+}
+function pick3D(px, py) {
+  let best = -1, bd = Infinity, bz = -Infinity;
+  for (const q of S._proj || []) {
+    const d = (q.x - px) ** 2 + (q.y - py) ** 2;
+    if (d <= q.r * q.r && (q.depth > bz + 0.05 || (Math.abs(q.depth - bz) <= 0.05 && d < bd))) { best = q.v; bd = d; bz = q.depth; }
+  }
+  return best;
+}
+function spin() {      // gentle rotation, paused while dragging or when the tab is hidden
+  if (S.M && S.tab === 'hasse' && S.mode3d && S.view3.auto && !drag && document.visibilityState === 'visible') { S.view3.yaw += 0.0035; draw(); }
+  requestAnimationFrame(spin);
 }
 function drawMatrix(w, h) {
   const M = S.M, st = M.computeStatus(), N = M.N;
@@ -1058,6 +1174,7 @@ function drawMatrix(w, h) {
 let drag = null;
 function worldPick(px, py) {
   const M = S.M; if (!M) return -1;
+  if (S.tab === 'hasse' && S.mode3d) return pick3D(px, py);
   if (S.tab === 'hasse') {
     const L = S.L || M.full, { s, tx, ty } = S.view; let best = -1, bd = Math.max(10, L.X * s * 0.5) ** 2;
     for (const v of L.nodes) { const dx = L.xy[2 * v] * s + tx - px, dy = L.xy[2 * v + 1] * s + ty - py, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = v; } }
@@ -1069,12 +1186,16 @@ function worldPick(px, py) {
   return { s: m.order[a], t: m.order[b], a, b };
 }
 
-cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); drag = { x: e.offsetX, y: e.offsetY, tx: S.view.tx, ty: S.view.ty, moved: 0 }; });
+cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); drag = { x: e.offsetX, y: e.offsetY, tx: S.view.tx, ty: S.view.ty, yaw: S.view3.yaw, pitch: S.view3.pitch, moved: 0 }; });
 cv.addEventListener('pointermove', e => {
   const M = S.M; if (!M) return;
   if (drag && S.tab === 'hasse') {
     const dx = e.offsetX - drag.x, dy = e.offsetY - drag.y; drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy));
-    if (drag.moved > 3) { S.view.tx = drag.tx + dx; S.view.ty = drag.ty + dy; draw(); }
+    if (drag.moved > 3) {
+      if (S.mode3d) { S.view3.yaw = drag.yaw + dx * 0.008; S.view3.pitch = Math.max(-1.3, Math.min(1.3, drag.pitch + dy * 0.006)); setSpin(false); }
+      else { S.view.tx = drag.tx + dx; S.view.ty = drag.ty + dy; }
+      draw();
+    }
     return;
   }
   const hit = worldPick(e.offsetX, e.offsetY), tip = $('#tip');
@@ -1100,11 +1221,21 @@ cv.addEventListener('pointerup', e => {
 cv.addEventListener('wheel', e => {
   if (S.tab !== 'hasse' || !S.M) return;
   e.preventDefault();
+  if (S.mode3d) { S.view3.zoom = Math.min(6, Math.max(0.3, S.view3.zoom * Math.exp(-e.deltaY * 0.0015))); draw(); return; }
   const f = Math.exp(-e.deltaY * 0.0015), v = S.view, ns = Math.min(8, Math.max(0.02, v.s * f));
   v.tx = e.offsetX - (e.offsetX - v.tx) * (ns / v.s); v.ty = e.offsetY - (e.offsetY - v.ty) * (ns / v.s); v.s = ns; draw();
 }, { passive: false });
 window.addEventListener('resize', () => draw());
 $('#fit').addEventListener('click', fitView);
+function setSpin(on) { S.view3.auto = on; $('#spinbtn').textContent = on ? 'Pause rotation' : 'Rotate'; $('#spinbtn').setAttribute('aria-pressed', on); }
+$('#spinbtn').addEventListener('click', () => setSpin(!S.view3.auto));
+function set3D(on) {
+  S.mode3d = on; $('#flat').textContent = on ? 'Flat view' : '3D view';
+  $('#spinbtn').style.display = on && S.tab === 'hasse' ? '' : 'none';
+  $('#hint').textContent = S.tab === 'hasse' ? (on ? 'Drag to turn, scroll to zoom. Click a cell, then a cell in its closure to nest' : 'Click a cell, then click inside its closure to nest') : $('#hint').textContent;
+  fitView();
+}
+$('#flat').addEventListener('click', () => set3D(!S.mode3d));
 /* Ask about one pair: select the row cell, ring the square, show the answer in the panel. */
 function askPair(s, t) {
   const M = S.M; if (!M || s < 0 || t < 0) return;
@@ -1126,11 +1257,13 @@ function setTab(t) {
   S.tab = t;
   ['hasse', 'matrix', 'poly'].forEach(k => $('#tab-' + k).setAttribute('aria-selected', t === k));
   $('#fit').style.display = t === 'hasse' ? '' : 'none';
+  $('#flat').style.display = t === 'hasse' ? '' : 'none';
+  $('#spinbtn').style.display = t === 'hasse' && S.mode3d ? '' : 'none';
   $('#focus').style.display = t === 'poly' ? 'none' : '';
   $('#pairq').hidden = t !== 'matrix';
   $('#find').style.display = t === 'matrix' ? 'none' : '';
   $('#polyview').hidden = t !== 'poly';
-  $('#hint').textContent = t === 'hasse' ? 'Click a cell, then click inside its closure to nest' : t === 'matrix' ? 'Hover to read a square; click it, or type two cells, to see the answer' : 'Click a cell to open it';
+  $('#hint').textContent = t === 'hasse' ? (S.mode3d ? 'Drag to turn, scroll to zoom. Click a cell, then a cell in its closure to nest' : 'Click a cell, then click inside its closure to nest') : t === 'matrix' ? 'Hover to read a square; click it, or type two cells, to see the answer' : 'Click a cell to open it';
   if (t === 'poly') renderPolyView(); else fitView();
 }
 function renderPolyView() {
@@ -1175,7 +1308,7 @@ document.addEventListener('keydown', e => {
 });
 function centerOn(i) {
   const L = S.L || (S.M && S.M.full);
-  if (S.tab !== 'hasse' || !L || !L.on[i]) return;
+  if (S.tab !== 'hasse' || S.mode3d || !L || !L.on[i]) return;
   const { w, h } = sizeCanvas(), v = S.view;
   v.tx = w / 2 - L.xy[2 * i] * v.s; v.ty = h / 2 - L.xy[2 * i + 1] * v.s; draw();
 }
@@ -1398,6 +1531,8 @@ $('#theme').addEventListener('click', () => {
   const t = cur === 'dark' ? 'light' : 'dark'; store.set('theme', t); applyTheme(t);
 });
 applyTheme(store.get('theme'));
+setSpin(S.view3.auto);
+requestAnimationFrame(spin);
 window.addEventListener('hashchange', route);
 loadManifest().then(route).catch(err => {
   $('#catalog').innerHTML = `<p class="lede">Could not find the data: ${esc(err.message)}. Open this page through GitHub Pages (or a local web server), not as a file. Adding manifest.json from build_manifest.py also works without GitHub's file listing.</p>`;
