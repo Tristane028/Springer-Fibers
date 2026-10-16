@@ -565,12 +565,47 @@ function setRows(M, L, Y) {
 /* ═════════════ app state, routing ═════════════ */
 const S = { focus: false, L: null, manifest: null, byKey: new Map(), M: null, sel: -1, rel: -1, tab: 'hasse', view: { s: 1, tx: 0, ty: 0 }, hover: -1, cache: new Map() };
 
+/* Partitions come from manifest.json when it exists; otherwise the page asks
+   GitHub for the repository's file list and finds every data_*.json itself. */
+const REPO_FALLBACK = 'Tristane028/Springer-Fibers';
+function repoName() {
+  const h = location.hostname;
+  if (h.endsWith('.github.io')) { const seg = location.pathname.split('/').filter(Boolean)[0]; return `${h.split('.')[0]}/${seg && !seg.includes('.') ? seg : h}`; }
+  return REPO_FALLBACK;
+}
+async function discoverFromGitHub() {
+  const repo = repoName();
+  const r = await fetch(`https://api.github.com/repos/${repo}/git/trees/HEAD?recursive=1`);
+  if (!r.ok) throw new Error(`GitHub listing for ${repo} returned ${r.status}`);
+  const tree = (await r.json()).tree || [];
+  const reports = new Map(), out = [];
+  for (const f of tree) {
+    const m = f.type === 'blob' && f.path.match(/(?:^|\/)closure_([^/]+)\.json$/);
+    if (m) reports.set(m[1], f.path);
+  }
+  for (const f of tree) {
+    const m = f.type === 'blob' && f.path.match(/(?:^|\/)data_([^/]+)\.json$/);
+    if (!m) continue;
+    const rows = rowLengths(m[1]);
+    if (!rows.length || rows.some(x => !(x > 0))) continue;
+    const e = { partition: m[1], rows, n: rows.reduce((a, b) => a + b, 0), path: f.path, bytes: f.size || 0, cells: null, edges: null, maxDim: null, dimProfile: null };
+    if (reports.has(m[1])) e.report = reports.get(m[1]);
+    out.push(e);
+  }
+  out.sort((a, b) => a.rows.length - b.rows.length || a.n - b.n || a.rows.join(',').localeCompare(b.rows.join(','), undefined, { numeric: true }));
+  return out;
+}
 async function loadManifest() {
-  const r = await fetch('manifest.json', { cache: 'no-cache' });
-  if (!r.ok) throw new Error('manifest.json not found (' + r.status + ')');
-  S.manifest = (await r.json()).partitions;
+  let list = null;
+  try {
+    const r = await fetch('manifest.json', { cache: 'no-cache' });
+    if (r.ok) list = (await r.json()).partitions;
+  } catch (e) { /* fall back below */ }
+  if (!list) list = await discoverFromGitHub();
+  S.manifest = list;
   S.manifest.forEach(e => S.byKey.set(e.partition, e));
 }
+const sizeText = b => b >= 1e6 ? (b / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1e3)) + ' KB';
 
 function route() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').map(decodeURIComponent).filter(Boolean);
@@ -602,8 +637,8 @@ function showHome() {
     if (!byN.has(e.n)) byN.set(e.n, []);
     byN.get(e.n).push(e);
   }
-  const total = S.manifest.reduce((a, e) => a + e.cells, 0);
-  $('#lede').innerHTML = `<strong>${S.manifest.length} Jordan types</strong> computed, ${total.toLocaleString()} cells in all. Rows are listed top to bottom as the boxes are labeled, so (1,2) and (2,1) are separate entries. Choose one to see its cells, which cells each closure meets, the curve that witnesses each relation, and the closure polynomials. Types marked “certified” also have an intersection report with exact Poincaré polynomials.`;
+  const total = S.manifest.every(e => e.cells != null) ? S.manifest.reduce((a, e) => a + e.cells, 0) : null;
+  $('#lede').innerHTML = `<strong>${S.manifest.length} Jordan types</strong> computed${total != null ? `, ${total.toLocaleString()} cells in all` : ''}. Rows are listed top to bottom as the boxes are labeled, so (1,2) and (2,1) are separate entries. Choose one to see its cells, which cells each closure meets, the curve that witnesses each relation, and the closure polynomials. Types marked “certified” also have an intersection report with exact Poincaré polynomials.`;
   let html = '';
   for (const [k, byN] of [...fam.entries()].sort((a, b) => a[0] - b[0])) {
     const count = [...byN.values()].reduce((a, l) => a + l.length, 0);
@@ -611,7 +646,7 @@ function showHome() {
     for (const [n, list] of [...byN.entries()].sort((a, b) => a[0] - b[0])) {
       html += `<div class="nrow"><div class="nlab"><i>n</i> = ${n}</div><div class="parts">`;
       for (const e of list) {
-        html += `<button class="part" data-p="${esc(e.partition)}" title="${e.edges.toLocaleString()} closure relations found">${miniDiagram(e.rows)}<span class="pname">${shapeText(e.rows)}</span><span class="pmeta">${e.cells.toLocaleString()} cells, dim ${e.maxDim}${e.report ? ', certified' : ''}</span></button>`;
+        html += `<button class="part" data-p="${esc(e.partition)}" title="${e.edges != null ? e.edges.toLocaleString() + ' relations with a curve' : sizeText(e.bytes)}">${miniDiagram(e.rows)}<span class="pname">${shapeText(e.rows)}</span><span class="pmeta">${e.cells != null ? `${e.cells.toLocaleString()} cells, dim ${e.maxDim}` : sizeText(e.bytes)}${e.report ? ', certified' : ''}</span></button>`;
       }
       html += `</div></div>`;
     }
@@ -644,6 +679,10 @@ async function showPartition(p, cellLabel) {
         data = await r.json(); S.cache.clear(); S.cache.set(p, data);
       }
       if (location.hash.split('/')[1] !== encodeURIComponent(p)) return;   // navigated away meanwhile
+      if (entry.cells == null) {
+        const dims = data.cells.map(c => c.dim), mx = Math.max(...dims);
+        Object.assign(entry, { cells: data.cells.length, edges: data.edges.length, maxDim: mx, dimProfile: Array.from({ length: mx + 1 }, (_, k) => dims.filter(x => x === k).length) });
+      }
       S.M = buildModel(entry, data);
       if (entry.report) {
         try {
@@ -1163,7 +1202,7 @@ $('#theme').addEventListener('click', () => {
 applyTheme(store.get('theme'));
 window.addEventListener('hashchange', route);
 loadManifest().then(route).catch(err => {
-  $('#catalog').innerHTML = `<p class="lede">Could not load manifest.json: ${esc(err.message)}. Run <code>python3 build_manifest.py</code> in the repository root, and open this page through GitHub Pages or a local web server rather than as a file.</p>`;
+  $('#catalog').innerHTML = `<p class="lede">Could not find the data: ${esc(err.message)}. Open this page through GitHub Pages (or a local web server), not as a file. Adding manifest.json from build_manifest.py also works without GitHub's file listing.</p>`;
 });
 </script>
 </body>
