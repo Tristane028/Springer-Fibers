@@ -121,6 +121,10 @@ sub, sup { font-size: 0.72em; line-height: 0; }
 .profile .bar-fill { height: 8px; background: var(--ink); border-radius: 2px; opacity: 0.75; }
 .profile .d { color: var(--graphite); font-family: var(--math); }
 .profile .c { color: var(--graphite); font-variant-numeric: tabular-nums; text-align: right; }
+.legend-sub { margin: 8px 0 4px; font-size: 12.5px; color: var(--graphite); }
+.dimscale { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; color: var(--graphite); font-family: var(--math); }
+.dimscale span { display: inline-flex; align-items: center; gap: 4px; }
+.dimscale i { display: inline-block; width: 14px; height: 14px; border-radius: 50%; }
 .legend { list-style: none; padding: 0; margin: 0; font-size: 13.5px; color: var(--graphite); }
 .legend li { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
 .sw { width: 12px; height: 12px; border-radius: 50%; flex: none; }
@@ -134,6 +138,9 @@ sub, sup { font-size: 0.72em; line-height: 0; }
   font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--rule); border-radius: 6px;
   background: var(--paper); color: var(--ink); width: 220px; max-width: 100%;
 }
+.pairq { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 14px; color: var(--graphite); }
+.pairq[hidden] { display: none; }
+.toolbar .pairq input { width: 140px; }
 .toolbar .hint { color: var(--faint); font-size: 12.5px; margin-left: auto; }
 .stage { position: relative; flex: 1; min-height: 360px; background-color: var(--paper);
   background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
@@ -178,6 +185,8 @@ sub, sup { font-size: 0.72em; line-height: 0; }
   cursor: pointer; font-family: var(--math); font-size: 14px; line-height: 1.5;
 }
 .chip:hover { border-color: var(--ink); }
+.dd { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; }
+.dimgroup { grid-template-columns: 62px 1fr; }
 .chip.direct { border-color: var(--blue); color: var(--blue); }
 .chip.implied { border-style: dashed; border-color: var(--blue-soft); color: var(--blue); }
 .chip.up { border-color: var(--green); color: var(--green); }
@@ -254,13 +263,16 @@ table.chk td.y { color: var(--green); }
       <dl class="stats" id="stats"></dl>
       <div class="profile" id="profile"></div>
       <h3>Colors</h3>
+      <p class="legend-sub">Fill: dimension</p>
+      <div class="dimscale" id="dimscale"></div>
+      <p class="legend-sub">After you select a cell</p>
       <ul class="legend">
-        <li><span class="sw" style="background:var(--ink)"></span>selected cell</li>
-        <li><span class="sw" style="background:var(--ink);box-shadow:0 0 0 3px var(--paper),0 0 0 4px var(--ink)"></span>numbered: the nesting chain</li>
-        <li><span class="sw" style="background:var(--blue)"></span>met by its closure (by every closure in the chain)</li>
-        <li><span class="sw" style="background:var(--blue-soft)"></span>reached only through a chain (unproven)</li>
-        <li><span class="sw" style="background:var(--green)"></span>its closure meets the selected cell</li>
-        <li><span class="sw" style="border:2px solid var(--red)"></span>below in Bruhat order, unresolved</li>
+        <li><span class="sw" style="background:var(--graphite);box-shadow:0 0 0 3px var(--paper),0 0 0 4.5px var(--ink)"></span>large ring: selected cell; numbers: the nesting chain</li>
+        <li><span class="sw sq" style="background:var(--graphite);height:2px"></span>full color, solid line: met by its closure (by every closure in the chain)</li>
+        <li><span class="sw" style="background:var(--faint);opacity:.35"></span>faded: unrelated</li>
+        <li><span class="sw" style="background:var(--graphite);box-shadow:0 0 0 2px var(--paper),0 0 0 3.5px var(--ink)"></span>ringed, dashed line: its closure meets the selected cell</li>
+        <li><span class="sw" style="border:2px dashed var(--ink)"></span>dashed ring: reached only through a chain (unproven)</li>
+        <li><span class="sw" style="border:2px solid var(--red);background:var(--surface)"></span>hollow, red ring: below in Bruhat order, unresolved</li>
         <li><span class="sw sq" style="background:var(--faint);height:2px"></span>grey lines: a simplified sketch of the relations</li>
       </ul>
     </aside>
@@ -275,6 +287,7 @@ table.chk td.y { color: var(--green); }
         <datalist id="labels"></datalist>
         <button class="icon-btn" id="focus" type="button" aria-pressed="false" title="Show only the selected cell and the cells related to it">Related cells only</button>
         <button class="icon-btn" id="fit" type="button">Fit</button>
+        <span class="pairq" id="pairq" hidden>Does the closure of <input id="pair-s" list="labels" placeholder="cell" autocomplete="off" aria-label="Closure of"> meet <input id="pair-t" list="labels" placeholder="cell" autocomplete="off" aria-label="Meets"> ?</span>
         <span class="hint" id="hint">Click a cell, then click inside its closure to nest</span>
       </div>
       <div class="stage" id="stage">
@@ -413,6 +426,38 @@ function evalExpr(src, env) {
   if (i !== toks.length) throw new Error('could not parse ' + src);
   return v;
 }
+
+/* ═════════════ dimension colors ═════════════ */
+// One hue (blue), lightness stepped evenly: low dimension light, high dimension dark
+// (reversed in dark mode). Up to 8 levels the adjacent steps are >= 0.06 apart in
+// OKLCH lightness; beyond that the rows and "dim k" labels carry the dimension too.
+function oklchHex(L, C, h) {
+  const a = C * Math.cos(h * Math.PI / 180), b = C * Math.sin(h * Math.PI / 180);
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3, m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3, q = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3;
+  const lin = [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * q, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * q, -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * q];
+  return '#' + lin.map(x => { x = Math.max(0, Math.min(1, x)); return Math.round(255 * (x <= 0.0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - 0.055)).toString(16).padStart(2, '0'); }).join('');
+}
+const isDark = () => { const t = document.documentElement.getAttribute('data-theme'); return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
+const rampCache = new Map();
+function dimRamp(k) {
+  const dark = isDark(), key = k + (dark ? 'd' : 'l');
+  if (rampCache.has(key)) return rampCache.get(key);
+  const [lo, hi] = dark ? [0.47, 0.935] : [0.745, 0.29];
+  const out = [];
+  for (let i = 0; i < k; i++) {
+    const L = lo + (hi - lo) * i / Math.max(1, k - 1);
+    out.push(oklchHex(L, dark ? 0.11 * Math.max(0.25, 1 - Math.max(0, L - 0.72) * 3.2) : 0.125, 255));
+  }
+  rampCache.set(key, out);
+  return out;
+}
+// Up to 8 dimensions (every Jordan type computed so far): one distinct hue per
+// dimension, from a validated 8-color palette in fixed order (checked for
+// color-blind separation in both themes). More than 8: fall back to the ramp.
+const DIM_HUES = { light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'],
+                   dark:  ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'] };
+const dimColor = d => { const M = S.M; if (!M) return css('--ink'); const k = M.maxDim + 1; return k <= 8 ? DIM_HUES[isDark() ? 'dark' : 'light'][d] : dimRamp(k)[d]; };
+const dimDot = d => `<span class="dd" style="background:${dimColor(d)}"></span>`;
 
 /* ═════════════ closure polynomials ═════════════ */
 // coefficient lists are ascending: c[k] = number of pieces of dimension k
@@ -674,7 +719,8 @@ async function showPartition(p, cellLabel) {
   document.title = `${shapeText(entry.rows)} Springer fiber`;
   renderJordan(entry.rows);
   if (!S.M || S.M.entry !== entry) {
-    S.M = null; S.sel = -1; S.rel = -1;
+    S.M = null; S.sel = -1; S.rel = -1; S.matPair = null; S.mHover = null; S._matCache = null; S.chain = [];
+    if ($('#pair-s')) { $('#pair-s').value = ''; $('#pair-t').value = ''; }
     $('#panel').innerHTML = '';
     $('#stats').innerHTML = ''; $('#profile').innerHTML = '';
     $('#status').textContent = `Loading ${shapeText(entry.rows)}, ${entry.bytes >= 1e6 ? (entry.bytes / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(entry.bytes / 1e3)) + ' KB'}…`;
@@ -759,8 +805,13 @@ function renderJordan(rows) {
     <p>Cells are indexed by permutations of 1,…,${n} in which each row's numbers appear in increasing order.</p>${xmat}`;
 }
 
+function renderDimScale() {
+  const M = S.M; if (!M) return;
+  $('#dimscale').innerHTML = Array.from({ length: M.maxDim + 1 }, (_, d) => `<span><i style="background:${dimColor(d)}"></i>${d}</span>`).join('');
+}
 function renderStats() {
   const M = S.M, e = M.entry;
+  renderDimScale();
   M.computeStatus();
   const tops = M.cells.filter(c => c.dim === M.maxDim).map(c => c.i);
   const palTop = tops.filter(i => isPal(M.meetPoly(i))).length;
@@ -783,7 +834,7 @@ function renderStats() {
   }
   $('#stats').innerHTML = h;
   const mx = Math.max(...e.dimProfile);
-  $('#profile').innerHTML = e.dimProfile.map((c, d) => `<span class="d">dim ${d}</span><span class="bar-track"><span class="bar-fill" style="display:block;width:${(100 * c / mx).toFixed(1)}%"></span></span><span class="c">${c}</span>`).reverse().join('');
+  $('#profile').innerHTML = e.dimProfile.map((c, d) => `<span class="d">dim ${d}</span><span class="bar-track"><span class="bar-fill" style="display:block;width:${(100 * c / mx).toFixed(1)}%;background:${dimColor(d)};opacity:1"></span></span><span class="c">${c}</span>`).reverse().join('');
 }
 
 /* ═════════════ canvas: Hasse diagram and matrix ═════════════ */
@@ -842,7 +893,7 @@ function drawHasse(w, h) {
     const y = (L.dmax - d) * L.Y * s + ty;
     if (y < -10 || y > h + 10) continue;
     ctx.strokeStyle = rule; ctx.lineWidth = 1; ctx.setLineDash([2, 4]);
-    ctx.beginPath(); ctx.moveTo(58, y); ctx.lineTo(w, y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(68, y); ctx.lineTo(w, y); ctx.stroke(); ctx.setLineDash([]);
   }
   const edgePath = (a, b) => {
     const x1 = X(a), y1 = Y(a), x2 = X(b), y2 = Y(b);
@@ -857,8 +908,8 @@ function drawHasse(w, h) {
   if (sets) {
     const ok = v => L.on[v];
     ctx.lineWidth = 1.2; ctx.globalAlpha = 0.75;
-    ctx.strokeStyle = blue; ctx.beginPath(); for (let t = 0; t < S.M.N; t++) if (sets.down[t] && ok(t)) edgePath(S.sel, t); ctx.stroke();
-    if (S.chain.length === 1) { ctx.strokeStyle = green; ctx.beginPath(); S.M.containers[S.sel].forEach(u => { if (ok(u)) edgePath(u, S.sel); }); ctx.stroke(); }
+    ctx.strokeStyle = graphite; ctx.beginPath(); for (let t = 0; t < S.M.N; t++) if (sets.down[t] && ok(t)) edgePath(S.sel, t); ctx.stroke();
+    if (S.chain.length === 1) { ctx.strokeStyle = graphite; ctx.setLineDash([4, 3]); ctx.beginPath(); S.M.containers[S.sel].forEach(u => { if (ok(u)) edgePath(u, S.sel); }); ctx.stroke(); ctx.setLineDash([]); }
     ctx.globalAlpha = 1;
     if (S.chain.length > 1) {      // the examination chain itself, outermost first
       ctx.strokeStyle = ink; ctx.lineWidth = 2.4; ctx.beginPath();
@@ -870,18 +921,18 @@ function drawHasse(w, h) {
   for (const v of L.nodes) {
     const x = X(v), y = Y(v);
     if (x < -20 || x > w + 20 || y < -20 || y > h + 20) continue;
-    let fill = ink, alpha = 1, ring = null;
+    let fill = dimColor(M.cells[v].dim), alpha = 1, ring = null, dash = null;
     if (sets) {
-      if (v === S.sel || sets.inChain[v]) fill = ink;
-      else if (sets.down[v]) fill = blue;
-      else if (sets.up[v]) fill = green;
-      else if (sets.via[v]) fill = css('--blue-soft');
-      else { fill = faint; alpha = 0.5; }
-      if (sets.miss[v]) { ring = red; alpha = 1; fill = css('--surface'); }
+      if (v === S.sel || sets.inChain[v] || sets.down[v]) { /* full color */ }
+      else if (sets.up[v]) ring = ink;
+      else if (sets.via[v]) { ring = ink; dash = [2, 2]; }
+      else if (sets.miss[v]) { ring = red; fill = css('--surface'); }
+      else alpha = 0.14;
     }
     ctx.globalAlpha = alpha; ctx.fillStyle = fill;
     ctx.beginPath(); ctx.arc(x, y, v === S.sel ? r + 2.5 : r, 0, 7); ctx.fill();
-    if (ring) { ctx.strokeStyle = ring; ctx.lineWidth = 2; ctx.stroke(); }
+    if (ring) { ctx.strokeStyle = ring; ctx.lineWidth = 2; if (dash) ctx.setLineDash(dash); ctx.beginPath(); ctx.arc(x, y, r + 2.5, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+    if (sets && sets.inChain[v] && v !== S.sel) { ctx.strokeStyle = ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, r + 3, 0, 7); ctx.stroke(); }
     if (v === S.sel) { ctx.strokeStyle = ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, r + 6, 0, 7); ctx.stroke(); }
     if (v === S.hover) { ctx.strokeStyle = ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, r + 3.5, 0, 7); ctx.stroke(); }
     ctx.globalAlpha = 1;
@@ -899,60 +950,107 @@ function drawHasse(w, h) {
     ctx.textAlign = 'start';
   }
   // dimension labels on a paper strip so edges never run through them
-  ctx.fillStyle = paper; ctx.globalAlpha = 0.92; ctx.fillRect(0, 0, 56, h); ctx.globalAlpha = 1;
+  ctx.fillStyle = paper; ctx.globalAlpha = 0.92; ctx.fillRect(0, 0, 66, h); ctx.globalAlpha = 1;
   ctx.font = '13px "STIX Two Text", serif'; ctx.fillStyle = graphite; ctx.textBaseline = 'middle';
-  for (let d = L.dmin; d <= L.dmax; d++) { const y = (L.dmax - d) * L.Y * s + ty; if (y > -10 && y < h + 10) ctx.fillText('dim ' + d, 10, y); }
+  for (let d = L.dmin; d <= L.dmax; d++) { const y = (L.dmax - d) * L.Y * s + ty; if (y > -10 && y < h + 10) { ctx.fillStyle = dimColor(d); ctx.beginPath(); ctx.arc(14, y, 5, 0, 7); ctx.fill(); ctx.fillStyle = graphite; ctx.fillText('dim ' + d, 24, y); } }
 }
 
+function matrixOrder() {
+  const M = S.M;
+  let ids = (S.focus && S.sel >= 0 && S.L && S.L !== M.full) ? S.L.nodes.slice() : M.cells.map(c => c.i);
+  if (S.matPair) for (const v of [S.matPair.s, S.matPair.t]) if (!ids.includes(v)) ids.push(v);
+  return ids.sort((a, b) => M.cells[b].dim - M.cells[a].dim || a - b);
+}
 function drawMatrix(w, h) {
   const M = S.M, st = M.computeStatus(), N = M.N;
-  const order = M.cells.map(c => c.i).sort((a, b) => M.cells[b].dim - M.cells[a].dim || a - b);
-  S._order = order;
-  const pad = 52;
-  const size = Math.max(40, Math.min(w - pad - 14, h - pad - 40));
-  const cs = size / N;
-  S._mat = { x0: pad, y0: pad, cs, order };
-  // pixels
-  const img = ctx.createImageData(N, N);
-  const hex = s => { s = s.replace('#', ''); return [parseInt(s.slice(0, 2), 16), parseInt(s.slice(2, 4), 16), parseInt(s.slice(4, 6), 16)]; };
-  const col = [hex(css('--surface')), hex(css('--blue')), hex(css('--green')), hex(css('--red')), hex(css('--blue-soft'))];
-  for (let a = 0; a < N; a++) for (let b = 0; b < N; b++) {
-    const k = st[order[a] * N + order[b]], c = a === b ? hex(css('--rule')) : col[k], p = 4 * (a * N + b);
-    img.data[p] = c[0]; img.data[p + 1] = c[1]; img.data[p + 2] = c[2]; img.data[p + 3] = 255;
+  const order = matrixOrder(), K = order.length;
+  const pos = new Map(order.map((v, k) => [v, k]));
+  const ink = css('--ink'), graphite = css('--graphite'), surface = css('--surface');
+  // labels along both axes whenever a square is tall enough to carry one
+  ctx.font = '11px "STIX Two Text", serif';
+  const labW = Math.max(...order.map(v => ctx.measureText(wordText(M.cells[v].word)).width));
+  // the margin always fits a cell name, so pinned names are never cut off
+  const padL = Math.ceil(labW) + 30, padT = Math.ceil(labW) + 30;
+  let size = Math.max(40, Math.min(w - padL - 14, h - padT - 40));
+  let cs = Math.min(size / K, 56);
+  const labels = cs >= 11;
+  size = cs * K;
+  S._mat = { x0: padL, y0: padT, cs, order, pos, labels };
+  // squares (cached offscreen image, one pixel per pair)
+  const key = order.join(',') + '|' + isDark() + '|' + (M.status ? 1 : 0);
+  if (!S._matCache || S._matCache.key !== key || S._matCache.M !== M) {
+    const img = new ImageData(K, K);
+    const hex = c => { c = c.replace('#', ''); return [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)]; };
+    const col = [hex(surface), hex(css('--blue')), hex(css('--green')), hex(css('--red')), hex(css('--blue-soft'))], diag = hex(css('--rule'));
+    for (let a = 0; a < K; a++) for (let b = 0; b < K; b++) {
+      const c = a === b ? diag : col[st[order[a] * N + order[b]]], q = 4 * (a * K + b);
+      img.data[q] = c[0]; img.data[q + 1] = c[1]; img.data[q + 2] = c[2]; img.data[q + 3] = 255;
+    }
+    const off = document.createElement('canvas'); off.width = K; off.height = K; off.getContext('2d').putImageData(img, 0, 0);
+    S._matCache = { key, off, M };
   }
-  const off = document.createElement('canvas'); off.width = N; off.height = N; off.getContext('2d').putImageData(img, 0, 0);
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(off, pad, pad, size, size);
-  ctx.strokeStyle = css('--rule'); ctx.lineWidth = 1; ctx.strokeRect(pad - 0.5, pad - 0.5, size + 1, size + 1);
-  // dimension blocks
-  ctx.strokeStyle = css('--graphite'); ctx.fillStyle = css('--graphite'); ctx.font = '12px "STIX Two Text", serif';
+  ctx.drawImage(S._matCache.off, padL, padT, size, size);
+  if (cs >= 6) {          // light grid between squares once they are big enough
+    ctx.strokeStyle = css('--grid'); ctx.lineWidth = 1; ctx.beginPath();
+    for (let k = 1; k < K; k++) { ctx.moveTo(padL + k * cs, padT); ctx.lineTo(padL + k * cs, padT + size); ctx.moveTo(padL, padT + k * cs); ctx.lineTo(padL + size, padT + k * cs); }
+    ctx.stroke();
+  }
+  ctx.strokeStyle = css('--rule'); ctx.lineWidth = 1; ctx.strokeRect(padL - 0.5, padT - 0.5, size + 1, size + 1);
+  // unresolved pairs at a visible minimum size
+  const mm = Math.max(cs, 3); ctx.fillStyle = css('--red');
+  for (let a = 0; a < K; a++) for (let b = 0; b < K; b++) if (st[order[a] * N + order[b]] === 3) ctx.fillRect(padL + b * cs + cs / 2 - mm / 2, padT + a * cs + cs / 2 - mm / 2, mm, mm);
+  // dimension blocks: colored strips on both axes
   let k = 0;
   for (let d = M.maxDim; d >= 0; d--) {
-    const cnt = M.cells.filter(c => c.dim === d).length; if (!cnt) continue;
-    const a = pad + k * cs, b = pad + (k + cnt) * cs;
-    ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.moveTo(pad, b); ctx.lineTo(pad + size, b); ctx.moveTo(b, pad); ctx.lineTo(b, pad + size); ctx.stroke(); ctx.globalAlpha = 1;
-    if (b - a > 12) { ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(String(d), pad - 6, (a + b) / 2); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(String(d), (a + b) / 2, pad - 4); }
+    const cnt = order.filter(v => M.cells[v].dim === d).length; if (!cnt) continue;
+    const a = k * cs, b = (k + cnt) * cs;
+    ctx.strokeStyle = graphite; ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.moveTo(padL, padT + b); ctx.lineTo(padL + size, padT + b); ctx.moveTo(padL + b, padT); ctx.lineTo(padL + b, padT + size); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillStyle = dimColor(d); ctx.fillRect(padL - 5, padT + a, 4, b - a); ctx.fillRect(padL + a, padT - 5, b - a, 4);
+    if (!labels && b - a > 12) { ctx.fillStyle = graphite; ctx.font = '12px "STIX Two Text", serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(String(d), padL - 9, padT + (a + b) / 2); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(String(d), padL + (a + b) / 2, padT - 8); }
     k += cnt;
   }
+  // highlight bands: selected cell, the chosen pair, the hovered square
+  const band = (row, colm, alpha) => {
+    ctx.globalAlpha = alpha; ctx.fillStyle = ink;
+    if (row != null) ctx.fillRect(padL, padT + row * cs, size, Math.max(cs, 1.5));
+    if (colm != null) ctx.fillRect(padL + colm * cs, padT, Math.max(cs, 1.5), size);
+    ctx.globalAlpha = 1;
+  };
+  const sp = S.sel >= 0 && pos.has(S.sel) ? pos.get(S.sel) : null;
+  if (sp != null) { band(sp, null, 0.10); ctx.strokeStyle = ink; ctx.lineWidth = 1.5; ctx.strokeRect(padL, padT + sp * cs, size, Math.max(cs, 1.5)); }
+  const pr = S.matPair && pos.has(S.matPair.s) && pos.has(S.matPair.t) ? [pos.get(S.matPair.s), pos.get(S.matPair.t)] : null;
+  if (pr) band(null, pr[1], 0.10);
+  const hv = S.mHover && S.mHover.key === key && S.mHover.a < K && S.mHover.b < K ? S.mHover : null;
+  if (hv) band(hv.a, hv.b, 0.07);
+  const ringAt = (a, b, width) => { const g = Math.max(3, cs * 0.25); ctx.strokeStyle = ink; ctx.lineWidth = width; ctx.strokeRect(padL + b * cs - g, padT + a * cs - g, Math.max(cs, 1) + 2 * g, Math.max(cs, 1) + 2 * g); };
+  if (pr) ringAt(pr[0], pr[1], 2.5);
+  if (hv) ringAt(hv.a, hv.b, 1.2);
+  // axis labels: all of them when they fit, otherwise just the rows/columns in play
+  const rowLab = (a, strong) => { const v = order[a], t = wordText(M.cells[v].word); ctx.font = (strong ? '600 ' : '') + '11px "STIX Two Text", serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillStyle = strong ? ink : graphite; ctx.fillText(t, padL - 9, padT + a * cs + cs / 2); };
+  const colLab = (b, strong) => { const v = order[b], t = wordText(M.cells[v].word); ctx.save(); ctx.translate(padL + b * cs + cs / 2, padT - 9); ctx.rotate(-Math.PI / 2); ctx.font = (strong ? '600 ' : '') + '11px "STIX Two Text", serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = strong ? ink : graphite; ctx.fillText(t, 0, 0); ctx.restore(); };
+  const pill = (x, y, t, align) => { ctx.font = '600 12px "STIX Two Text", serif'; const tw = ctx.measureText(t).width + 10; const x0 = align === 'right' ? x - tw : x - tw / 2; ctx.fillStyle = ink; ctx.fillRect(x0, y - 9, tw, 18); ctx.fillStyle = surface; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t, x0 + tw / 2, y); };
+  if (labels) {
+    for (let a = 0; a < K; a++) rowLab(a, a === sp || (pr && a === pr[0]) || (hv && a === hv.a));
+    for (let b = 0; b < K; b++) colLab(b, (pr && b === pr[1]) || (hv && b === hv.b));
+  } else {
+    const rows = new Set([sp, pr && pr[0], hv && hv.a].filter(x => x != null)), cols = new Set([pr && pr[1], hv && hv.b].filter(x => x != null));
+    rows.forEach(a => pill(padL - 8, padT + a * cs + cs / 2, wordText(M.cells[order[a]].word), 'right'));
+    cols.forEach(b => pill(padL + b * cs + cs / 2, padT - 14, wordText(M.cells[order[b]].word), 'center'));
+  }
   ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
-  // missing pairs drawn at a visible minimum size
-  const m = Math.max(cs, 3), pos = new Int32Array(N); order.forEach((v, k) => { pos[v] = k; });
-  ctx.fillStyle = css('--red');
-  for (let s2 = 0; s2 < N; s2++) for (let t = 0; t < N; t++) if (st[s2 * N + t] === 3) ctx.fillRect(pad + pos[t] * cs + cs / 2 - m / 2, pad + pos[s2] * cs + cs / 2 - m / 2, m, m);
   // key
-  const ky = Math.min(pad + size + 22, h - 8);
-  let kx = pad;
+  const ky = Math.min(padT + size + 24, h - 8);
+  let kx = padL;
   [['--blue', 'curve found'], ['--blue-soft', 'only through a chain of curves'], ['--green', 'nonempty in report only'], ['--red', 'Bruhat-below, unresolved']].forEach(([c, t]) => {
     ctx.fillStyle = css(c); ctx.fillRect(kx, ky - 9, 10, 10);
-    ctx.fillStyle = css('--graphite'); ctx.font = '13px "Public Sans", sans-serif'; ctx.fillText(t, kx + 15, ky);
+    ctx.fillStyle = graphite; ctx.font = '13px "Public Sans", sans-serif'; ctx.fillText(t, kx + 15, ky);
     kx += 22 + ctx.measureText(t).width + 14;
   });
-  ctx.font = '12px "STIX Two Text", serif'; ctx.fillStyle = css('--graphite');
-  ctx.save(); ctx.translate(pad - 22, pad + size / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillText('source cell, by dimension', 0, 0); ctx.restore();
-  ctx.textAlign = 'center'; ctx.fillText('target cell, by dimension', pad + size / 2, pad - 18); ctx.textAlign = 'start';
-  if (S.sel >= 0) {
-    const a = order.indexOf(S.sel);
-    ctx.strokeStyle = css('--ink'); ctx.lineWidth = 1.5; ctx.strokeRect(pad, pad + a * cs, size, Math.max(cs, 1.5));
+  if (!labels) {
+    ctx.font = '12px "STIX Two Text", serif'; ctx.fillStyle = graphite;
+    ctx.save(); ctx.translate(14, padT + size / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'center'; ctx.fillText('closure of (row), by dimension', 0, 0); ctx.restore();
+    ctx.textAlign = 'center'; ctx.fillText('meets (column), by dimension', padL + size / 2, 14); ctx.textAlign = 'start';
   }
 }
 
@@ -967,8 +1065,8 @@ function worldPick(px, py) {
   }
   const m = S._mat; if (!m) return -1;
   const a = Math.floor((py - m.y0) / m.cs), b = Math.floor((px - m.x0) / m.cs);
-  if (a < 0 || b < 0 || a >= M.N || b >= M.N) return -1;
-  return { s: m.order[a], t: m.order[b] };
+  if (a < 0 || b < 0 || a >= m.order.length || b >= m.order.length) return -1;
+  return { s: m.order[a], t: m.order[b], a, b };
 }
 
 cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); drag = { x: e.offsetX, y: e.offsetY, tx: S.view.tx, ty: S.view.ty, moved: 0 }; });
@@ -984,19 +1082,20 @@ cv.addEventListener('pointermove', e => {
     if (hit !== S.hover) { S.hover = hit; draw(); }
     if (hit >= 0) { const c = M.cells[hit]; tip.innerHTML = `<span class="math">${cellName(c)}</span>, dim ${c.dim}`; showTip(e); } else tip.style.display = 'none';
   } else if (hit && hit !== -1) {
+    if (!S.mHover || S.mHover.a !== hit.a || S.mHover.b !== hit.b) { S.mHover = { a: hit.a, b: hit.b, key: S._matCache && S._matCache.key }; draw(); }
     const st = M.computeStatus()[hit.s * M.N + hit.t];
-    const what = hit.s === hit.t ? 'same cell' : ['closure does not meet it', 'curve found by the search', 'nonempty in the intersection report', 'below in Bruhat order, unresolved', 'reached only through a chain of curves (unproven)'][st];
-    tip.innerHTML = `<span class="math">${cellName(M.cells[hit.t])}</span> vs closure of <span class="math">${cellName(M.cells[hit.s])}</span>: ${what}`; showTip(e);
-  } else tip.style.display = 'none';
+    const what = hit.s === hit.t ? 'the same cell' : ['no: the closure does not meet it', 'yes: a curve was found', 'yes: nonempty in the intersection report', 'unresolved: below in Bruhat order, no curve found', 'probably: reached only through a chain of curves'][st];
+    tip.innerHTML = `Does the closure of <span class="math">${cellName(M.cells[hit.s])}</span> meet <span class="math">${cellName(M.cells[hit.t])}</span>? ${what}`; showTip(e);
+  } else { tip.style.display = 'none'; if (S.mHover) { S.mHover = null; draw(); } }
 });
 function showTip(e) { const tip = $('#tip'); tip.style.display = 'block'; const r = $('#stage').getBoundingClientRect(); let x = e.offsetX + 14, y = e.offsetY + 14; if (x + tip.offsetWidth > r.width) x = e.offsetX - tip.offsetWidth - 10; tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
-cv.addEventListener('pointerleave', () => { $('#tip').style.display = 'none'; if (S.hover >= 0) { S.hover = -1; draw(); } });
+cv.addEventListener('pointerleave', () => { $('#tip').style.display = 'none'; if (S.hover >= 0 || S.mHover) { S.hover = -1; S.mHover = null; draw(); } });
 cv.addEventListener('pointerup', e => {
   const d = drag; drag = null;
   if (!S.M || (d && d.moved > 3)) return;
   const hit = worldPick(e.offsetX, e.offsetY);
   if (S.tab === 'hasse') { if (hit >= 0) drill(hit); else select(-1); }
-  else if (hit && hit !== -1) { select(hit.s); if (hit.s !== hit.t) openRelation(hit.t); }
+  else if (hit && hit !== -1) askPair(hit.s, hit.t);
 });
 cv.addEventListener('wheel', e => {
   if (S.tab !== 'hasse' || !S.M) return;
@@ -1006,15 +1105,32 @@ cv.addEventListener('wheel', e => {
 }, { passive: false });
 window.addEventListener('resize', () => draw());
 $('#fit').addEventListener('click', fitView);
+/* Ask about one pair: select the row cell, ring the square, show the answer in the panel. */
+function askPair(s, t) {
+  const M = S.M; if (!M || s < 0 || t < 0) return;
+  S.matPair = { s, t };
+  $('#pair-s').value = wordText(M.cells[s].word); $('#pair-t').value = wordText(M.cells[t].word);
+  select(s);
+  if (s !== t) openRelation(t);
+  draw();
+}
+function pairFromInputs() {
+  const s = findCell($('#pair-s').value), t = findCell($('#pair-t').value);
+  if (s >= 0 && t >= 0) askPair(s, t);
+}
+$('#pair-s').addEventListener('change', pairFromInputs);
+$('#pair-t').addEventListener('change', pairFromInputs);
 function setFocus(on) { S.focus = on; $('#focus').setAttribute('aria-pressed', on); if (S.M) select(S.sel, false); }
 $('#focus').addEventListener('click', () => setFocus(!S.focus));
 function setTab(t) {
   S.tab = t;
   ['hasse', 'matrix', 'poly'].forEach(k => $('#tab-' + k).setAttribute('aria-selected', t === k));
   $('#fit').style.display = t === 'hasse' ? '' : 'none';
-  $('#focus').style.display = t === 'hasse' ? '' : 'none';
+  $('#focus').style.display = t === 'poly' ? 'none' : '';
+  $('#pairq').hidden = t !== 'matrix';
+  $('#find').style.display = t === 'matrix' ? 'none' : '';
   $('#polyview').hidden = t !== 'poly';
-  $('#hint').textContent = t === 'hasse' ? 'Click a cell, then click inside its closure to nest' : t === 'matrix' ? 'Row: source cell. Column: target. Click a square to inspect the pair' : 'Click a cell to open it';
+  $('#hint').textContent = t === 'hasse' ? 'Click a cell, then click inside its closure to nest' : t === 'matrix' ? 'Hover to read a square; click it, or type two cells, to see the answer' : 'Click a cell to open it';
   if (t === 'poly') renderPolyView(); else fitView();
 }
 function renderPolyView() {
@@ -1054,7 +1170,7 @@ $('#polyview').addEventListener('click', e => { const b = e.target.closest('[dat
 $('#find').addEventListener('change', e => { const i = findCell(e.target.value); if (i >= 0) { drill(i); if (!S.focus) centerOn(i); e.target.value = ''; } });
 document.addEventListener('keydown', e => {
   if (!S.M || document.activeElement.tagName === 'INPUT') return;
-  if (e.key === 'Escape') select(-1);
+  if (e.key === 'Escape') { S.matPair = null; select(-1); }
   else if (e.key === 'Backspace' && S.chain.length > 1) { e.preventDefault(); popTo(S.chain.length - 2); }
 });
 function centerOn(i) {
@@ -1092,7 +1208,7 @@ function setChain(chain, updateHash = true) {
   if (S.L !== prev) fitView(); else draw();
 }
 // Fresh start at cell i (or clear with -1).
-function select(i, updateHash = true) { setChain(i >= 0 ? [i] : [], updateHash); }
+function select(i, updateHash = true) { if (S.matPair && S.matPair.s !== i) S.matPair = null; setChain(i >= 0 ? [i] : [], updateHash); }
 // Examine cell i from the current chain: nest if it lies in the current intersection, else start over.
 function drill(i) {
   if (i < 0) return;
@@ -1107,7 +1223,7 @@ function chips(list, cls, M) {
   const byDim = new Map();
   list.forEach(v => { const d = M.cells[v].dim; if (!byDim.has(d)) byDim.set(d, []); byDim.get(d).push(v); });
   return [...byDim.entries()].sort((a, b) => b[0] - a[0]).map(([d, vs]) =>
-    `<div class="dimgroup"><span class="dl">dim ${d}</span><div class="chips">${vs.map(v => `<button class="chip ${typeof cls === 'function' ? cls(v) : cls}" data-c="${v}">${cellName(M.cells[v])}</button>`).join('')}</div></div>`).join('');
+    `<div class="dimgroup"><span class="dl">${dimDot(d)}dim ${d}</span><div class="chips">${vs.map(v => `<button class="chip ${typeof cls === 'function' ? cls(v) : cls}" data-c="${v}">${dimDot(d)}${cellName(M.cells[v])}</button>`).join('')}</div></div>`).join('');
 }
 function fillingSvg(c, rows) {
   const B = 26, G = 3;
@@ -1274,6 +1390,7 @@ function applyTheme(t) {
   if (t) document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme');
   const dark = t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
   $('#theme').textContent = dark ? 'Light' : 'Dark';
+  if (S.M) { renderStats(); renderPanel(); }
   draw();
 }
 $('#theme').addEventListener('click', () => {
