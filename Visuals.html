@@ -116,6 +116,11 @@ sub, sup { font-size: 0.72em; line-height: 0; }
 .stats dt { color: var(--graphite); }
 .stats dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
 .stats dd.red { color: var(--red); }
+.theorem { margin: 10px 0 0; padding: 8px 10px; border: 1px solid var(--rule); border-left: 3px solid var(--graphite); border-radius: 4px; background: var(--surface); font-size: 13px; line-height: 1.45; color: var(--graphite); }
+.theorem b { color: var(--ink); font-weight: 600; }
+.theorem.yes { border-left-color: var(--green); }
+.theorem.no { border-left-color: var(--red); }
+.theorem a { color: var(--blue); }
 .profile { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 8px; align-items: center; font-size: 13px; margin-top: 4px; }
 .profile .bar-track { height: 8px; background: var(--grid); border-radius: 2px; }
 .profile .bar-fill { height: 8px; background: var(--ink); border-radius: 2px; opacity: 0.75; }
@@ -518,6 +523,31 @@ function polyVerdict(c, certified) {
   return { cls: 'bad', text: certified ? 'singular' : 'not palindromic', note: certified ? 'Betti numbers are not palindromic, so Poincaré duality fails' : 'often just partial intersections, see note' };
 }
 
+/* What is proven about smoothness of the irreducible components (type A).
+   Fresse–Melnikov (arXiv:0905.1617): every component of the Springer fiber is
+   smooth exactly for a hook, two rows, two rows plus one box, or (2,2,2); every
+   other Jordan type has a singular component. Smooth projective varieties satisfy
+   Poincaré duality, so their Poincaré polynomials are palindromic. Fresse
+   (arXiv:0909.4008): for two columns, a component is singular iff its Poincaré
+   polynomial is not palindromic; and whenever a Springer fiber has a singular
+   component, some component has a non-palindromic Poincaré polynomial. */
+const REF_FM = 'https://arxiv.org/abs/0905.1617', REF_F = 'https://arxiv.org/abs/0909.4008';
+function smoothness(rowsIn) {
+  const l = rowsIn.slice().sort((a, b) => b - a), k = l.length, txt = '(' + l.join(',') + ')';
+  let kind = null;
+  if (k === 1) kind = 'one row (the fiber is a point)';
+  else if (l[1] <= 1) kind = 'a hook';
+  else if (k === 2) kind = 'two rows';
+  else if (k === 3 && l[2] === 1) kind = 'two rows plus one box';
+  else if (k === 3 && l.every(x => x === 2)) kind = 'the exceptional case (2,2,2)';
+  return { all: !!kind, kind, shape: txt, twoColumn: l[0] <= 2 };
+}
+function theoremHtml(M) {
+  const t = smoothness(M.rows);
+  if (t.all) return `<div class="theorem yes"><b>Every component is smooth</b>, since the Jordan type ${t.shape} is ${t.kind} (<a href="${REF_FM}" target="_blank" rel="noopener">Fresse–Melnikov</a>). So every top-dimensional cell has a palindromic Poincaré polynomial, and a search estimate that is not palindromic is off: it counts whole cells the closure only partly meets, or misses some.</div>`;
+  return `<div class="theorem no"><b>Some component is singular.</b> ${t.shape} is not a hook, two rows, two rows plus one box, or (2,2,2), so by <a href="${REF_FM}" target="_blank" rel="noopener">Fresse–Melnikov</a> it has a singular component, and by <a href="${REF_F}" target="_blank" rel="noopener">Fresse</a> at least one component has a Poincaré polynomial that is not palindromic.${t.twoColumn ? ' For two columns, as here, a component is singular exactly when its Poincaré polynomial is not palindromic.' : ''}</div>`;
+}
+
 /* ═════════════ model of one partition ═════════════ */
 function buildModel(entry, data) {
   const cells = data.cells.map((c, i) => ({ i, label: c.perm, word: parsePerm(c.perm), dim: c.dim, free: c.free, plucker: c.plucker }));
@@ -882,7 +912,8 @@ function renderStats() {
   let h = `<dt>Cells</dt><dd>${e.cells.toLocaleString()}</dd>
     <dt>Relations with a curve</dt><dd>${e.edges.toLocaleString()}</dd>
     <dt>Components (top cells)</dt><dd>${tops.length}</dd>
-    <dt>Components, palindromic count</dt><dd>${palTop}</dd>`;
+    <dt>Components with a palindromic estimate</dt><dd>${palTop}</dd>
+    <dt>All components smooth (proven)</dt><dd class="${smoothness(M.rows).all ? '' : 'red'}">${smoothness(M.rows).all ? 'yes' : 'no'}</dd>`;
   if (M.rep) {
     const certified = M.cells.filter(c => M.reportFor(c.i) && M.reportFor(c.i).poly);
     const sing = certified.filter(c => !isPal(M.reportFor(c.i).poly));
@@ -897,6 +928,9 @@ function renderStats() {
       <dt>Bruhat-below, unresolved</dt><dd class="${M.nMissing ? 'red' : ''}">${M.nMissing.toLocaleString()}</dd>`;
   }
   $('#stats').innerHTML = h;
+  let th = $('#theorem');
+  if (!th) { th = document.createElement('div'); th.id = 'theorem'; $('#stats').after(th); }
+  th.innerHTML = theoremHtml(M);
   const mx = Math.max(...e.dimProfile);
   $('#profile').innerHTML = e.dimProfile.map((c, d) => `<span class="d">dim ${d}</span><span class="bar-track"><span class="bar-fill" style="display:block;width:${(100 * c / mx).toFixed(1)}%;background:${dimColor(d)};opacity:1"></span></span><span class="c">${c}</span>`).reverse().join('');
 }
@@ -1323,13 +1357,15 @@ function renderPolyView() {
   h += `<p class="note">${hasRep
     ? 'This Jordan type has an intersection report, so each closure has a certified Poincaré polynomial: the number of affine pieces of each dimension, whole cells and partial intersections. Those are Betti numbers; when they are not palindromic the closure is singular.'
     : 'Estimate from the search: each cell plus the cells reached by a curve or a chain of curves, counted by dimension. It equals the Poincaré polynomial when the closure is a union of cells; otherwise it can be off, so "not palindromic" here does not mean singular. An intersection report (closure_*.json, from parse_closure_report.py) gives certified polynomials.'}</p>`;
+  h += theoremHtml(M).replace('class="theorem', 'style="max-width:80ch;margin:0 0 12px" class="theorem');
   h += `<div class="pv-sum">${[...tally.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `<span class="${k === 'singular' ? 'bad' : ''}">${esc(k)} ×${v}</span>`).join('')}</div>`;
   h += `<table class="ptable"><thead><tr><th>Cell</th><th>dim</th>${hasRep ? '<th>Certified Poincaré polynomial</th><th>Factorization</th>' : ''}<th>Estimate from the search</th><th>Factorization</th></tr></thead><tbody>`;
   for (const r of rows) {
     const c = M.cells[r.i];
     h += `<tr><td><button class="cellbtn" data-cell="${r.i}">${cellName(c)}</button></td><td class="num">${c.dim}</td>`;
     if (hasRep) h += r.cv ? `<td>${polyHtml(r.cert)}</td><td class="${r.cv.cls}">${r.cv.text}</td>` : '<td>—</td><td></td>';
-    h += `<td>${polyHtml(r.meet)}</td><td class="${r.mv.cls === 'ok' ? 'ok' : ''}">${r.mv.cls === 'ok' ? r.mv.text : r.mv.text}</td></tr>`;
+    const forced = smoothness(M.rows).all && c.dim === M.maxDim && r.mv.cls === 'bad';
+    h += `<td>${polyHtml(r.meet)}</td><td class="${r.mv.cls === 'ok' ? 'ok' : ''}">${forced ? 'estimate off (smooth, so truly palindromic)' : r.mv.text}</td></tr>`;
   }
   h += `</tbody></table>`;
   el.innerHTML = h;
@@ -1687,7 +1723,7 @@ function renderPanel() {
     h += `<details class="lvl"><summary><b>Closure polynomial</b> certified${v.cls === 'bad' ? ', singular' : ''}</summary><p class="math" style="margin:6px 0 2px 10px">${polyHtml(rep.poly)}</p><p class="verdict-line ${v.cls}" style="margin-left:10px">${v.cls === 'ok' ? 'Factors as ' + v.text + '.' : v.cls === 'bad' ? 'Singular: ' + v.note + '.' : 'Palindromic, not a product of q-integers.'}</p></details>`;
   } else {
     const meet = M.meetPoly(S.sel), v = polyVerdict(meet, false);
-    h += `<details class="lvl"><summary><b>Closure polynomial</b> estimate</summary><p class="math" style="margin:6px 0 2px 10px">${polyHtml(meet)}</p><p class="note" style="margin-left:10px">This cell plus the cells reached by curves or chains, by dimension; exact only when the closure is a union of cells.</p></details>`;
+    h += `<details class="lvl"><summary><b>Closure polynomial</b> estimate</summary><p class="math" style="margin:6px 0 2px 10px">${polyHtml(meet)}</p><p class="note" style="margin-left:10px">This cell plus the cells reached by curves or chains, by dimension; exact only when the closure is a union of cells.${c.dim === M.maxDim ? (smoothness(M.rows).all ? ' This closure is an irreducible component of a Jordan type whose components are all smooth (Fresse–Melnikov), so its true Poincaré polynomial is palindromic' + (isPal(meet) ? '.' : '; this estimate is not, so it is off here.') : ' This Jordan type has singular components (Fresse–Melnikov), so a component here can have a non-palindromic polynomial.') : ''}</p></details>`;
   }
   c.plucker.forEach((vec, k) => {
     const r = k + 1, vals = splitVec(vec), I = subsets(M.n, r);
