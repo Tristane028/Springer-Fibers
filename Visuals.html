@@ -490,12 +490,12 @@ function dimRamp(k) {
   rampCache.set(key, out);
   return out;
 }
-// Up to 8 dimensions (every Jordan type computed so far): one distinct hue per
-// dimension, from a validated 8-color palette in fixed order (checked for
-// color-blind separation in both themes). More than 8: fall back to the ramp.
-const DIM_HUES = { light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'],
-                   dark:  ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'] };
-const dimColor = d => { const M = S.M; if (!M) return css('--ink'); const k = M.maxDim + 1; return k <= 8 ? DIM_HUES[isDark() ? 'dark' : 'light'][d] : dimRamp(k)[d]; };
+// Up to 12 dimensions (dim 0 to 11): one distinct hue per dimension, in fixed
+// order so a dimension keeps its color across Jordan types; checked for
+// color-blind separation in both themes. More than 12: fall back to the ramp.
+const DIM_HUES = { light: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948', '#0a8fa3', '#b0701f', '#c2369e', '#6b7a00'],
+                   dark:  ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767', '#1fa3b8', '#b9802e', '#cf4fb0', '#8a9a10'] };
+const dimColor = d => { const M = S.M; if (!M) return css('--ink'); const k = M.maxDim + 1; return k <= DIM_HUES.light.length ? DIM_HUES[isDark() ? 'dark' : 'light'][d] : dimRamp(k)[d]; };
 const dimDot = d => `<span class="dd" style="background:${dimColor(d)}"></span>`;
 
 /* ═════════════ closure polynomials ═════════════ */
