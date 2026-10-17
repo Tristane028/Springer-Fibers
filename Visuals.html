@@ -318,7 +318,7 @@ table.chk td.y { color: var(--green); }
         <button class="icon-btn" id="spinbtn" type="button" aria-pressed="true" title="Rotate the 3D diagram">Pause rotation</button>
         <button class="icon-btn" id="flat" type="button" title="Switch between the rotating 3D diagram and the flat layered diagram">Flat view</button>
         <button class="icon-btn" id="fit" type="button">Fit</button>
-        <button class="icon-btn" id="routebtn" type="button" title="Animate the 16 → 8 → 4 → 2 route from the selected cell down to one cell" disabled>Halving route</button>
+        <button class="icon-btn" id="routebtn" type="button" title="Animate the 128 → 64 → … → 4 → 2 route from the selected cell down to one cell" disabled>Halving route</button>
         <span class="pairq" id="pairq" hidden>Does the closure of <input id="pair-s" list="labels" placeholder="cell" autocomplete="off" aria-label="Closure of"> meet <input id="pair-t" list="labels" placeholder="cell" autocomplete="off" aria-label="Meets"> ?</span>
         <span class="hint" id="hint">Drag to turn, scroll to zoom. Click a cell, then a cell in its closure to nest</span>
       </div>
@@ -1389,12 +1389,12 @@ function centerOn(i) {
   v.tx = w / 2 - L.xy[2 * i] * v.s; v.ty = h / 2 - L.xy[2 * i + 1] * v.s; draw();
 }
 
-/* ═════════════ halving route: 16 → 8 → 4 → 2 ═════════════ */
+/* ═════════════ halving route: 128 → 64 → … → 4 → 2 ═════════════ */
 /* Start from S = {A} ∪ (cells the closure of A meets). One step picks a cell B in S and
    keeps S ∩ ({B} ∪ cells the closure of B meets). Divisors are used in the fixed order
-   16, 8, 4, 2 (each may repeat or be skipped, never revisited); dividing by d needs at least
+   128, 64, 32, 16, 8, 4, 2 (each may repeat or be skipped, never revisited); dividing by d needs at least
    d cells and must land on ⌊n/d⌋ or ⌈n/d⌉. The route ends at one cell: the last B chosen. */
-const ROUTE_DIVS = [16, 8, 4, 2];
+const ROUTE_DIVS = [128, 64, 32, 16, 8, 4, 2];
 function closedSet(M, v) { (M._cs || (M._cs = []));  return M._cs[v] || (M._cs[v] = new Set([v, ...M.closureOf[v]])); }
 function halvingRoute(M, a, pref = S.routePref || 'gradual') {
   M.routes = M.routes || new Map();
@@ -1618,11 +1618,11 @@ $('#animbar').addEventListener('change', e => { if (e.target.id === 'ab-pref' &&
 $('#routebtn').addEventListener('click', () => { if (S.anim) stopRoute(); else if (S.sel >= 0) startRoute(S.sel); });
 function routePanelHtml(M, a) {
   const R = halvingRoute(M, a);
-  let h = `<h3>Route to one cell<span class="n">16 → 8 → 4 → 2</span></h3>`;
+  let h = `<h3>Route to one cell<span class="n">128 → 64 → … → 4 → 2</span></h3>`;
   if (R.start.length === 1) return h + `<p class="note">Its closure meets no other cell, so there is nothing to halve.</p>`;
-  if (!R.steps) return h + `<p class="note">No 16 → 8 → 4 → 2 route from this cell with the current data.</p>`;
+  if (!R.steps) return h + `<p class="note">No 128 → 64 → … → 4 → 2 route from this cell with the current data.</p>`;
   h += `<div class="route-seq">${routeSeqHtml(R, -1)}</div>`;
-  h += `<p class="note">Counts include the cell itself. Each step intersects with the closure of a chosen cell, dividing the count by 16, 8, 4 or 2 in that order (rounded either way); it ends at <span class="math">${cellName(M.cells[R.final])}</span>.</p>`;
+  h += `<p class="note">Counts include the cell itself. Each step intersects with the closure of a chosen cell, dividing the count by a power of 2 from 128 down to 2, never going back up (rounded either way); it ends at <span class="math">${cellName(M.cells[R.final])}</span>.</p>`;
   h += `<button class="icon-btn" data-route="${a}">${S.anim && S.anim.R.a === a ? 'Replay the route' : 'Animate the route'}</button>`;
   return h;
 }
