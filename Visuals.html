@@ -161,6 +161,12 @@ sub, sup { font-size: 0.72em; line-height: 0; }
 .polyview h3 { font-family: var(--math); font-weight: 600; font-size: 18px; margin: 0; }
 .polyview label { font-size: 13.5px; color: var(--graphite); display: inline-flex; gap: 6px; align-items: center; }
 .polyview .note { color: var(--graphite); font-size: 13.5px; max-width: 80ch; margin: 4px 0 12px; }
+.polyview select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 1px 4px; }
+.rtable td.rt { white-space: normal; font-family: var(--ui); font-size: 13px; line-height: 1.9; }
+.rt-step { white-space: nowrap; margin-left: 6px; }
+.rt-d { color: var(--graphite); font-variant-numeric: tabular-nums; }
+.rt-n { display: inline-block; min-width: 22px; text-align: center; border: 1px solid var(--rule); border-radius: 10px; padding: 0 6px; font-weight: 600; font-variant-numeric: tabular-nums; background: var(--paper); }
+.rt-play { padding: 0 8px; }
 .ptable { border-collapse: collapse; font-size: 13.5px; background: var(--surface); }
 .ptable th { text-align: left; font-weight: 500; color: var(--graphite); border-bottom: 1px solid var(--rule); padding: 6px 10px; position: sticky; top: -16px; background: var(--surface); }
 .ptable td { padding: 4px 10px; border-bottom: 1px solid var(--grid); font-family: var(--math); font-size: 14.5px; vertical-align: top; white-space: nowrap; }
@@ -310,7 +316,7 @@ table.chk td.y { color: var(--green); }
         <div class="tabs" role="tablist">
           <button role="tab" id="tab-hasse" aria-selected="true">Diagram</button>
           <button role="tab" id="tab-matrix" aria-selected="false">Matrix</button>
-          <button role="tab" id="tab-poly" aria-selected="false">Polynomials</button>
+          <button role="tab" id="tab-poly" aria-selected="false">Routes</button>
         </div>
         <input id="find" list="labels" placeholder="Go to cell, e.g. 21354" autocomplete="off" aria-label="Go to cell">
         <datalist id="labels"></datalist>
@@ -544,7 +550,7 @@ function smoothness(rowsIn) {
 }
 function theoremHtml(M) {
   const t = smoothness(M.rows);
-  if (t.all) return `<div class="theorem yes"><b>Every component is smooth</b>, since the Jordan type ${t.shape} is ${t.kind} (<a href="${REF_FM}" target="_blank" rel="noopener">Fresse–Melnikov</a>). So every top-dimensional cell has a palindromic Poincaré polynomial, and a search estimate that is not palindromic is off: it counts whole cells the closure only partly meets, or misses some.</div>`;
+  if (t.all) return `<div class="theorem yes"><b>Every component is smooth</b>, since the Jordan type ${t.shape} is ${t.kind} (<a href="${REF_FM}" target="_blank" rel="noopener">Fresse–Melnikov</a>). So every top-dimensional cell has a palindromic Poincaré polynomial.</div>`;
   return `<div class="theorem no"><b>Some component is singular.</b> ${t.shape} is not a hook, two rows, two rows plus one box, or (2,2,2), so by <a href="${REF_FM}" target="_blank" rel="noopener">Fresse–Melnikov</a> it has a singular component, and by <a href="${REF_F}" target="_blank" rel="noopener">Fresse</a> at least one component has a Poincaré polynomial that is not palindromic.${t.twoColumn ? ' For two columns, as here, a component is singular exactly when its Poincaré polynomial is not palindromic.' : ''}</div>`;
 }
 
@@ -908,11 +914,9 @@ function renderStats() {
   renderDimScale();
   M.computeStatus();
   const tops = M.cells.filter(c => c.dim === M.maxDim).map(c => c.i);
-  const palTop = tops.filter(i => isPal(M.meetPoly(i))).length;
   let h = `<dt>Cells</dt><dd>${e.cells.toLocaleString()}</dd>
     <dt>Relations with a curve</dt><dd>${e.edges.toLocaleString()}</dd>
     <dt>Components (top cells)</dt><dd>${tops.length}</dd>
-    <dt>Components with a palindromic estimate</dt><dd>${palTop}</dd>
     <dt>All components smooth (proven)</dt><dd class="${smoothness(M.rows).all ? '' : 'red'}">${smoothness(M.rows).all ? 'yes' : 'no'}</dd>`;
   if (M.rep) {
     const certified = M.cells.filter(c => M.reportFor(c.i) && M.reportFor(c.i).poly);
@@ -1340,42 +1344,69 @@ function setTab(t) {
   $('#hint').textContent = t === 'hasse' ? (S.mode3d ? 'Drag to turn, scroll to zoom. Click a cell, then a cell in its closure to nest' : 'Click a cell, then click inside its closure to nest') : t === 'matrix' ? 'Hover to read a square; click it, or type two cells, to see the answer' : 'Click a cell to open it';
   if (t === 'poly') renderPolyView(); else fitView();
 }
+/* Routes tab: for every cell, the route the 128 → … → 2 rule takes down to one cell. */
+function allRoutes(M) {
+  const pref = S.routePref || 'gradual';
+  if (M._allRoutes && M._allRoutes.pref === pref) return M._allRoutes.list;
+  const list = M.cells.map(c => halvingRoute(M, c.i, pref));
+  M._allRoutes = { pref, list };
+  return list;
+}
 function renderPolyView() {
   const M = S.M, el = $('#polyview'); if (!M) return;
-  const topOnly = S.polyTop !== false;
-  const list = M.cells.filter(c => !topOnly || c.dim === M.maxDim).map(c => c.i);
-  const rows = list.map(i => {
-    const meet = M.meetPoly(i), r = M.reportFor(i);
-    return { i, meet, mv: polyVerdict(meet, false), cert: r && r.poly, cv: r && r.poly ? polyVerdict(r.poly, true) : null };
-  });
-  const estKey = c => { const m = qintFactor(c); return m ? qintKey(m) : isPal(c) ? 'palindromic, not a product of [k]' : 'not palindromic'; };
-  const keyOf = r => r.cv ? (r.cv.cls === 'bad' ? 'singular' : estKey(r.cert)) : estKey(r.meet);
-  rows.sort((a, b) => M.cells[b.i].dim - M.cells[a.i].dim || keyOf(a).localeCompare(keyOf(b)) || a.i - b.i);
-  const tally = new Map(); rows.forEach(r => tally.set(keyOf(r), (tally.get(keyOf(r)) || 0) + 1));
-  const hasRep = !!M.rep;
-  let h = `<div class="pv-head"><h3>${topOnly ? 'Components' : 'All closures'}</h3><label><input type="checkbox" id="pv-top"${topOnly ? ' checked' : ''}> top-dimensional cells only</label></div>`;
-  h += `<p class="note">${hasRep
-    ? 'This Jordan type has an intersection report, so each closure has a certified Poincaré polynomial: the number of affine pieces of each dimension, whole cells and partial intersections. Those are Betti numbers; when they are not palindromic the closure is singular.'
-    : 'Estimate from the search: each cell plus the cells reached by a curve or a chain of curves, counted by dimension. It equals the Poincaré polynomial when the closure is a union of cells; otherwise it can be off, so "not palindromic" here does not mean singular. An intersection report (closure_*.json, from parse_closure_report.py) gives certified polynomials.'}</p>`;
-  h += theoremHtml(M).replace('class="theorem', 'style="max-width:80ch;margin:0 0 12px" class="theorem');
-  h += `<div class="pv-sum">${[...tally.entries()].sort((a, b) => b[1] - a[1]).map(([k, v]) => `<span class="${k === 'singular' ? 'bad' : ''}">${esc(k)} ×${v}</span>`).join('')}</div>`;
-  h += `<table class="ptable"><thead><tr><th>Cell</th><th>dim</th>${hasRep ? '<th>Certified Poincaré polynomial</th><th>Factorization</th>' : ''}<th>Estimate from the search</th><th>Factorization</th></tr></thead><tbody>`;
-  for (const r of rows) {
-    const c = M.cells[r.i];
-    h += `<tr><td><button class="cellbtn" data-cell="${r.i}">${cellName(c)}</button></td><td class="num">${c.dim}</td>`;
-    if (hasRep) h += r.cv ? `<td>${polyHtml(r.cert)}</td><td class="${r.cv.cls}">${r.cv.text}</td>` : '<td>—</td><td></td>';
-    const forced = smoothness(M.rows).all && c.dim === M.maxDim && r.mv.cls === 'bad';
-    h += `<td>${polyHtml(r.meet)}</td><td class="${r.mv.cls === 'ok' ? 'ok' : ''}">${forced ? 'estimate off (smooth, so truly palindromic)' : r.mv.text}</td></tr>`;
+  const topOnly = !!S.routeTop;
+  const R = allRoutes(M);
+  const ids = M.cells.filter(c => !topOnly || c.dim === M.maxDim).map(c => c.i)
+    .sort((a, b) => M.cells[b].dim - M.cells[a].dim || R[b].start.length - R[a].start.length || a - b);
+  const shown = ids.filter(i => R[i].start.length > 1);
+  const none = shown.filter(i => !R[i].steps);
+  const lens = new Map(), divs = new Map();
+  shown.forEach(i => { if (!R[i].steps) return; const L = R[i].steps.length; lens.set(L, (lens.get(L) || 0) + 1); R[i].steps.forEach(st => divs.set(st.d, (divs.get(st.d) || 0) + 1)); });
+  const pref = S.routePref || 'gradual';
+  let h = `<div class="pv-head"><h3>Routes to one cell</h3>
+    <label><input type="checkbox" id="rt-top"${topOnly ? ' checked' : ''}> top-dimensional cells only</label>
+    <label>Route <select id="rt-pref"><option value="gradual"${pref === 'gradual' ? ' selected' : ''}>gradual: halve unless forced</option><option value="short"${pref === 'short' ? ' selected' : ''}>fewest steps</option></select></label>
+    <button class="icon-btn" id="rt-csv" type="button">Download CSV</button></div>`;
+  h += `<p class="note">Start from the cells the closure meets, counting the cell itself. Each step picks a cell in the current set and keeps only what its closure also meets, dividing the count by 128, 64, 32, 16, 8, 4 or 2, rounded either way, never going back up to a larger divisor. The route ends at one cell. Click a cell to open it; ▶ plays the route in the diagram.</p>`;
+  h += `<div class="pv-sum"><span>${shown.length - none.length} of ${shown.length} cells have a route</span>${none.length ? `<span class="bad">no route: ${none.length}</span>` : ''}${[...lens.entries()].sort((a, b) => a[0] - b[0]).map(([k, v]) => `<span>${k} step${k > 1 ? 's' : ''} ×${v}</span>`).join('')}${[...divs.entries()].sort((a, b) => b[0] - a[0]).map(([d, v]) => `<span>÷${d} used ${v}×</span>`).join('')}</div>`;
+  h += `<table class="ptable rtable"><thead><tr><th>Cell</th><th>dim</th><th>cells</th><th>steps</th><th>Route</th><th></th></tr></thead><tbody>`;
+  for (const i of shown) {
+    const c = M.cells[i], r = R[i];
+    h += `<tr><td><button class="cellbtn" data-cell="${i}">${cellName(c)}</button></td><td class="num">${c.dim}</td><td class="num">${r.start.length}</td><td class="num">${r.steps ? r.steps.length : '—'}</td><td class="rt">`;
+    if (!r.steps) h += `<span class="bad">no route with the current data</span>`;
+    else h += `<span class="rt-n">${r.start.length}</span>` + r.steps.map(st => `<span class="rt-step"><span class="rt-d">÷${st.d}</span> ∩ <button class="cellbtn" data-cell="${st.B}" title="intersect with the closure of this cell">${cellName(M.cells[st.B])}</button> <span class="rt-n">${st.to}</span></span>`).join('');
+    h += `</td><td>${r.steps ? `<button class="icon-btn rt-play" data-play="${i}" title="Play this route in the diagram">▶</button>` : ''}</td></tr>`;
   }
+  if (!shown.length) h += `<tr><td colspan="6">No cell here has more than one cell in its closure.</td></tr>`;
   h += `</tbody></table>`;
   el.innerHTML = h;
+}
+function routesCsv() {
+  const M = S.M, R = allRoutes(M);
+  const q = x => /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x;
+  const lines = ['cell,dim,closure_cells,steps,divisors,counts,chosen_cells,final_cell'];
+  M.cells.forEach(c => { const r = R[c.i]; if (r.start.length < 2) return;
+    lines.push([c.label, c.dim, r.start.length, r.steps ? r.steps.length : '', r.steps ? r.steps.map(s => s.d).join(';') : '',
+      r.steps ? [r.start.length, ...r.steps.map(s => s.to)].join(';') : '', r.steps ? r.steps.map(s => M.cells[s.B].label).join(';') : '',
+      r.steps ? M.cells[r.final].label : ''].map(x => q(String(x))).join(',')); });
+  const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `routes_${M.entry.partition}.csv`;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 
 $('#tab-hasse').addEventListener('click', () => setTab('hasse'));
 $('#tab-matrix').addEventListener('click', () => setTab('matrix'));
 $('#tab-poly').addEventListener('click', () => setTab('poly'));
-$('#polyview').addEventListener('change', e => { if (e.target.id === 'pv-top') { S.polyTop = e.target.checked; renderPolyView(); } });
-$('#polyview').addEventListener('click', e => { const b = e.target.closest('[data-cell]'); if (b) select(Number(b.dataset.cell)); });
+$('#polyview').addEventListener('change', e => {
+  if (e.target.id === 'rt-top') { S.routeTop = e.target.checked; renderPolyView(); }
+  if (e.target.id === 'rt-pref') { S.routePref = e.target.value; renderPolyView(); if (S.sel >= 0) renderPanel(); }
+});
+$('#polyview').addEventListener('click', e => {
+  if (e.target.closest('#rt-csv')) { routesCsv(); return; }
+  const pl = e.target.closest('[data-play]');
+  if (pl) { const i = Number(pl.dataset.play); setTab('hasse'); select(i); if (!S.focus) centerOn(i); startRoute(i); return; }
+  const b = e.target.closest('[data-cell]'); if (b) select(Number(b.dataset.cell));
+});
 $('#find').addEventListener('change', e => { const i = findCell(e.target.value); if (i >= 0) { drill(i); if (!S.focus) centerOn(i); e.target.value = ''; } });
 document.addEventListener('keydown', e => {
   if (!S.M || document.activeElement.tagName === 'INPUT') return;
@@ -1718,13 +1749,6 @@ function renderPanel() {
 
   // secondary material, collapsed
   h += `<h3>More about ${cellName(c)}</h3>`;
-  if (rep && rep.poly) {
-    const v = polyVerdict(rep.poly, true);
-    h += `<details class="lvl"><summary><b>Closure polynomial</b> certified${v.cls === 'bad' ? ', singular' : ''}</summary><p class="math" style="margin:6px 0 2px 10px">${polyHtml(rep.poly)}</p><p class="verdict-line ${v.cls}" style="margin-left:10px">${v.cls === 'ok' ? 'Factors as ' + v.text + '.' : v.cls === 'bad' ? 'Singular: ' + v.note + '.' : 'Palindromic, not a product of q-integers.'}</p></details>`;
-  } else {
-    const meet = M.meetPoly(S.sel), v = polyVerdict(meet, false);
-    h += `<details class="lvl"><summary><b>Closure polynomial</b> estimate</summary><p class="math" style="margin:6px 0 2px 10px">${polyHtml(meet)}</p><p class="note" style="margin-left:10px">This cell plus the cells reached by curves or chains, by dimension; exact only when the closure is a union of cells.${c.dim === M.maxDim ? (smoothness(M.rows).all ? ' This closure is an irreducible component of a Jordan type whose components are all smooth (Fresse–Melnikov), so its true Poincaré polynomial is palindromic' + (isPal(meet) ? '.' : '; this estimate is not, so it is off here.') : ' This Jordan type has singular components (Fresse–Melnikov), so a component here can have a non-palindromic polynomial.') : ''}</p></details>`;
-  }
   c.plucker.forEach((vec, k) => {
     const r = k + 1, vals = splitVec(vec), I = subsets(M.n, r);
     const nz = []; vals.forEach((x, j) => { if (x !== '0') nz.push([I[j], x]); });
