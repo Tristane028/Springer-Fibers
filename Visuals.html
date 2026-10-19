@@ -167,6 +167,14 @@ sub, sup { font-size: 0.72em; line-height: 0; }
 .rt-d { color: var(--graphite); font-variant-numeric: tabular-nums; }
 .rt-n { display: inline-block; min-width: 22px; text-align: center; border: 1px solid var(--rule); border-radius: 10px; padding: 0 6px; font-weight: 600; font-variant-numeric: tabular-nums; background: var(--paper); }
 .rt-play { padding: 0 8px; }
+.ptable .cube-row td { white-space: normal; background: var(--paper); }
+.cube-wrap { overflow-x: auto; padding: 6px 0; position: sticky; left: 0; }
+.cube-wrap svg { display: block; margin: 6px 0; }
+.cube-ctl { display: flex; gap: 10px; align-items: center; font-family: var(--ui); font-size: 13.5px; }
+.cube-ctl .bad { color: var(--red); }
+.pieces { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 4px 6px; }
+.piece { font-size: 13px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.piece .pd { color: var(--graphite); font-variant-numeric: tabular-nums; }
 .ptable { border-collapse: collapse; font-size: 13.5px; background: var(--surface); }
 .ptable th { text-align: left; font-weight: 500; color: var(--graphite); border-bottom: 1px solid var(--rule); padding: 6px 10px; position: sticky; top: -16px; background: var(--surface); }
 .ptable td { padding: 4px 10px; border-bottom: 1px solid var(--grid); font-family: var(--math); font-size: 14.5px; vertical-align: top; white-space: nowrap; }
@@ -395,7 +403,7 @@ const splitVec = s => s.replace(/^\[|\]$/g, '').split(' : ');
 function fmtExpr(s) {
   let h = esc(s.trim());
   h = h.replace(/([a-zA-Z])(\d+)/g, '<i>$1</i><sub>$2</sub>');
-  h = h.replace(/\*\*(\d+)/g, '<sup>$1</sup>');
+  h = h.replace(/\*\*(\d+)/g, '<sup>$1</sup>').replace(/\^(\d+)/g, '<sup>$1</sup>');
   h = h.replace(/\*/g, '');
   h = h.replace(/ - /g, ' − ').replace(/^-/, '−').replace(/\(-/g, '(−');
   return h;
@@ -742,8 +750,8 @@ async function discoverFromGitHub() {
   const tree = (await r.json()).tree || [];
   const reports = new Map(), out = [];
   for (const f of tree) {
-    const m = f.type === 'blob' && f.path.match(/(?:^|\/)closure_([^/]+)\.json$/);
-    if (m) reports.set(m[1], f.path);
+    const m = f.type === 'blob' && f.path.match(/(?:^|\/)closure_([^/]+)\.json(\.gz)?$/);
+    if (m && (m[2] || !reports.has(m[1]))) reports.set(m[1], f.path);
   }
   const seen = new Map();
   for (const f of tree) {
@@ -857,7 +865,7 @@ async function showPartition(p, cellLabel) {
       if (entry.report) {
         try {
           const rr = await fetch(entry.report.split('/').map(encodeURIComponent).join('/'));
-          if (rr.ok) S.M.attachReport(await rr.json());
+          if (rr.ok) S.M.attachReport(await readJson(rr));
         } catch (e) { /* the viewer works without the report */ }
       }
     } catch (err) {
@@ -934,15 +942,18 @@ function renderStats() {
     <dt>Components (top cells)</dt><dd>${tops.length}</dd>
     <dt>All components smooth (proven)</dt><dd class="${smoothness(M.rows).all ? '' : 'red'}">${smoothness(M.rows).all ? 'yes' : 'no'}</dd>`;
   if (M.rep) {
-    const certified = M.cells.filter(c => M.reportFor(c.i) && M.reportFor(c.i).poly);
+    const withPoly = M.cells.filter(c => M.reportFor(c.i) && M.reportFor(c.i).poly);
+    const certified = withPoly.filter(c => isCertified(M.reportFor(c.i)));
     const sing = certified.filter(c => !isPal(M.reportFor(c.i).poly));
     const singTop = sing.filter(c => c.dim === M.maxDim).length;
     const extra = [...M.inReport].filter(k => !M.edge.has(k)).length;
-    h += `<dt>Certified closures</dt><dd>${certified.length}</dd>
+    h += `<dt>Closures computed exactly</dt><dd>${withPoly.length}</dd>
+      <dt>Polynomials certified</dt><dd>${certified.length}</dd>
       <dt>Singular closures</dt><dd class="${sing.length ? 'red' : ''}">${sing.length}</dd>
       <dt>Singular components</dt><dd class="${singTop ? 'red' : ''}">${singTop}</dd>
       <dt>Meetings with no curve found</dt><dd>${extra.toLocaleString()}</dd>`;
-  } else {
+  }
+  {
     h += `<dt>Pairs reached only through chains</dt><dd>${M.nChain.toLocaleString()}</dd>
       <dt>Bruhat-below, unresolved</dt><dd class="${M.nMissing ? 'red' : ''}">${M.nMissing.toLocaleString()}</dd>`;
   }
@@ -1384,26 +1395,123 @@ function renderPolyView() {
     <button class="icon-btn" id="rt-csv" type="button">Download CSV</button></div>`;
   h += `<p class="note">Start from the cells the closure meets, counting the cell itself. Each step picks a cell in the current set and keeps only what its closure also meets, dividing the count by 128, 64, 32, 16, 8, 4 or 2, rounded either way, never going back up to a larger divisor. The route ends at one cell. Click a cell to open it; ▶ plays the route in the diagram.</p>`;
   h += `<div class="pv-sum"><span>${shown.length - none.length} of ${shown.length} cells have a route</span>${none.length ? `<span class="bad">no route: ${none.length}</span>` : ''}${[...lens.entries()].sort((a, b) => a[0] - b[0]).map(([k, v]) => `<span>${k} step${k > 1 ? 's' : ''} ×${v}</span>`).join('')}${[...divs.entries()].sort((a, b) => b[0] - a[0]).map(([d, v]) => `<span>÷${d} used ${v}×</span>`).join('')}</div>`;
-  h += `<table class="ptable rtable"><thead><tr><th>Cell</th><th>dim</th><th>cells</th><th>steps</th><th>Route</th><th></th></tr></thead><tbody>`;
+  const cubes = shown.map(i => cubeOf(M, i)).filter(q => q && !q.none);
+  if (cubes.length) h += `<div class="pv-sum"><span>closure = 2<sup>dim</sup> cells, drawn as a cube: ${cubes.length}</span><span>every sub-closure a face: ${cubes.filter(q => q.perfect).length}</span><span>tower routes exist: ${cubes.filter(q => q.towers > 0).length}</span></div>`;
+  h += `<p class="note">⧉ opens a cell's closure as a cube when it meets exactly 2<sup>dim</sup> cells. <b>Towers</b> counts routes in which every step halves and the chosen cell drops exactly one dimension; <b>chains</b> counts all sequences of nested half-size sub-closures, which is dim! when the closure is a perfect cube.</p>`;
+  h += `<table class="ptable rtable"><thead><tr><th>Cell</th><th>dim</th><th>cells</th><th>steps</th><th>Route</th><th></th><th>Cube</th><th>towers</th><th>chains</th></tr></thead><tbody>`;
   for (const i of shown) {
-    const c = M.cells[i], r = R[i];
+    const c = M.cells[i], r = R[i], Q = cubeOf(M, i), cube = Q && !Q.none;
     h += `<tr><td><button class="cellbtn" data-cell="${i}">${cellName(c)}</button></td><td class="num">${c.dim}</td><td class="num">${r.start.length}</td><td class="num">${r.steps ? r.steps.length : '—'}</td><td class="rt">`;
     if (!r.steps) h += `<span class="bad">no route with the current data</span>`;
     else h += `<span class="rt-n">${r.start.length}</span>` + r.steps.map(st => `<span class="rt-step"><span class="rt-d">÷${st.d}</span> ∩ <button class="cellbtn" data-cell="${st.B}" title="intersect with the closure of this cell">${cellName(M.cells[st.B])}</button> <span class="rt-n">${st.to}</span></span>`).join('');
-    h += `</td><td>${r.steps ? `<button class="icon-btn rt-play" data-play="${i}" title="Play this route in the diagram">▶</button>` : ''}</td></tr>`;
+    h += `</td><td>${r.steps ? `<button class="icon-btn rt-play" data-play="${i}" title="Play this route in the diagram">▶</button>` : ''}</td>`;
+    h += cube ? `<td><button class="icon-btn" data-cube="${i}" aria-expanded="${S.cubeOpen === i}" title="Draw this closure as a ${Q.d}-cube">⧉ ${Q.perfect ? '' : '<span class="bad">*</span>'}</button></td><td class="num">${Q.towers}</td><td class="num">${Q.chains}${Q.chains === fact(Q.d) ? '' : ` <span class="bad" title="a perfect cube has ${fact(Q.d)}">≠${fact(Q.d)}</span>`}</td>` : `<td></td><td></td><td></td>`;
+    h += `</tr>`;
+    if (cube && S.cubeOpen === i) h += `<tr class="cube-row"><td colspan="9">${cubeDetail(M, i, Math.max(300, el.clientWidth - 60))}</td></tr>`;
   }
-  if (!shown.length) h += `<tr><td colspan="6">No cell here has more than one cell in its closure.</td></tr>`;
+  if (!shown.length) h += `<tr><td colspan="9">No cell here has more than one cell in its closure.</td></tr>`;
   h += `</tbody></table>`;
   el.innerHTML = h;
+  el.querySelectorAll('.cube-wrap').forEach(w => { w.style.maxWidth = Math.max(300, el.clientWidth - 60) + 'px'; });
+}
+/* Cube view. When the closure of A meets exactly 2^d cells (d = dim A), look at the
+   sub-closures S ∩ clo(B) of size 2^(d-1): in every two-row case there are exactly d of
+   them, and "which ones does a cell avoid" gives it a code in {0,1}^d with A = 11…1.
+   The cube is "perfect" when every sub-closure S ∩ clo(B) is the face {c : code c ≤ code B}. */
+const popc = x => { let n = 0; while (x) { n += x & 1; x >>= 1; } return n; };
+function cubeOf(M, a) {
+  M._cube = M._cube || new Map();
+  if (M._cube.has(a)) return M._cube.get(a);
+  let out = null;
+  const S = [...closedSet(M, a)].sort((x, y) => x - y), d = M.cells[a].dim, n = S.length;
+  if (d >= 1 && d <= 7 && n === 1 << d) {
+    const sub = b => { const cb = closedSet(M, b); return S.filter(x => cb.has(x)); };
+    const seen = new Map();
+    for (const b of S) { const T = sub(b); if (T.length === n / 2) { const k = T.join(','); if (!seen.has(k)) seen.set(k, { T: new Set(T), gen: b }); } }
+    const facets = [...seen.values()].sort((x, y) => M.cells[y.gen].dim - M.cells[x.gen].dim || x.gen - y.gen);
+    let pick = null;
+    const tryCombo = cmb => { const codes = new Map(); for (const c of S) { let v = 0; cmb.forEach((F, i) => { if (!F.T.has(c)) v |= 1 << i; }); codes.set(c, v); } return new Set(codes.values()).size === n ? codes : null; };
+    if (facets.length >= d && facets.length <= 14) {
+      const idx = [...Array(d).keys()];
+      while (true) {
+        const codes = tryCombo(idx.map(i => facets[i])); if (codes) { pick = { gens: idx.map(i => facets[i].gen), codes }; break; }
+        let i = d - 1; while (i >= 0 && idx[i] === facets.length - d + i) i--; if (i < 0) break;
+        idx[i]++; for (let j = i + 1; j < d; j++) idx[j] = idx[j - 1] + 1;
+      }
+    }
+    if (pick) {
+      const byCode = new Array(n); pick.codes.forEach((v, c) => { byCode[v] = c; });
+      let perfect = true;
+      for (const b of S) { const vb = pick.codes.get(b), T = sub(b); if (T.length !== 1 << popc(vb) || T.some(c => (pick.codes.get(c) & ~vb) !== 0)) { perfect = false; break; } }
+      // tower routes: each step halves and the chosen cell drops one dimension
+      const memo = new Map();
+      const tower = (cur, prev) => { if (cur.length === 1) return 1; const k = prev + ':' + cur.length; if (memo.has(k)) return memo.get(k);
+        let t = 0; const want = M.cells[prev].dim - 1;
+        for (const B of cur) { if (M.cells[B].dim !== want) continue; const cb = closedSet(M, B), nx = cur.filter(x => cb.has(x)); if (nx.length * 2 === cur.length) t += tower(nx, B); }
+        memo.set(k, t); return t; };
+      // halving chains: distinct nested sub-closures, each half the last (d! in a perfect cube)
+      const memo2 = new Map();
+      const chains = cur => { if (cur.length === 1) return 1; const k = cur.join(','); if (memo2.has(k)) return memo2.get(k);
+        const nxs = new Map(); for (const B of cur) { const cb = closedSet(M, B), nx = cur.filter(x => cb.has(x)); if (nx.length * 2 === cur.length) nxs.set(nx.join(','), nx); }
+        let t = 0; nxs.forEach(nx => { t += chains(nx); }); memo2.set(k, t); return t; };
+      out = { d, S, gens: pick.gens, codes: pick.codes, byCode, perfect, towers: tower(S, a), chains: chains(S),
+              dimOff: S.filter(c => M.cells[c].dim !== popc(pick.codes.get(c))).length };
+    } else out = { d, S, none: true };
+  }
+  M._cube.set(a, out); return out;
+}
+const fact = k => k <= 1 ? 1 : k * fact(k - 1);
+function cubeSvg(M, a, step, avail = 900) {
+  const Q = cubeOf(M, a), d = Q.d, n = 1 << d, R = halvingRoute(M, a);
+  const sets = R.steps ? [new Set(R.start), ...R.steps.map(s => new Set(s.set))] : [new Set(R.start)];
+  const k = Math.max(0, Math.min(step, sets.length - 1)), cur = sets[k], chosen = k > 0 ? R.steps[k - 1].B : -1;
+  const levels = Array.from({ length: d + 1 }, () => []);
+  for (let v = 0; v < n; v++) levels[popc(v)].push(v);
+  const wide = Math.max(...levels.map(l => l.length));
+  const nameW = Math.max(70, 9 + 7.4 * Math.max(...Q.S.map(c => wordText(M.cells[c].word).length)));
+  // names when they fit, else just the binary codes, else dots (hover or click a dot for its cell)
+  const mode = wide * nameW + 40 <= avail ? 2 : wide * (8 * d + 14) + 40 <= avail ? 1 : 0, labels = mode === 2;
+  const colW = mode === 2 ? nameW : mode === 1 ? 8 * d + 14 : Math.max(22, (avail - 40) / wide), rowH = mode ? 74 : 56;
+  const W = Math.max(320, wide * colW + 40), H = d * rowH + 70;
+  const pos = new Array(n);
+  levels.forEach((l, lv) => l.forEach((v, j) => { pos[v] = [W / 2 + (j - (l.length - 1) / 2) * colW, 30 + (d - lv) * rowH]; }));
+  let s = `<svg class="cube" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Closure drawn as a ${d}-cube">`;
+  for (let v = 0; v < n; v++) for (let b = 0; b < d; b++) if (v & (1 << b)) {
+    const u = v ^ (1 << b), on = cur.has(Q.byCode[v]) && cur.has(Q.byCode[u]);
+    s += `<line x1="${pos[v][0]}" y1="${pos[v][1]}" x2="${pos[u][0]}" y2="${pos[u][1]}" style="stroke:${on ? 'var(--graphite)' : 'var(--rule)'};stroke-width:${on ? 1.6 : 1};opacity:${on ? 0.9 : 0.45}"/>`;
+  }
+  for (let v = 0; v < n; v++) {
+    const c = Q.byCode[v], cell = M.cells[c], on = cur.has(c), off = cell.dim !== popc(v), [x, y] = pos[v];
+    const name = wordText(cell.word);
+    s += `<g class="cv" data-cell="${c}" style="cursor:pointer;opacity:${on ? 1 : 0.2}"><title>C${name} · dim ${cell.dim} · code ${v.toString(2).padStart(d, '0')}${off ? ' · dimension differs from its cube level' : ''}</title>`;
+    if (c === chosen) s += `<circle cx="${x}" cy="${y}" r="13" style="fill:none;stroke:var(--ink);stroke-width:2"/>`;
+    s += `<circle cx="${x}" cy="${y}" r="8" style="fill:${dimColor(cell.dim)};stroke:var(--paper);stroke-width:2"/>`;
+    if (off) s += `<circle cx="${x}" cy="${y}" r="10.5" style="fill:none;stroke:var(--ink);stroke-width:1;stroke-dasharray:2 2"/>`;
+    if (labels) s += `<text x="${x}" y="${y + 26}" text-anchor="middle" style="font:12px var(--math);fill:var(--ink)">${name}</text>`;
+    if (mode) s += `<text x="${x}" y="${y + (labels ? 39 : 26)}" text-anchor="middle" style="font:10px var(--ui);fill:var(--graphite)">${v.toString(2).padStart(d, '0')}</text>`;
+    s += `</g>`;
+  }
+  return s + `</svg>`;
+}
+function cubeDetail(M, a, avail) {
+  const Q = cubeOf(M, a), R = halvingRoute(M, a), L = R.steps ? R.steps.length : 0, k = Math.max(0, Math.min(S.cubeStep || 0, L));
+  const isFace = set => { let top = 0; set.forEach(c => { top |= Q.codes.get(c); }); return set.size === 1 << popc(top) && [...set].every(c => (Q.codes.get(c) & ~top) === 0); };
+  const faces = R.steps ? R.steps.map(st => isFace(new Set(st.set))) : [];
+  let h = `<div class="cube-wrap"><div class="cube-ctl"><button class="icon-btn" data-cstep="${k - 1}" ${k ? '' : 'disabled'}>◀</button>
+    <span>step ${k} of ${L}: ${k ? `÷${R.steps[k - 1].d} ∩ closure of ${cellName(M.cells[R.steps[k - 1].B])} → ${R.steps[k - 1].to} cell${R.steps[k - 1].to > 1 ? 's' : ''}${faces[k - 1] ? ' (a face of the cube)' : ' (<span class="bad">not a face</span>)'}` : `all ${1 << Q.d} cells of the closure`}</span>
+    <button class="icon-btn" data-cstep="${k + 1}" ${k < L ? '' : 'disabled'}>▶</button></div>`;
+  h += cubeSvg(M, a, k, avail);
+  h += `<p class="note">Axis <i>i</i> = 1 when a cell lies outside the closure of ${Q.gens.map((g, i) => `${cellName(M.cells[g])}<sub style="font-family:var(--ui)">(${i + 1})</sub>`).join(', ')} (the ${Q.d} half-size sub-closures, read right to left in the code). Rows are cube levels: the number of 1s. Colour is the cell's dimension; a dashed ring marks a cell whose dimension differs from its level (${Q.dimOff} of ${1 << Q.d}). The ring shows the cell chosen at this step; faded cells have been cut away. ${Q.perfect ? 'Every sub-closure here is a face of the cube.' : '<span class="bad">Some sub-closures here are not faces of the cube.</span>'}</p></div>`;
+  return h;
 }
 function routesCsv() {
   const M = S.M, R = allRoutes(M);
   const q = x => /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x;
-  const lines = ['cell,dim,closure_cells,steps,divisors,counts,chosen_cells,final_cell'];
+  const lines = ['cell,dim,closure_cells,steps,divisors,counts,chosen_cells,final_cell,cube,perfect_cube,tower_routes,halving_chains'];
   M.cells.forEach(c => { const r = R[c.i]; if (r.start.length < 2) return;
     lines.push([c.label, c.dim, r.start.length, r.steps ? r.steps.length : '', r.steps ? r.steps.map(s => s.d).join(';') : '',
       r.steps ? [r.start.length, ...r.steps.map(s => s.to)].join(';') : '', r.steps ? r.steps.map(s => M.cells[s.B].label).join(';') : '',
-      r.steps ? M.cells[r.final].label : ''].map(x => q(String(x))).join(',')); });
+      r.steps ? M.cells[r.final].label : '', ...((Q => Q && !Q.none ? ['yes', Q.perfect ? 'yes' : 'no', Q.towers, Q.chains] : ['', '', '', ''])(cubeOf(M, c.i)))].map(x => q(String(x))).join(',')); });
   const blob = new Blob([lines.join('\n') + '\n'], { type: 'text/csv' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `routes_${M.entry.partition}.csv`;
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
@@ -1418,6 +1526,10 @@ $('#polyview').addEventListener('change', e => {
 });
 $('#polyview').addEventListener('click', e => {
   if (e.target.closest('#rt-csv')) { routesCsv(); return; }
+  const cb = e.target.closest('[data-cube]');
+  if (cb) { const i = Number(cb.dataset.cube); S.cubeOpen = S.cubeOpen === i ? -1 : i; S.cubeStep = 0; const y = $('#polyview').scrollTop; renderPolyView(); $('#polyview').scrollTop = y; return; }
+  const cs = e.target.closest('[data-cstep]');
+  if (cs) { S.cubeStep = Number(cs.dataset.cstep); const y = $('#polyview').scrollTop; renderPolyView(); $('#polyview').scrollTop = y; return; }
   const pl = e.target.closest('[data-play]');
   if (pl) { const i = Number(pl.dataset.play); setTab('hasse'); select(i); if (!S.focus) centerOn(i); startRoute(i); return; }
   const b = e.target.closest('[data-cell]'); if (b) select(Number(b.dataset.cell));
@@ -1662,6 +1774,29 @@ $('#animbar').addEventListener('click', e => {
 });
 $('#animbar').addEventListener('change', e => { if (e.target.id === 'ab-pref' && S.anim) { S.routePref = e.target.value; const a = S.anim.R.a; startRoute(a); renderPanel(); } });
 $('#routebtn').addEventListener('click', () => { if (S.anim) stopRoute(); else if (S.sel >= 0) startRoute(S.sel); });
+/* Ideals from the Gröbner computation name the target cell's free variables
+   b1, b2, … in order; they are the same variables as the cell's a's (checked
+   against the Sage script for 322, 333 and 532), so show them as a's. */
+const idealInA = (M, t, ideal) => { const fr = M.cells[t].free || []; return String(ideal || '').replace(/\bb(\d+)\b/g, (m, k) => fr[Number(k) - 1] || m); };
+const isCertified = r => !!r && !!r.poly && !/not certified|incomplete/i.test(r.status || '');
+/* Exact closure from the Gröbner computation (closure_<p>.json): the pieces
+   closure(C_a) ∩ C_t and the polynomial sum of q^dim over them. */
+function exactPanelHtml(M, a) {
+  const r = M.reportFor(a); if (!r || !r.poly) return '';
+  const cert = isCertified(r), v = polyVerdict(r.poly, cert);
+  const pieces = (r.pieces || []).filter(p => M.idx.has(p.cell));
+  const full = pieces.filter(p => p.kind === 'full'), part = pieces.filter(p => p.kind !== 'full');
+  let h = `<h3>Closure polynomial<span class="n">${cert ? 'certified' : 'not certified'}</span></h3>`;
+  h += `<p class="math" style="margin:4px 0 2px">${polyHtml(r.poly)}</p>`;
+  h += `<p class="verdict-line ${cert ? v.cls : ''}">${cert ? (v.cls === 'ok' ? 'Factors as ' + v.text + '.' : v.cls === 'bad' ? 'Not palindromic, so this closure is singular.' : 'Palindromic, not a product of q-integers.') : 'Some pieces are not shown to be affine spaces, so this counts pieces by dimension but may not be a Poincaré polynomial.'}</p>`;
+  h += `<p class="note">One term q<sup>k</sup> for each cell the closure meets, with k the dimension of the piece it meets: ${full.length} whole cell${full.length === 1 ? '' : 's'} and ${part.length} partial piece${part.length === 1 ? '' : 's'}. A partial piece is that cell's own free parameters with some of them solved in terms of the others; k is the number left free.</p>`;
+  if (part.length) {
+    const byDrop = part.slice().sort((x, y) => (y.cellDim - y.dim) - (x.cellDim - x.dim) || y.dim - x.dim);
+    h += `<details class="lvl"><summary><b>Partial pieces</b> ${part.length}</summary><div class="pieces">${byDrop.map(p => { const t = M.idx.get(p.cell);
+      return `<div class="piece"><button class="chip direct" data-c="${t}">${dimDot(M.cells[t].dim)}${cellName(M.cells[t])}</button> <span class="pd">dim ${p.dim} of ${p.cellDim ?? M.cells[t].dim}</span> <span class="math">${fmtExpr(idealInA(M, t, p.ideal))}</span></div>`; }).join('')}</div></details>`;
+  }
+  return h;
+}
 function routePanelHtml(M, a) {
   const R = halvingRoute(M, a);
   let h = `<h3>Route to one cell<span class="n">128 → 64 → … → 4 → 2</span></h3>`;
@@ -1739,7 +1874,7 @@ function renderPanel() {
   const freeTxt = c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'none';
   let h = `<h2>${cellName(c)}</h2><p class="sub">Dimension ${c.dim}${c.dim === M.maxDim ? ' (its closure is an irreducible component)' : ''}. Free parameters: <span class="math">${freeTxt}</span></p>`;
   h += `<div class="fill">${fillingSvg(c, M.rows)}</div>`;
-  if (depth === 1) h += routePanelHtml(M, S.sel);
+  if (depth === 1) h += exactPanelHtml(M, S.sel) + routePanelHtml(M, S.sel);
 
   // nested intersection: the formula, then what it contains
   h += `<h3>${depth > 1 ? 'Nested intersection' : 'Cells its closure meets'}<span class="n">${nested.length}</span></h3>`;
@@ -1779,7 +1914,7 @@ function showStep(a, b, scroll = true) {
   const M = S.M, box = $('#relbox'); if (!box) return;
   const r = M.reportFor(a), pc = r ? (r.pieces || []).find(x => x.cell === M.cells[b].label) : null;
   let h = `<div class="rel"><h4>Last step: the closure of ${cellName(M.cells[a])} meets ${cellName(M.cells[b])}</h4>`;
-  if (pc) h += `<p class="note">Intersection report: ${pc.kind === 'full' ? `the whole cell (dimension ${pc.dim}) lies in the closure.` : `a piece of dimension ${pc.dim} of this ${pc.cellDim}-dimensional cell, cut out by <span class="math">${fmtExpr(pc.ideal)}</span>.`}</p>`;
+  if (pc) h += `<p class="note">Intersection report: ${pc.kind === 'full' ? `the whole cell (dimension ${pc.dim}) lies in the closure.` : `a piece of dimension ${pc.dim} of this ${pc.cellDim}-dimensional cell, cut out by <span class="math">${fmtExpr(idealInA(M, b, pc.ideal))}</span> in its free parameters.`}</p>`;
   h += M.edge.has(a * M.N + b) ? `<div id="witness"></div>` : `<p class="note">No curve in the search grid reaches it; the report settles it.</p>`;
   box.innerHTML = h + `</div>`;
   if (M.edge.has(a * M.N + b)) renderWitness(a, b, $('#witness'));
@@ -1812,7 +1947,7 @@ function openRelation(t) {
   const describe = (a, b) => {   // closure of a meets cell b
     let h = `<div class="rel"><h4>The closure of ${cellName(M.cells[a])} meets ${cellName(M.cells[b])}</h4>${go}`;
     const pc = piece(a, b);
-    if (pc) h += `<p class="note">Intersection report: ${pc.kind === 'full' ? `the whole cell (dimension ${pc.dim}) lies in the closure.` : `a piece of dimension ${pc.dim} of this ${pc.cellDim}-dimensional cell, cut out by <span class="math">${fmtExpr(pc.ideal)}</span>.`}</p>`;
+    if (pc) h += `<p class="note">Intersection report: ${pc.kind === 'full' ? `the whole cell (dimension ${pc.dim}) lies in the closure.` : `a piece of dimension ${pc.dim} of this ${pc.cellDim}-dimensional cell, cut out by <span class="math">${fmtExpr(idealInA(M, b, pc.ideal))}</span> in its free parameters.`}</p>`;
     if (M.edge.has(a * M.N + b)) h += `<div id="witness"></div>`;
     else h += `<p class="note">No curve in the search grid reaches it; the report settles it.</p>`;
     return h + `</div>`;
