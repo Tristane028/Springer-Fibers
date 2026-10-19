@@ -172,6 +172,9 @@ sub, sup { font-size: 0.72em; line-height: 0; }
 .cube-wrap svg { display: block; margin: 6px 0; }
 .cube-ctl { display: flex; gap: 10px; align-items: center; font-family: var(--ui); font-size: 13.5px; }
 .cube-ctl .bad { color: var(--red); }
+.cube-ctl .seg { display: inline-flex; gap: 0; margin-left: 12px; }
+.cube-ctl .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.cube-btn { padding: 1px 8px; white-space: nowrap; }
 .pieces { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 4px 6px; }
 .piece { font-size: 13px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .piece .pd { color: var(--graphite); font-variant-numeric: tabular-nums; }
@@ -1398,14 +1401,15 @@ function renderPolyView() {
   const cubes = shown.map(i => cubeOf(M, i)).filter(q => q && !q.none);
   if (cubes.length) h += `<div class="pv-sum"><span>closure = 2<sup>dim</sup> cells, drawn as a cube: ${cubes.length}</span><span>every sub-closure a face: ${cubes.filter(q => q.perfect).length}</span><span>tower routes exist: ${cubes.filter(q => q.towers > 0).length}</span></div>`;
   h += `<p class="note">⧉ opens a cell's closure as a cube when it meets exactly 2<sup>dim</sup> cells. <b>Towers</b> counts routes in which every step halves and the chosen cell drops exactly one dimension; <b>chains</b> counts all sequences of nested half-size sub-closures, which is dim! when the closure is a perfect cube.</p>`;
-  h += `<table class="ptable rtable"><thead><tr><th>Cell</th><th>dim</th><th>cells</th><th>steps</th><th>Route</th><th></th><th>Cube</th><th>towers</th><th>chains</th></tr></thead><tbody>`;
+  h += `<table class="ptable rtable"><thead><tr><th>Cell</th><th>dim</th><th>cells</th><th>steps</th><th>Cube</th><th>towers</th><th>chains</th><th>Route</th><th></th></tr></thead><tbody>`;
   for (const i of shown) {
     const c = M.cells[i], r = R[i], Q = cubeOf(M, i), cube = Q && !Q.none;
-    h += `<tr><td><button class="cellbtn" data-cell="${i}">${cellName(c)}</button></td><td class="num">${c.dim}</td><td class="num">${r.start.length}</td><td class="num">${r.steps ? r.steps.length : '—'}</td><td class="rt">`;
+    h += `<tr><td><button class="cellbtn" data-cell="${i}">${cellName(c)}</button></td><td class="num">${c.dim}</td><td class="num">${r.start.length}</td><td class="num">${r.steps ? r.steps.length : '—'}</td>`;
+    h += cube ? `<td><button class="icon-btn cube-btn" data-cube="${i}" aria-expanded="${S.cubeOpen === i}" title="Draw this closure as a ${Q.d}-cube">⧉ cube${Q.perfect ? '' : ' <span class="bad">*</span>'}</button></td><td class="num">${Q.towers}</td><td class="num">${Q.chains}${Q.chains === fact(Q.d) ? '' : ` <span class="bad" title="a perfect cube has ${fact(Q.d)}">≠${fact(Q.d)}</span>`}</td>` : `<td></td><td></td><td></td>`;
+    h += `<td class="rt">`;
     if (!r.steps) h += `<span class="bad">no route with the current data</span>`;
     else h += `<span class="rt-n">${r.start.length}</span>` + r.steps.map(st => `<span class="rt-step"><span class="rt-d">÷${st.d}</span> ∩ <button class="cellbtn" data-cell="${st.B}" title="intersect with the closure of this cell">${cellName(M.cells[st.B])}</button> <span class="rt-n">${st.to}</span></span>`).join('');
     h += `</td><td>${r.steps ? `<button class="icon-btn rt-play" data-play="${i}" title="Play this route in the diagram">▶</button>` : ''}</td>`;
-    h += cube ? `<td><button class="icon-btn" data-cube="${i}" aria-expanded="${S.cubeOpen === i}" title="Draw this closure as a ${Q.d}-cube">⧉ ${Q.perfect ? '' : '<span class="bad">*</span>'}</button></td><td class="num">${Q.towers}</td><td class="num">${Q.chains}${Q.chains === fact(Q.d) ? '' : ` <span class="bad" title="a perfect cube has ${fact(Q.d)}">≠${fact(Q.d)}</span>`}</td>` : `<td></td><td></td><td></td>`;
     h += `</tr>`;
     if (cube && S.cubeOpen === i) h += `<tr class="cube-row"><td colspan="9">${cubeDetail(M, i, Math.max(300, el.clientWidth - 60))}</td></tr>`;
   }
@@ -1468,13 +1472,37 @@ function cubeSvg(M, a, step, avail = 900) {
   const levels = Array.from({ length: d + 1 }, () => []);
   for (let v = 0; v < n; v++) levels[popc(v)].push(v);
   const wide = Math.max(...levels.map(l => l.length));
-  const nameW = Math.max(70, 9 + 7.4 * Math.max(...Q.S.map(c => wordText(M.cells[c].word).length)));
-  // names when they fit, else just the binary codes, else dots (hover or click a dot for its cell)
-  const mode = wide * nameW + 40 <= avail ? 2 : wide * (8 * d + 14) + 40 <= avail ? 1 : 0, labels = mode === 2;
-  const colW = mode === 2 ? nameW : mode === 1 ? 8 * d + 14 : Math.max(22, (avail - 40) / wide), rowH = mode ? 74 : 56;
-  const W = Math.max(320, wide * colW + 40), H = d * rowH + 70;
+  const nameW = Math.max(70, 9 + 7.4 * Math.max(...Q.S.map(c => wordText(M.cells[c].word).length))), codeW = 8 * d + 14;
   const pos = new Array(n);
-  levels.forEach((l, lv) => l.forEach((v, j) => { pos[v] = [W / 2 + (j - (l.length - 1) / 2) * colW, 30 + (d - lv) * rowH]; }));
+  let W, H, mode;
+  if ((S.cubeLayout || 'level') === 'box') {
+    // the familiar picture: a square, a cube in oblique perspective, a cube inside a cube (d = 4),
+    // two of those side by side (d = 5), then stacked (d = 6) and repeated (d = 7)
+    const ax = [[1, 0], [0, -1], [0.65, -0.3]], c3 = [0.825, -0.65], sc = 0.35;   // chosen so no corner sits on another corner or edge
+    const unit = v => {
+      let x = 0, y = 0;
+      for (let b = 0; b < Math.min(d, 3); b++) if (v & (1 << b)) { x += ax[b][0]; y += ax[b][1]; }
+      if (d >= 4 && v & 8) { x = c3[0] + sc * (x - c3[0]); y = c3[1] + sc * (y - c3[1]); }
+      if (v & 16) { x += 2.3; y += 0.3; } if (v & 32) { y += 2.1; x += 0.3; } if (v & 64) x += 5.0;
+      return [x, y];
+    };
+    const U = Array.from({ length: n }, (_, v) => unit(v));
+    const xs = U.map(u => u[0]), ys = U.map(u => u[1]), x0 = Math.min(...xs), y0 = Math.min(...ys);
+    const spanX = Math.max(...xs) - x0 || 1, spanY = Math.max(...ys) - y0 || 1;
+    const L = Math.max(60, Math.min(d <= 3 ? 230 : 300, (avail - 90) / spanX));
+    // the shortest edge on screen bounds what labels fit
+    const short = L * (d >= 4 ? 0.25 : 0.7);
+    mode = nameW <= short * 1.6 ? 2 : codeW <= short * 1.6 ? 1 : 0;
+    W = Math.max(320, spanX * L + 90); H = spanY * L + 80;
+    U.forEach((u, v) => { pos[v] = [45 + (u[0] - x0) * L, 30 + (u[1] - y0) * L]; });
+  } else {
+    // names when they fit, else just the binary codes, else dots (hover or click a dot for its cell)
+    mode = wide * nameW + 40 <= avail ? 2 : wide * codeW + 40 <= avail ? 1 : 0;
+    const colW = mode === 2 ? nameW : mode === 1 ? codeW : Math.max(22, (avail - 40) / wide), rowH = mode ? 74 : 56;
+    W = Math.max(320, wide * colW + 40); H = d * rowH + 70;
+    levels.forEach((l, lv) => l.forEach((v, j) => { pos[v] = [W / 2 + (j - (l.length - 1) / 2) * colW, 30 + (d - lv) * rowH]; }));
+  }
+  const labels = mode === 2;
   let s = `<svg class="cube" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Closure drawn as a ${d}-cube">`;
   for (let v = 0; v < n; v++) for (let b = 0; b < d; b++) if (v & (1 << b)) {
     const u = v ^ (1 << b), on = cur.has(Q.byCode[v]) && cur.has(Q.byCode[u]);
@@ -1499,9 +1527,10 @@ function cubeDetail(M, a, avail) {
   const faces = R.steps ? R.steps.map(st => isFace(new Set(st.set))) : [];
   let h = `<div class="cube-wrap"><div class="cube-ctl"><button class="icon-btn" data-cstep="${k - 1}" ${k ? '' : 'disabled'}>◀</button>
     <span>step ${k} of ${L}: ${k ? `÷${R.steps[k - 1].d} ∩ closure of ${cellName(M.cells[R.steps[k - 1].B])} → ${R.steps[k - 1].to} cell${R.steps[k - 1].to > 1 ? 's' : ''}${faces[k - 1] ? ' (a face of the cube)' : ' (<span class="bad">not a face</span>)'}` : `all ${1 << Q.d} cells of the closure`}</span>
-    <button class="icon-btn" data-cstep="${k + 1}" ${k < L ? '' : 'disabled'}>▶</button></div>`;
+    <button class="icon-btn" data-cstep="${k + 1}" ${k < L ? '' : 'disabled'}>▶</button>
+    <span class="seg" role="group" aria-label="Cube layout"><button class="icon-btn" data-clayout="level" aria-pressed="${(S.cubeLayout || 'level') === 'level'}">by level</button><button class="icon-btn" data-clayout="box" aria-pressed="${S.cubeLayout === 'box'}">box</button></span></div>`;
   h += cubeSvg(M, a, k, avail);
-  h += `<p class="note">Axis <i>i</i> = 1 when a cell lies outside the closure of ${Q.gens.map((g, i) => `${cellName(M.cells[g])}<sub style="font-family:var(--ui)">(${i + 1})</sub>`).join(', ')} (the ${Q.d} half-size sub-closures, read right to left in the code). Rows are cube levels: the number of 1s. Colour is the cell's dimension; a dashed ring marks a cell whose dimension differs from its level (${Q.dimOff} of ${1 << Q.d}). The ring shows the cell chosen at this step; faded cells have been cut away. ${Q.perfect ? 'Every sub-closure here is a face of the cube.' : '<span class="bad">Some sub-closures here are not faces of the cube.</span>'}</p></div>`;
+  h += `<p class="note">Axis <i>i</i> = 1 when a cell lies outside the closure of ${Q.gens.map((g, i) => `${cellName(M.cells[g])}<sub style="font-family:var(--ui)">(${i + 1})</sub>`).join(', ')} (the ${Q.d} half-size sub-closures, read right to left in the code). ${S.cubeLayout === 'box' ? (Q.d >= 4 ? 'Box layout: axes 1–3 draw a cube, axis 4 is the inner cube (a tesseract), axis 5 a second copy beside it.' : 'Box layout: axis 1 runs across, axis 2 up, axis 3 into the page.') : 'Rows are cube levels: the number of 1s.'} Colour is the cell's dimension; a dashed ring marks a cell whose dimension differs from its level (${Q.dimOff} of ${1 << Q.d}). The ring shows the cell chosen at this step; faded cells have been cut away. ${Q.perfect ? 'Every sub-closure here is a face of the cube.' : '<span class="bad">Some sub-closures here are not faces of the cube.</span>'}</p></div>`;
   return h;
 }
 function routesCsv() {
@@ -1528,6 +1557,8 @@ $('#polyview').addEventListener('click', e => {
   if (e.target.closest('#rt-csv')) { routesCsv(); return; }
   const cb = e.target.closest('[data-cube]');
   if (cb) { const i = Number(cb.dataset.cube); S.cubeOpen = S.cubeOpen === i ? -1 : i; S.cubeStep = 0; const y = $('#polyview').scrollTop; renderPolyView(); $('#polyview').scrollTop = y; return; }
+  const cl = e.target.closest('[data-clayout]');
+  if (cl) { S.cubeLayout = cl.dataset.clayout; const y = $('#polyview').scrollTop; renderPolyView(); $('#polyview').scrollTop = y; return; }
   const cs = e.target.closest('[data-cstep]');
   if (cs) { S.cubeStep = Number(cs.dataset.cstep); const y = $('#polyview').scrollTop; renderPolyView(); $('#polyview').scrollTop = y; return; }
   const pl = e.target.closest('[data-play]');
@@ -1805,6 +1836,7 @@ function routePanelHtml(M, a) {
   h += `<div class="route-seq">${routeSeqHtml(R, -1)}</div>`;
   h += `<p class="note">Counts include the cell itself. Each step intersects with the closure of a chosen cell, dividing the count by a power of 2 from 128 down to 2, never going back up (rounded either way); it ends at <span class="math">${cellName(M.cells[R.final])}</span>.</p>`;
   h += `<button class="icon-btn" data-route="${a}">${S.anim && S.anim.R.a === a ? 'Replay the route' : 'Animate the route'}</button>`;
+  { const Q = cubeOf(S.M, a); if (Q && !Q.none) h += ` <button class="icon-btn" data-cubeview="${a}" title="Open the Routes tab with this closure drawn as a ${Q.d}-cube">View closure as a cube</button>`; }
   return h;
 }
 /* Nested intersection. closureOf(c) = the cells the closure of C_c meets (a curve
@@ -1924,6 +1956,9 @@ function showStep(a, b, scroll = true) {
 $('#panel').addEventListener('click', e => {
   const ro = e.target.closest('[data-route]');
   if (ro) { startRoute(Number(ro.dataset.route)); return; }
+  const cv = e.target.closest('[data-cubeview]');
+  if (cv) { const a = Number(cv.dataset.cubeview); S.cubeOpen = a; S.cubeStep = 0; if (S.routeTop && S.M.cells[a].dim !== S.M.maxDim) S.routeTop = false;
+    setTab('poly'); const b = $(`#polyview [data-cube="${a}"]`); if (b) b.closest('tr').scrollIntoView({ block: 'start' }); return; }
   const n = e.target.closest('[data-nest]');
   if (n) { drill(Number(n.dataset.nest)); return; }
   const pp = e.target.closest('[data-pop]');
