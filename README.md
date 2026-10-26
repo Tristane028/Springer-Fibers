@@ -19,7 +19,7 @@ This project studies the geometry and combinatorics of Springer fibers in type A
 
 The repository holds four things:
 
-- **Closure data** for 94 Jordan types (two, three and four rows, up to n = 10), with an explicit witness curve for every relation.
+- **Closure data** for 99 Jordan types (two, three and four rows, up to n = 10; a 100th, (2,3,5), is still running), with an explicit witness curve for every relation.
 - **An interactive viewer** for exploring that data: the closure diagram in 3D, nested intersections, a searchable relation matrix, and "halving routes" that walk a closure down to a single cell.
 - **The computation script**, rewritten to be fast enough for (3,3,3) and the larger three- and four-row cases.
 - **Working notes** developing the ideal-theoretic method for computing an intersection exactly.
@@ -66,7 +66,7 @@ Each `data_<partition>.json` contains:
 | `edges[]` | one closure relation each: `src`, `tgt`, the limit variable `limit`, and the substitutions `srcSubs`, `tgtSubs` that witness it |
 | `_complete` | present once every pair has been checked; an unfinished run instead keeps a `_checked` list so it can resume |
 
-**94 partitions · 19,848 cells · 521,672 closure relations.**
+**99 partitions · 25,588 cells · 709,116 closure relations.**
 
 ### What a relation means
 
@@ -161,6 +161,7 @@ Components are iterated ℙ¹-bundles (Fung), all smooth.
 | 5,1,1 | 7 | (1,4,5,6,7) (2) (3) | 42 | 158 | 3 |
 | 1,1,6 | 8 | (1) (2) (3,4,5,6,7,8) | 56 | 218 | 3 |
 | 1,2,5 | 8 | (1) (2,4) (3,5,6,7,8) | 168 | 1,433 | 4 |
+| 1,3,4 | 8 | (1) (2,4,6) (3,5,7,8) | 280 | 4,038 | 5 |
 | 2,2,4 | 8 | (1,4) (2,5) (3,6,7,8) | 420 | 8,660 | 6 |
 | 2,3,3 | 8 | (1,4) (2,5,7) (3,6,8) | 560 | 17,010 | 7 |
 | 3,3,2 | 8 | (1,4,7) (2,5,8) (3,6) | 560 | 16,159 | 7 |
@@ -181,13 +182,19 @@ Components are iterated ℙ¹-bundles (Fung), all smooth.
 | 7,1,1 | 9 | (1,4,5,6,7,8,9) (2) (3) | 72 | 290 | 3 |
 | 1,1,8 | 10 | (1) (2) (3,4,5,6,7,8,9,10) | 90 | 370 | 3 |
 | 1,2,7 | 10 | (1) (2,4) (3,5,6,7,8,9,10) | 360 | 3,401 | 4 |
+| 1,3,6 | 10 | (1) (2,4,6) (3,5,7,8,9,10) | 840 | 15,173 | 5 |
+| 1,4,5 | 10 | (1) (2,4,6,8) (3,5,7,9,10) | 1,260 | 35,772 | 6 |
 | 2,2,6 | 10 | (1,4) (2,5) (3,6,7,8,9,10) | 1,260 | 31,578 | 6 |
+| 5,3,2 | 10 | (1,4,7,9,10) (2,5,8) (3,6) | 2,520 | 117,494 | 7 |
 | 5,4,1 | 10 | (1,4,6,8,10) (2,5,7,9) (3) | 1,260 | 34,734 | 6 |
 | 6,2,2 | 10 | (1,4,7,8,9,10) (2,5) (3,6) | 1,260 | 31,468 | 6 |
+| 6,3,1 | 10 | (1,4,6,8,9,10) (2,5,7) (3) | 840 | 14,967 | 5 |
 | 7,2,1 | 10 | (1,4,6,7,8,9,10) (2,5) (3) | 360 | 3,370 | 4 |
 | 8,1,1 | 10 | (1,4,5,6,7,8,9,10) (2) (3) | 90 | 371 | 3 |
 
-*44 partitions · 16,084 cells · 438,121 relations.*
+*49 partitions · 21,824 cells · 625,565 relations.*
+
+(2,3,5) is still being searched; its file will be added when the run finishes.
 
 
 ### Four-row partitions
@@ -227,7 +234,7 @@ Start from a cell's closure set S: the cell together with every cell its closure
 - Dividing by d needs at least d cells.
 - The route ends at one cell, which is always the last cell chosen.
 
-**Result.** Every one of the 19,754 cells in the repository with more than one cell in its closure has such a route, with rounding either way and even with rounding down only.
+**Result.** Every one of the 25,489 cells in the repository (99 complete Jordan types) with more than one cell in its closure has such a route, with rounding either way and even with rounding down only.
 
 **Why powers of 2.** For two rows the reason is geometric. A component is a tower of ℙ¹-bundles, each layer doubling the number of fixed points. Fixing the top k layers at a fixed point gives a sub-tower with 2^(d−k) of them, so dividing by 2ᵏ is peeling off k layers. The data agrees: inside complete two-row closures, every one-step intersection has a power-of-two size.
 
@@ -250,14 +257,15 @@ Start from a cell's closure set S: the cell together with every cell its closure
 
 [`Visuals.html`](https://tristane028.github.io/Springer-Fibers/Visuals.html) is a single page that reads the data files straight from this repository. It needs no build step and no manifest: a new `data_*.json` anywhere in the repo appears on the next page load.
 
-- **Catalog.** Partitions grouped by number of rows and n, with cell counts and top dimension.
+- **Catalog.** Partitions grouped by number of rows and n, with cell counts and top dimension. Each shape sits directly above its reverse (rows read bottom to top): the lexicographically smaller one on top, e.g. for three rows at n = 9 the top line is (1,1,7) (1,2,6) (1,3,5) (2,2,5) (2,3,4) (3,3,3) and the bottom line (7,1,1) (6,2,1) (5,3,1) (5,2,2) (4,3,2). A shape equal to its reverse stands alone. When only one of a pair is in the repository, the other shows as a dashed “not computed yet” placeholder that cannot be opened (a link straight to it returns to the catalog); it becomes a normal entry as soon as its `data_*.json` is uploaded.
 - **Jordan block card.** The labeled tableau, the arrows of the nilpotent operator, the blocks, and the matrix of X.
 - **Diagram.** The closure diagram as a rotating 3D stack of discs, one per dimension, with a flat layered view as an alternative. Each dimension has its own color (up to dimension 11). "Related cells only" trims large partitions to the selected cell's neighbourhood.
 - **Nested intersections.** Click a cell to see what its closure meets. Click one of those to look from inside both closures, and keep nesting. The chain lives in the URL, so a view can be shared.
 - **Witnesses.** Each relation shows its curve, re-checked exactly in the browser with rational arithmetic.
 - **Matrix.** Every ordered pair as a grid square: yes (curve found), probably (only through a chain), unresolved (below in Bruhat order with no curve), or no. Axis labels, a crosshair and a "does the closure of _ meet _?" box make a single relation quick to find.
 - **Halving route animation.** From any cell, an animation of its 128 → … → 2 route: the chosen cell is ringed, its closure reaches out, and the cells that drop away vanish one by one. A counter and a log-scale "cells left" curve track the population. Routes come in a gradual style (halve unless forced) or with the fewest steps.
-- **Routes tab.** Every cell's route as a table, with step counts, divisors and the chosen cells, plus a CSV download. Cells whose closure meets exactly 2^dim cells get a ⧉ button that draws the closure as a d-cube (rows = cube levels, colour = cell dimension, dashed ring = dimension differs from level), with a step control that fades out each cut. The table also counts tower routes and halving chains (a starred ⧉ marks a closure that is not a perfect cube).
+- **Coordinates tab.** For the selected cell: the nilpotent operator *X* (each box sent to the box on its left, boxes labeled column-first), the Schubert cell matrix *C* (pivot 1 in row w_j of column j, free entries above it, the relations from X·V_j ⊆ V_j already substituted), the product X·C, and every Plücker coordinate of every V_r = span of the first r columns, zeros included, written as one projective vector per V_r, [p_I : p_J : …] with the index sets in lexicographic order (zeros greyed, nonzeros highlighted, hover for the index, a Copy button for plain text); a labelled-table view with a switch to hide zeros is also available. *C* is read back from the stored Plücker vectors: with P the pivot rows of the first r−1 columns, entry C[s][r] = ± p_{P∪{s}}; this was checked entry by entry against `Computational Geometry.py`. Each matrix has a *Copy LaTeX* button; the Plücker table downloads as CSV for one cell or for every cell of the partition.
+- **Routes tab.** Every cell's route as a table, with step counts, divisors and the chosen cells, plus a CSV download. Cells whose closure meets exactly 2^dim cells get a **⧉ cube** button (also reachable from the cell panel: *View closure as a cube*) that draws the closure as a d-cube, colour = cell dimension, dashed ring = dimension differs from its cube level. Two layouts: *by level* (rows = number of 1s in the code) and *box* (a square, a cube in perspective, a cube inside a cube for d = 4, two of those side by side for d = 5). A step control fades out each cut of the halving route. The table also counts tower routes and halving chains (a starred ⧉ marks a closure that is not a perfect cube).
 - **Smoothness note.** For each partition, what Fresse–Melnikov and Fresse prove about its components.
 - **Themes.** Light and dark, following the system setting.
 
