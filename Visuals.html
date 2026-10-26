@@ -23,6 +23,7 @@
   --red: #C2412D;
   --red-soft: #F2C4BB;
   --focus: #2B59C3;
+  --nz-bg: #FFFFFF; --nz-fg: #1C2533; --z-bg: #E6EBF1; --z-fg: #A3ACB8;
   --math: "STIX Two Text", "STIX Two Math", Cambria, Georgia, serif;
   --ui: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: light;
@@ -31,13 +32,13 @@
   :root:not([data-theme="light"]) {
     --paper: #121821; --surface: #19212C; --ink: #E6EAF0; --graphite: #A3ADBA; --faint: #6B7685;
     --rule: #2C3644; --grid: #1C2530; --blue: #7FA2F0; --blue-soft: #34508A; --green: #5DBB8E;
-    --green-soft: #2A5A45; --red: #E7735F; --red-soft: #6E3027; --focus: #7FA2F0; color-scheme: dark;
+    --green-soft: #2A5A45; --red: #E7735F; --red-soft: #6E3027; --focus: #7FA2F0; color-scheme: dark; --nz-bg: #F2F5F9; --nz-fg: #121821; --z-bg: #1C2530; --z-fg: #5B6676;
   }
 }
 :root[data-theme="dark"] {
   --paper: #121821; --surface: #19212C; --ink: #E6EAF0; --graphite: #A3ADBA; --faint: #6B7685;
   --rule: #2C3644; --grid: #1C2530; --blue: #7FA2F0; --blue-soft: #34508A; --green: #5DBB8E;
-  --green-soft: #2A5A45; --red: #E7735F; --red-soft: #6E3027; --focus: #7FA2F0; color-scheme: dark;
+  --green-soft: #2A5A45; --red: #E7735F; --red-soft: #6E3027; --focus: #7FA2F0; color-scheme: dark; --nz-bg: #F2F5F9; --nz-fg: #121821; --z-bg: #1C2530; --z-fg: #5B6676;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
@@ -167,6 +168,34 @@ sub, sup { font-size: 0.72em; line-height: 0; }
 .rt-d { color: var(--graphite); font-variant-numeric: tabular-nums; }
 .rt-n { display: inline-block; min-width: 22px; text-align: center; border: 1px solid var(--rule); border-radius: 10px; padding: 0 6px; font-weight: 600; font-variant-numeric: tabular-nums; background: var(--paper); }
 .rt-play { padding: 0 8px; }
+.coordview h4 { font-family: var(--math); font-weight: 600; font-size: 16px; margin: 22px 0 4px; }
+.coordview .cv-head select { max-width: 260px; }
+.mwrap { overflow-x: auto; padding: 4px 0 6px; }
+table.mat { border-collapse: separate; border-spacing: 3px; font-family: var(--math); font-size: 14.5px; position: relative; }
+table.mat td { padding: 3px 8px; text-align: center; border-radius: 3px; white-space: nowrap; min-width: 18px; }
+table.mat th { font: 11px var(--ui); color: var(--faint); font-weight: 400; padding: 0 4px; }
+table.mat td.z, .pgrid .z { color: var(--z-fg); background: var(--z-bg); }
+table.mat td.nz, .pgrid .nz { color: var(--nz-fg); background: var(--nz-bg); box-shadow: inset 0 0 0 1px var(--rule), 0 1px 2px rgba(20,30,45,.08); font-weight: 500; }
+table.mat td.one { color: var(--paper); background: var(--blue); font-weight: 600; }
+.mat-brk { display: inline-flex; align-items: stretch; }
+.mat-brk::before, .mat-brk::after { content: ''; width: 7px; border: 1.5px solid var(--ink); }
+.mat-brk::before { border-right: 0; } .mat-brk::after { border-left: 0; }
+.mat-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--pw, 120px), 1fr)); gap: 3px; margin: 6px 0 4px; }
+.pgrid > div { display: flex; justify-content: space-between; gap: 8px; padding: 3px 8px; border-radius: 3px; font-family: var(--math); font-size: 14px; }
+.pgrid .k { font-size: 12.5px; opacity: 0.85; }
+.pgrid .nz .k { color: var(--nz-fg); opacity: .6; }
+.pgrid.hidez .z { display: none; }
+details.plv { margin: 6px 0; }
+details.plv > summary { cursor: pointer; font-size: 14px; }
+details.plv > summary b { font-family: var(--math); font-weight: 600; }
+.legend-z { display: inline-block; padding: 0 8px; border-radius: 3px; }
+.pvec { display: flex; flex-wrap: wrap; align-items: center; row-gap: 5px; margin: 6px 0 2px; font-family: var(--math); font-size: 15px; line-height: 1.5; }
+.pvec > .z, .pvec > .nz { padding: 1px 6px; border-radius: 3px; }
+.pvec .col { color: var(--graphite); padding: 0 3px; }
+.pvec .br { font-size: 20px; color: var(--ink); padding: 0 3px; }
+.pidx { font: 11.5px var(--ui); color: var(--faint); margin: 2px 0 8px; overflow-wrap: anywhere; }
+.pcopy { font-size: 12px; padding: 0 7px; margin-left: 8px; }
 .ptable .cube-row td { white-space: normal; background: var(--paper); }
 .cube-wrap { overflow-x: auto; padding: 6px 0; position: sticky; left: 0; }
 .cube-wrap svg { display: block; margin: 6px 0; }
@@ -328,6 +357,7 @@ table.chk td.y { color: var(--green); }
           <button role="tab" id="tab-hasse" aria-selected="true">Diagram</button>
           <button role="tab" id="tab-matrix" aria-selected="false">Matrix</button>
           <button role="tab" id="tab-poly" aria-selected="false">Routes</button>
+          <button role="tab" id="tab-coords" aria-selected="false">Coordinates</button>
         </div>
         <input id="find" list="labels" placeholder="Go to cell, e.g. 21354" autocomplete="off" aria-label="Go to cell">
         <datalist id="labels"></datalist>
@@ -345,6 +375,7 @@ table.chk td.y { color: var(--green); }
         <div class="status" id="status"></div>
         <div id="animbar" hidden aria-live="polite"></div>
         <div id="polyview" class="polyview" hidden></div>
+        <div id="coordview" class="polyview coordview" hidden></div>
       </div>
     </section>
     <aside class="col right"><div class="panel" id="panel"></div></aside>
@@ -1360,18 +1391,19 @@ function setFocus(on) { S.focus = on; $('#focus').setAttribute('aria-pressed', o
 $('#focus').addEventListener('click', () => setFocus(!S.focus));
 function setTab(t) {
   S.tab = t;
-  ['hasse', 'matrix', 'poly'].forEach(k => $('#tab-' + k).setAttribute('aria-selected', t === k));
+  ['hasse', 'matrix', 'poly', 'coords'].forEach(k => $('#tab-' + k).setAttribute('aria-selected', t === k));
   $('#fit').style.display = t === 'hasse' ? '' : 'none';
   $('#flat').style.display = t === 'hasse' ? '' : 'none';
   $('#spinbtn').style.display = t === 'hasse' && S.mode3d ? '' : 'none';
   $('#routebtn').style.display = t === 'hasse' ? '' : 'none';
   if (t !== 'hasse' && S.anim) { S.anim = null; $('#animbar').hidden = true; }
-  $('#focus').style.display = t === 'poly' ? 'none' : '';
+  $('#focus').style.display = t === 'poly' || t === 'coords' ? 'none' : '';
   $('#pairq').hidden = t !== 'matrix';
   $('#find').style.display = t === 'matrix' ? 'none' : '';
   $('#polyview').hidden = t !== 'poly';
-  $('#hint').textContent = t === 'hasse' ? (S.mode3d ? 'Drag to turn, scroll to zoom. Click a cell, then a cell in its closure to nest' : 'Click a cell, then click inside its closure to nest') : t === 'matrix' ? 'Hover to read a square; click it, or type two cells, to see the answer' : 'Click a cell to open it';
-  if (t === 'poly') renderPolyView(); else fitView();
+  $('#coordview').hidden = t !== 'coords';
+  $('#hint').textContent = t === 'hasse' ? (S.mode3d ? 'Drag to turn, scroll to zoom. Click a cell, then a cell in its closure to nest' : 'Click a cell, then click inside its closure to nest') : t === 'matrix' ? 'Hover to read a square; click it, or type two cells, to see the answer' : t === 'coords' ? 'Type a cell above or pick one from the list' : 'Click a cell to open it';
+  if (t === 'poly') renderPolyView(); else if (t === 'coords') renderCoordView(); else fitView();
 }
 /* Routes tab: for every cell, the route the 128 → … → 2 rule takes down to one cell. */
 function allRoutes(M) {
@@ -1533,6 +1565,149 @@ function cubeDetail(M, a, avail) {
   h += `<p class="note">Axis <i>i</i> = 1 when a cell lies outside the closure of ${Q.gens.map((g, i) => `${cellName(M.cells[g])}<sub style="font-family:var(--ui)">(${i + 1})</sub>`).join(', ')} (the ${Q.d} half-size sub-closures, read right to left in the code). ${S.cubeLayout === 'box' ? (Q.d >= 4 ? 'Box layout: axes 1–3 draw a cube, axis 4 is the inner cube (a tesseract), axis 5 a second copy beside it.' : 'Box layout: axis 1 runs across, axis 2 up, axis 3 into the page.') : 'Rows are cube levels: the number of 1s.'} Colour is the cell's dimension; a dashed ring marks a cell whose dimension differs from its level (${Q.dimOff} of ${1 << Q.d}). The ring shows the cell chosen at this step; faded cells have been cut away. ${Q.perfect ? 'Every sub-closure here is a face of the cube.' : '<span class="bad">Some sub-closures here are not faces of the cube.</span>'}</p></div>`;
   return h;
 }
+
+/* ═════════════ Coordinates tab: X, the Schubert cell matrix C, X·C, all Plücker coordinates ═════════════ */
+/* X sends each box to the box on its left (first column to 0), boxes labeled column-first:
+   X[i][j] = 1 when box j+1 sits directly right of box i+1.
+   C (as in Computational Geometry.py): column c has its pivot 1 in row w_c, free entries above it,
+   relations from X·V_j ⊆ V_j substituted. Column c is read back from the stored Plücker vector of
+   V_{c+1}: with P the pivot rows of the first c columns, C[s][c] = ± p_{P ∪ {s}}. */
+function nilMatrix(M) {
+  if (M._X) return M._X;
+  const n = M.n, t = labeledTableau(M.rows), X = Array.from({ length: n }, () => new Array(n).fill(0)), right = new Array(n).fill(-1);
+  t.forEach(row => row.forEach((v, k) => { if (k > 0) { X[row[k - 1] - 1][v - 1] = 1; right[row[k - 1] - 1] = v - 1; } }));
+  return (M._X = { X, right });
+}
+function topTerms(s) {          // split a sympy sum at top-level ' + ' / ' - '
+  const out = []; let depth = 0, cur = '';
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '(') depth++; else if (ch === ')') depth--;
+    if (depth === 0 && (s.startsWith(' + ', i) || s.startsWith(' - ', i))) { out.push(cur); cur = s[i + 1] === '-' ? '-' : ''; i += 2; continue; }
+    cur += ch;
+  }
+  out.push(cur); return out;
+}
+function negExpr(s) {
+  s = s.trim(); if (s === '0') return '0';
+  const t = topTerms(s).map(x => x.startsWith('-') ? x.slice(1) : '-' + x);
+  return t.map((x, k) => k === 0 ? x : x.startsWith('-') ? ' - ' + x.slice(1) : ' + ' + x).join('');
+}
+function schubertMatrix(M, i) {
+  const c = M.cells[i]; if (c._C) return c._C;
+  const n = M.n, w = c.word, C = Array.from({ length: n }, () => new Array(n).fill('0'));
+  for (let col = 0; col < n - 1; col++) {
+    const r = col + 1, vals = splitVec(c.plucker[col]), I = subsets(n, r), idx = new Map(I.map((x, j) => [x.join(','), j]));
+    const P = w.slice(0, col).map(v => v - 1);
+    for (let s = 0; s < n; s++) {
+      if (P.includes(s)) continue;
+      const rows = [...P, s].sort((a, b) => a - b), pos = rows.indexOf(s);
+      const sig = rows.filter(x => x !== s).map(x => w.indexOf(x + 1));
+      let inv = 0; for (let a = 0; a < sig.length; a++) for (let b = a + 1; b < sig.length; b++) if (sig[a] > sig[b]) inv++;
+      const v = (vals[idx.get(rows.map(x => x + 1).join(','))] || '0').trim();
+      C[s][col] = (pos + col + inv) % 2 ? negExpr(v) : v;
+    }
+  }
+  C[w[n - 1] - 1][n - 1] = '1';
+  return (c._C = C);
+}
+function productMatrix(M, i) {
+  const { right } = nilMatrix(M), C = schubertMatrix(M, i), n = M.n;
+  return Array.from({ length: n }, (_, r) => right[r] >= 0 ? C[right[r]].slice() : new Array(n).fill('0'));
+}
+const texExpr = s => String(s).trim().replace(/\*\*(\d+)/g, '^{$1}').replace(/\*\*\(([^)]*)\)/g, '^{$1}').replace(/\*/g, ' ').replace(/([a-zA-Z])(\d+)/g, '$1_{$2}');
+const texMatrix = A => '\\begin{pmatrix}\n' + A.map(r => r.map(x => texExpr(x)).join(' & ')).join(' \\\\\n') + '\n\\end{pmatrix}';
+function matHtml(A, ones = false) {
+  const n = A.length;
+  let h = `<span class="mat-brk"><table class="mat"><thead><tr><th></th>${A[0].map((_, j) => `<th>${j + 1}</th>`).join('')}</tr></thead><tbody>`;
+  A.forEach((row, i) => {
+    h += `<tr><th>${i + 1}</th>` + row.map(x => {
+      const z = String(x).trim() === '0';
+      return `<td class="${z ? 'z' : ones && String(x) === '1' ? 'one' : 'nz'}">${z ? '0' : fmtExpr(String(x))}</td>`;
+    }).join('') + `</tr>`;
+  });
+  return h + `</tbody></table></span>`;
+}
+function renderCoordView() {
+  const M = S.M, el = $('#coordview'); if (!M || !el) return;
+  const i = S.sel, n = M.n;
+  const opts = M.cells.map(c => `<option value="${c.i}"${c.i === i ? ' selected' : ''}>C${esc(wordText(c.word))} · dim ${c.dim}</option>`).join('');
+  let h = `<div class="pv-head cv-head"><h3>Coordinates</h3>
+    <label>Cell <select id="cv-cell"><option value="-1"${i < 0 ? ' selected' : ''}>choose a cell…</option>${opts}</select></label>
+    <button class="icon-btn" data-cvmove="-1" ${i > 0 ? '' : 'disabled'} title="Previous cell">◀</button><button class="icon-btn" data-cvmove="1" ${i >= 0 && i < M.cells.length - 1 ? '' : 'disabled'} title="Next cell">▶</button>
+    <label>Plücker <select id="cv-pform"><option value="vec"${(S.cvForm || 'vec') === 'vec' ? ' selected' : ''}>[ x : y : … ] vectors</option><option value="grid"${S.cvForm === 'grid' ? ' selected' : ''}>labelled table</option></select></label>
+    ${S.cvForm === 'grid' ? `<label><input type="checkbox" id="cv-hidez"${S.cvHideZero ? ' checked' : ''}> hide zero coordinates</label>` : ''}
+    <button class="icon-btn" id="cv-csv-all" type="button" title="Every Plücker coordinate of every cell, zeros included">Download all cells (CSV)</button></div>`;
+  const { X } = nilMatrix(M);
+  h += `<h4>Nilpotent operator <i>X</i></h4><p class="note">Boxes labeled column-first; <i>X</i> sends each box to the box on its left and the first column to 0, so <i>X</i><sub><i>ij</i></sub> = 1 when box <i>j</i> sits directly right of box <i>i</i> (<i>Xe<sub>j</sub></i> = <i>e<sub>i</sub></i>).</p>
+    <div class="mat-row"><div class="mwrap">${matHtml(X, true)}</div><button class="icon-btn" data-tex="X">Copy LaTeX</button></div>`;
+  if (i < 0) {
+    h += `<p class="note" style="margin-top:18px">Choose a cell above (or type its permutation in the box at the top) to see its Schubert cell matrix, the product <i>X</i>·<i>C</i> and its Plücker coordinates.</p>`;
+    el.innerHTML = h; return;
+  }
+  const c = M.cells[i], C = schubertMatrix(M, i), XC = productMatrix(M, i);
+  h += `<h4>Schubert cell matrix <i>C</i> of ${cellName(c)}</h4><p class="note">Column <i>j</i> has its pivot 1 in row <i>w<sub>j</sub></i> (${esc(wordText(c.word))}) and free entries above it; the relations that keep <i>X</i>·<i>V<sub>j</sub></i> ⊆ <i>V<sub>j</sub></i> are already substituted, so only ${c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'constants'} remain. <i>V<sub>r</sub></i> is the span of the first <i>r</i> columns.</p>
+    <div class="mat-row"><div class="mwrap">${matHtml(C, true)}</div><button class="icon-btn" data-tex="C">Copy LaTeX</button></div>`;
+  h += `<h4>Product <i>X</i>·<i>C</i></h4><p class="note">Row <i>i</i> of <i>X</i>·<i>C</i> is the row of <i>C</i> for the box right of box <i>i</i>, or zero when box <i>i</i> ends its row. Each column of <i>X</i>·<i>C</i> lies in the span of the columns of <i>C</i> up to it.</p>
+    <div class="mat-row"><div class="mwrap">${matHtml(XC, true)}</div><button class="icon-btn" data-tex="XC">Copy LaTeX</button></div>`;
+  let total = 0, totalNz = 0;
+  const lv = c.plucker.map((vec, k) => { const vals = splitVec(vec).map(x => x.trim()); const nz = vals.filter(x => x !== '0').length; total += vals.length; totalNz += nz; return { r: k + 1, vals, nz }; });
+  h += `<h4>Plücker coordinates of ${cellName(c)}</h4><p class="note">For each <i>r</i>, the <i>r</i> × <i>r</i> minors of the first <i>r</i> columns of <i>C</i>, one for every row set {<i>i</i><sub>1</sub> &lt; … &lt; <i>i<sub>r</sub></i>}, in lexicographic order. <span class="legend-z" style="box-shadow:inset 0 0 0 1px var(--rule);background:var(--nz-bg);color:var(--nz-fg)">nonzero</span> <span class="legend-z" style="background:var(--z-bg);color:var(--z-fg)">zero</span> · ${totalNz} of ${total} nonzero.
+    <button class="icon-btn" id="cv-csv" type="button">Download this cell (CSV)</button></p>`;
+  const longest = Math.max(...lv.flatMap(l => l.vals.map(x => x.length)), 1);
+  const pw = Math.min(420, Math.max(110, 40 + n * 9 + longest * 7.5));
+  lv.forEach(({ r, vals, nz }) => {
+    const I = subsets(n, r);
+    h += `<details class="plv" open><summary><b>V<sub>${r}</sub></b> in Gr(${r}, ${n}) · ${nz} of ${vals.length} nonzero <button class="icon-btn pcopy" data-pcopy="${r}" type="button" title="Copy this vector as plain text">Copy</button></summary>`;
+    if ((S.cvForm || 'vec') === 'vec') {
+      // one projective vector, coordinates in lexicographic order of the index sets; hover for the index
+      h += `<div class="pvec"><span class="br">[</span>` + vals.map((x, j) => { const z = x === '0', nm = 'p' + I[j].join(n > 9 ? ',' : '');
+        return `<span class="${z ? 'z' : 'nz'}" title="${nm}${z ? ' = 0' : ''}">${z ? '0' : fmtExpr(x)}</span>`; }).join('<span class="col">:</span>') + `<span class="br">]</span></div>`;
+      h += `<p class="pidx">order: ${I.map(x => x.join(n > 9 ? ',' : '')).join(', ')}</p>`;
+    } else {
+      h += `<div class="pgrid${S.cvHideZero ? ' hidez' : ''}" style="--pw:${pw}px">`;
+      vals.forEach((x, j) => { const z = x === '0'; h += `<div class="${z ? 'z' : 'nz'}"><span class="k">${pName(I[j], n)}</span><span>${z ? '0' : fmtExpr(x)}</span></div>`; });
+      h += `</div>`;
+    }
+    h += `</details>`;
+  });
+  el.innerHTML = h;
+}
+function downloadText(name, text, type = 'text/csv') {
+  const blob = new Blob([text], { type });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function pluckerCsv(cells) {
+  const M = S.M, q = x => /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x;
+  const lines = ['cell,dim,r,index,value,nonzero'];
+  cells.forEach(i => { const c = M.cells[i]; c.plucker.forEach((vec, k) => { const I = subsets(M.n, k + 1);
+    splitVec(vec).forEach((x, j) => { x = x.trim(); lines.push([c.label, c.dim, k + 1, '{' + I[j].join(',') + '}', x, x === '0' ? 0 : 1].map(v => q(String(v))).join(',')); }); }); });
+  return lines.join('\n') + '\n';
+}
+$('#coordview').addEventListener('change', e => {
+  if (e.target.id === 'cv-cell') { const i = Number(e.target.value); select(i); if (i < 0) renderCoordView(); }
+  if (e.target.id === 'cv-pform') { S.cvForm = e.target.value; renderCoordView(); return; }
+  if (e.target.id === 'cv-hidez') { S.cvHideZero = e.target.checked; $('#coordview').querySelectorAll('.pgrid').forEach(g => g.classList.toggle('hidez', S.cvHideZero)); }
+});
+$('#coordview').addEventListener('click', async e => {
+  const M = S.M; if (!M) return;
+  const mv = e.target.closest('[data-cvmove]');
+  if (mv) { select(Math.max(0, Math.min(M.cells.length - 1, S.sel + Number(mv.dataset.cvmove)))); return; }
+  if (e.target.closest('#cv-csv') && S.sel >= 0) { downloadText(`plucker_${M.entry.partition}_${M.cells[S.sel].label}.csv`, pluckerCsv([S.sel])); return; }
+  if (e.target.closest('#cv-csv-all')) { downloadText(`plucker_${M.entry.partition}_all.csv`, pluckerCsv(M.cells.map(c => c.i))); return; }
+  const pc = e.target.closest('[data-pcopy]');
+  if (pc && S.sel >= 0) { e.preventDefault(); const r = Number(pc.dataset.pcopy);
+    const txt = '[' + splitVec(M.cells[S.sel].plucker[r - 1]).map(x => x.trim()).join(' : ') + ']';
+    try { await navigator.clipboard.writeText(txt); pc.textContent = 'Copied'; } catch (err) { pc.textContent = 'Copy failed'; }
+    setTimeout(() => { pc.textContent = 'Copy'; }, 1400); return; }
+  const tx = e.target.closest('[data-tex]');
+  if (tx) {
+    const k = tx.dataset.tex, A = k === 'X' ? nilMatrix(M).X : k === 'C' ? schubertMatrix(M, S.sel) : productMatrix(M, S.sel);
+    try { await navigator.clipboard.writeText(texMatrix(A)); tx.textContent = 'Copied'; } catch (err) { tx.textContent = 'Copy failed'; }
+    setTimeout(() => { tx.textContent = 'Copy LaTeX'; }, 1400);
+  }
+});
 function routesCsv() {
   const M = S.M, R = allRoutes(M);
   const q = x => /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x;
@@ -1549,6 +1724,7 @@ function routesCsv() {
 $('#tab-hasse').addEventListener('click', () => setTab('hasse'));
 $('#tab-matrix').addEventListener('click', () => setTab('matrix'));
 $('#tab-poly').addEventListener('click', () => setTab('poly'));
+$('#tab-coords').addEventListener('click', () => setTab('coords'));
 $('#polyview').addEventListener('change', e => {
   if (e.target.id === 'rt-top') { S.routeTop = e.target.checked; renderPolyView(); }
   if (e.target.id === 'rt-pref') { S.routePref = e.target.value; renderPolyView(); if (S.sel >= 0) renderPanel(); }
@@ -1897,6 +2073,7 @@ function renderPanel() {
   const M = S.M, P = $('#panel');
   if (!M) { P.innerHTML = ''; return; }
   if (S.tab === 'poly') renderPolyView();
+  if (S.tab === 'coords') renderCoordView();
   if (S.sel < 0) {
     P.innerHTML = `<p class="empty">Click a cell in the diagram, or type its permutation in the box above, to see which cells its closure meets. Click one of those to look at it from inside the first closure: the list narrows to the cells met by both closures, and you can keep nesting.</p>`;
     return;
@@ -1931,12 +2108,7 @@ function renderPanel() {
 
   // secondary material, collapsed
   h += `<h3>More about ${cellName(c)}</h3>`;
-  c.plucker.forEach((vec, k) => {
-    const r = k + 1, vals = splitVec(vec), I = subsets(M.n, r);
-    const nz = []; vals.forEach((x, j) => { if (x !== '0') nz.push([I[j], x]); });
-    const shown = nz.slice(0, 120);
-    h += `<details class="lvl"><summary><b>Plücker V<sub>${r}</sub></b> ${nz.length} of ${vals.length} nonzero</summary><div class="pl">${shown.map(([I, x]) => `<span class="k">${pName(I, M.n)}</span><span>${fmtExpr(x)}</span>`).join('')}</div>${nz.length > shown.length ? `<p class="more">and ${nz.length - shown.length} more</p>` : ''}</details>`;
-  });
+  h += `<p class="note">The nilpotent operator <i>X</i>, the Schubert cell matrix, the product <i>X</i>·<i>C</i> and every Plücker coordinate (zeros included) are in the Coordinates tab.</p><button class="icon-btn" data-coords="${S.sel}">Open coordinates of ${cellName(c)}</button>`;
   P.innerHTML = h;
   if (depth > 1) showStep(chain[depth - 2], chain[depth - 1], false);
 }
@@ -1956,6 +2128,8 @@ function showStep(a, b, scroll = true) {
 $('#panel').addEventListener('click', e => {
   const ro = e.target.closest('[data-route]');
   if (ro) { startRoute(Number(ro.dataset.route)); return; }
+  const co = e.target.closest('[data-coords]');
+  if (co) { setTab('coords'); return; }
   const cv = e.target.closest('[data-cubeview]');
   if (cv) { const a = Number(cv.dataset.cubeview); S.cubeOpen = a; S.cubeStep = 0; if (S.routeTop && S.M.cells[a].dim !== S.M.maxDim) S.routeTop = false;
     setTab('poly'); const b = $(`#polyview [data-cube="${a}"]`); if (b) b.closest('tr').scrollIntoView({ block: 'start' }); return; }
