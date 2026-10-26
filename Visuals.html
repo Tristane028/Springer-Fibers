@@ -83,7 +83,10 @@ sub, sup { font-size: 0.72em; line-height: 0; }
 .nrow { display: grid; grid-template-columns: 64px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--rule); }
 .nrow .nlab { font-family: var(--math); color: var(--graphite); padding-top: 6px; }
 .nrow .nlab i { color: var(--ink); }
-.parts { display: flex; flex-wrap: wrap; gap: 8px; }
+.parts { display: flex; flex-wrap: wrap; gap: 10px 8px; align-items: flex-start; }
+.pcol { display: flex; flex-direction: column; gap: 6px; }
+.pcol > .part { width: 100%; }
+.part-missing { opacity: .55; border-style: dashed !important; cursor: default; background: transparent !important; box-shadow: none !important; }
 .part {
   display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center;
   background: var(--surface); border: 1px solid var(--rule); border-radius: 4px;
@@ -847,15 +850,26 @@ function showHome() {
     byN.get(e.n).push(e);
   }
   const total = S.manifest.every(e => e.cells != null) ? S.manifest.reduce((a, e) => a + e.cells, 0) : null;
-  $('#lede').innerHTML = `<strong>${S.manifest.length} Jordan types</strong> computed${total != null ? `, ${total.toLocaleString()} cells in all` : ''}. Rows are listed top to bottom as the boxes are labeled, so (1,2) and (2,1) are separate entries. Choose one to see its cells, which cells each closure meets, the curve that witnesses each relation, and the closure polynomials. Types marked “certified” also have an intersection report with exact Poincaré polynomials.`;
+  $('#lede').innerHTML = `<strong>${S.manifest.length} Jordan types</strong> computed${total != null ? `, ${total.toLocaleString()} cells in all` : ''}. Rows are listed top to bottom as the boxes are labeled, so (1,2) and (2,1) are separate entries; each shape sits directly above its reverse. Choose one to see its cells, which cells each closure meets, the curve that witnesses each relation, and the closure polynomials. Types marked “certified” also have an intersection report with exact Poincaré polynomials.`;
   let html = '';
   for (const [k, byN] of [...fam.entries()].sort((a, b) => a[0] - b[0])) {
     const count = [...byN.values()].reduce((a, l) => a + l.length, 0);
     html += `<section class="family"><h2>${familyName(k)}</h2><p class="count">${count} Jordan types</p>`;
     for (const [n, list] of [...byN.entries()].sort((a, b) => a[0] - b[0])) {
       html += `<div class="nrow"><div class="nlab"><i>n</i> = ${n}</div><div class="parts">`;
+      // pair each shape with its reverse (rows read bottom to top): the lexicographically
+      // smaller one on top, its reverse directly below; a shape equal to its reverse stands alone
+      const cmp = (a, b) => { for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) return a[i] - b[i]; return a.length - b.length; };
+      const byRows = new Map(list.map(e => [e.rows.join(','), e])), cols = new Map();
       for (const e of list) {
-        html += `<button class="part" data-p="${esc(e.partition)}" title="${e.edges != null ? e.edges.toLocaleString() + ' relations with a curve' : sizeText(e.bytes)}">${miniDiagram(e.rows)}<span class="pname">${shapeText(e.rows)}</span><span class="pmeta">${e.cells != null ? `${e.cells.toLocaleString()} cells, dim ${e.maxDim}` : sizeText(e.bytes)}${e.report ? ', certified' : ''}</span></button>`;
+        const rev = e.rows.slice().reverse(), top = cmp(e.rows, rev) <= 0 ? e.rows : rev, key = top.join(',');
+        if (!cols.has(key)) cols.set(key, { top, bottom: top.slice().reverse() });
+      }
+      const card = e => `<button class="part" data-p="${esc(e.partition)}" title="${e.edges != null ? e.edges.toLocaleString() + ' relations with a curve' : sizeText(e.bytes)}">${miniDiagram(e.rows)}<span class="pname">${shapeText(e.rows)}</span><span class="pmeta">${e.cells != null ? `${e.cells.toLocaleString()} cells, dim ${e.maxDim}` : sizeText(e.bytes)}${e.report ? ', certified' : ''}</span></button>`;
+      const hole = rows => `<div class="part part-missing" title="${shapeText(rows)} has not been computed yet">${miniDiagram(rows)}<span class="pname">${shapeText(rows)}</span><span class="pmeta">not computed yet</span></div>`;
+      for (const { top, bottom } of [...cols.values()].sort((a, b) => cmp(a.top, b.top))) {
+        const pal = top.join(',') === bottom.join(','), et = byRows.get(top.join(',')), eb = byRows.get(bottom.join(','));
+        html += `<div class="pcol">${et ? card(et) : hole(top)}${pal ? '' : eb ? card(eb) : hole(bottom)}</div>`;
       }
       html += `</div></div>`;
     }
