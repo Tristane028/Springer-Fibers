@@ -86,7 +86,8 @@ sub, sup { font-size: 0.72em; line-height: 0; }
 .parts { display: flex; flex-wrap: wrap; gap: 10px 8px; align-items: flex-start; }
 .pcol { display: flex; flex-direction: column; gap: 6px; }
 .pcol > .part { width: 100%; }
-.part-missing { opacity: .55; border-style: dashed !important; cursor: default; background: transparent !important; box-shadow: none !important; }
+.part-missing { opacity: .55; border-style: dashed !important; cursor: not-allowed; background: transparent !important; box-shadow: none !important; user-select: none; }
+.part-missing:hover { border-color: var(--rule) !important; }
 .part {
   display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: center;
   background: var(--surface); border: 1px solid var(--rule); border-radius: 4px;
@@ -866,7 +867,7 @@ function showHome() {
         if (!cols.has(key)) cols.set(key, { top, bottom: top.slice().reverse() });
       }
       const card = e => `<button class="part" data-p="${esc(e.partition)}" title="${e.edges != null ? e.edges.toLocaleString() + ' relations with a curve' : sizeText(e.bytes)}">${miniDiagram(e.rows)}<span class="pname">${shapeText(e.rows)}</span><span class="pmeta">${e.cells != null ? `${e.cells.toLocaleString()} cells, dim ${e.maxDim}` : sizeText(e.bytes)}${e.report ? ', certified' : ''}</span></button>`;
-      const hole = rows => `<div class="part part-missing" title="${shapeText(rows)} has not been computed yet">${miniDiagram(rows)}<span class="pname">${shapeText(rows)}</span><span class="pmeta">not computed yet</span></div>`;
+      const hole = rows => `<div class="part part-missing" aria-disabled="true" title="${shapeText(rows)} has not been computed yet">${miniDiagram(rows)}<span class="pname">${shapeText(rows)}</span><span class="pmeta">not computed yet</span></div>`;
       for (const { top, bottom } of [...cols.values()].sort((a, b) => cmp(a.top, b.top))) {
         const pal = top.join(',') === bottom.join(','), et = byRows.get(top.join(',')), eb = byRows.get(bottom.join(','));
         html += `<div class="pcol">${et ? card(et) : hole(top)}${pal ? '' : eb ? card(eb) : hole(bottom)}</div>`;
@@ -877,14 +878,14 @@ function showHome() {
   }
   $('#catalog').innerHTML = html;
 }
-$('#catalog').addEventListener('click', ev => { const b = ev.target.closest('.part'); if (b) location.hash = '#/' + encodeURIComponent(b.dataset.p); });
+$('#catalog').addEventListener('click', ev => { const b = ev.target.closest('.part'); if (b && !b.classList.contains('part-missing') && b.dataset.p && S.byKey.has(b.dataset.p)) location.hash = '#/' + encodeURIComponent(b.dataset.p); });
 
 /* ═════════════ partition page ═════════════ */
 async function showPartition(p, cellLabel) {
   if (S.M && S.M.entry.partition === p && Array.isArray(cellLabel) && S.chain.length && cellLabel.join('/') === S.chain.map(i => S.M.cells[i].label).join('/')) return;
   $('#home').style.display = 'none'; $('#part').style.display = 'block';
   const entry = S.byKey.get(p);
-  if (!entry) { $('#status').textContent = `No data for ${p}. Run build_manifest.py after adding the file.`; return; }
+  if (!entry) { history.replaceState(null, '', '#/'); showHome(); return; }
   $('#crumbs').innerHTML = `<a href="#/">All Jordan types</a><span class="sep">/</span><span>${familyName(entry.rows.length)}</span><span class="sep">/</span><span><i>n</i> = ${entry.n}</span><span class="sep">/</span><span class="here">${shapeText(entry.rows)}</span>`;
   document.title = `${shapeText(entry.rows)} Springer fiber`;
   renderJordan(entry.rows);
