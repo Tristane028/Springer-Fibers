@@ -1683,19 +1683,23 @@ function renderCoordView() {
   h += `<h4>Nilpotent operator <i>X</i></h4><p class="note">Boxes labeled column-first; <i>X</i> sends each box to the box on its left and the first column to 0, so <i>X</i><sub><i>ij</i></sub> = 1 when box <i>j</i> sits directly right of box <i>i</i> (<i>Xe<sub>j</sub></i> = <i>e<sub>i</sub></i>).</p>
     <div class="mat-row"><div class="mwrap">${matHtml(X, true)}</div><button class="icon-btn" data-tex="X">Copy LaTeX</button></div>`;
   if (i < 0) {
-    h += `<p class="note" style="margin-top:18px">Choose a cell above (or type its permutation in the box at the top) to see its Schubert cell matrix, the product <i>X</i>·<i>C</i> and its Plücker coordinates.</p>`;
+    h += `<p class="note" style="margin-top:18px">Choose a cell above (or type its permutation in the box at the top) to see its Schubert cell matrix, the product <i>X</i>·<i>C</i>, the relations and its Plücker coordinates.</p>`;
     el.innerHTML = h; return;
   }
   const c = M.cells[i], C = schubertMatrix(M, i), XC = productMatrix(M, i);
   const Gm = genericMatrix(M, i);
   h += `<h4>Schubert cell matrix of ${cellName(c)} before the flag condition</h4><p class="note">Column <i>j</i> has its pivot 1 in row <i>w<sub>j</sub></i> (${esc(wordText(c.word))}). Every entry with no 1 to its left in its row and none above it in its column is a variable, named <i>a</i><sub>1</sub>, <i>a</i><sub>2</sub>, … row by row: ${Gm.pos.length} in all.${Gm.rel.length ? ' <span class="elim-key">Outlined</span> entries are the ones the flag condition eliminates.' : ''}</p>
     <div class="mat-row"><div class="mwrap">${matHtml(Gm.G, true, Gm.mark)}</div><button class="icon-btn" data-tex="G">Copy LaTeX</button></div>`;
+  {
+    const { right } = nilMatrix(M), XG = Gm.G.map((_, r) => right[r] >= 0 ? Gm.G[right[r]].slice() : new Array(n).fill('0'));
+    const markXG = new Set(); Gm.mark.forEach(k => { const r = Math.floor(k / n), col = k % n; right.forEach((src, row) => { if (src === r) markXG.add(row * n + col); }); });
+    h += `<h4>Product <i>X</i>·<i>C</i> before the flag condition</h4><p class="note">Row <i>i</i> of <i>X</i>·<i>C</i> is the row of <i>C</i> for the box right of box <i>i</i>, or zero when box <i>i</i> ends its row. The checks below compare each column of this matrix with the columns of <i>C</i> up to it.</p>
+    <div class="mat-row"><div class="mwrap">${matHtml(XG, true, markXG)}</div><button class="icon-btn" data-tex="XG">Copy LaTeX</button></div>`;
+  }
   h += `<h4>Relations from the spanning checks</h4><p class="note">Check <i>j</i> asks whether column <i>j</i> of <i>X</i>·<i>C</i> lies in the span of columns 1, …, <i>j</i> of <i>C</i>, so that <i>X</i>·<i>V<sub>j</sub></i> ⊆ <i>V<sub>j</sub></i>. ${Gm.rel.length ? `Imposing all ${n} checks eliminates ${Gm.rel.length} of the ${Gm.pos.length} variables` : `All ${n} checks hold for every value of the ${Gm.pos.length} variables, so none is eliminated`}; the ${c.free.length} that remain, ${c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'none'}, give the dimension ${c.dim}.</p>`;
   if (Gm.rel.length) h += `<div class="rels">${Gm.rel.map(x => `<span class="rel-eq"><span class="math">${fmtExpr(x.name)} = ${x.val === '0' ? '0' : fmtExpr(x.val)}</span><span class="rel-pos">row ${x.r + 1}, col ${x.c + 1}</span></span>`).join('')}</div>`;
   h += `<h4>Schubert cell matrix <i>C</i> of ${cellName(c)} after the flag condition</h4><p class="note">The relations substituted: the outlined entries now hold what the eliminated variables became, and only ${c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'constants'} remain. <i>V<sub>r</sub></i> is the span of the first <i>r</i> columns.</p>
     <div class="mat-row"><div class="mwrap">${matHtml(C, true, Gm.mark)}</div><button class="icon-btn" data-tex="C">Copy LaTeX</button></div>`;
-  h += `<h4>Product <i>X</i>·<i>C</i></h4><p class="note">Row <i>i</i> of <i>X</i>·<i>C</i> is the row of <i>C</i> for the box right of box <i>i</i>, or zero when box <i>i</i> ends its row. Each column of <i>X</i>·<i>C</i> lies in the span of the columns of <i>C</i> up to it.</p>
-    <div class="mat-row"><div class="mwrap">${matHtml(XC, true)}</div><button class="icon-btn" data-tex="XC">Copy LaTeX</button></div>`;
   let total = 0, totalNz = 0;
   const lv = c.plucker.map((vec, k) => { const vals = splitVec(vec).map(x => x.trim()); const nz = vals.filter(x => x !== '0').length; total += vals.length; totalNz += nz; return { r: k + 1, vals, nz }; });
   h += `<h4>Plücker coordinates of ${cellName(c)}</h4><p class="note">For each <i>r</i>, the <i>r</i> × <i>r</i> minors of the first <i>r</i> columns of <i>C</i>, one for every row set {<i>i</i><sub>1</sub> &lt; … &lt; <i>i<sub>r</sub></i>}, in lexicographic order. <span class="legend-z" style="box-shadow:inset 0 0 0 1px var(--rule);background:var(--nz-bg);color:var(--nz-fg)">nonzero</span> <span class="legend-z" style="background:var(--z-bg);color:var(--z-fg)">zero</span> · ${totalNz} of ${total} nonzero.
@@ -1749,7 +1753,8 @@ $('#coordview').addEventListener('click', async e => {
     setTimeout(() => { pc.textContent = 'Copy'; }, 1400); return; }
   const tx = e.target.closest('[data-tex]');
   if (tx) {
-    const k = tx.dataset.tex, A = k === 'X' ? nilMatrix(M).X : k === 'G' ? genericMatrix(M, S.sel).G : k === 'C' ? schubertMatrix(M, S.sel) : productMatrix(M, S.sel);
+    const genXC = () => { const G = genericMatrix(M, S.sel).G, { right } = nilMatrix(M); return G.map((_, r) => right[r] >= 0 ? G[right[r]].slice() : new Array(M.n).fill('0')); };
+    const k = tx.dataset.tex, A = k === 'X' ? nilMatrix(M).X : k === 'G' ? genericMatrix(M, S.sel).G : k === 'XG' ? genXC() : k === 'C' ? schubertMatrix(M, S.sel) : productMatrix(M, S.sel);
     try { await navigator.clipboard.writeText(texMatrix(A)); tx.textContent = 'Copied'; } catch (err) { tx.textContent = 'Copy failed'; }
     setTimeout(() => { tx.textContent = 'Copy LaTeX'; }, 1400);
   }
