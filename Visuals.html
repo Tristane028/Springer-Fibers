@@ -23,7 +23,7 @@
   --red: #C2412D;
   --red-soft: #F2C4BB;
   --focus: #2B59C3;
-  --nz-bg: #FFFFFF; --nz-fg: #1C2533; --z-bg: #E6EBF1; --z-fg: #A3ACB8;
+  --elim: #D08A1E; --nz-bg: #FFFFFF; --nz-fg: #1C2533; --z-bg: #E6EBF1; --z-fg: #A3ACB8;
   --math: "STIX Two Text", "STIX Two Math", Cambria, Georgia, serif;
   --ui: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: light;
@@ -32,13 +32,13 @@
   :root:not([data-theme="light"]) {
     --paper: #121821; --surface: #19212C; --ink: #E6EAF0; --graphite: #A3ADBA; --faint: #6B7685;
     --rule: #2C3644; --grid: #1C2530; --blue: #7FA2F0; --blue-soft: #34508A; --green: #5DBB8E;
-    --green-soft: #2A5A45; --red: #E7735F; --red-soft: #6E3027; --focus: #7FA2F0; color-scheme: dark; --nz-bg: #F2F5F9; --nz-fg: #121821; --z-bg: #1C2530; --z-fg: #5B6676;
+    --green-soft: #2A5A45; --red: #E7735F; --red-soft: #6E3027; --focus: #7FA2F0; color-scheme: dark; --elim: #E2A445; --nz-bg: #F2F5F9; --nz-fg: #121821; --z-bg: #1C2530; --z-fg: #5B6676;
   }
 }
 :root[data-theme="dark"] {
   --paper: #121821; --surface: #19212C; --ink: #E6EAF0; --graphite: #A3ADBA; --faint: #6B7685;
   --rule: #2C3644; --grid: #1C2530; --blue: #7FA2F0; --blue-soft: #34508A; --green: #5DBB8E;
-  --green-soft: #2A5A45; --red: #E7735F; --red-soft: #6E3027; --focus: #7FA2F0; color-scheme: dark; --nz-bg: #F2F5F9; --nz-fg: #121821; --z-bg: #1C2530; --z-fg: #5B6676;
+  --green-soft: #2A5A45; --red: #E7735F; --red-soft: #6E3027; --focus: #7FA2F0; color-scheme: dark; --elim: #E2A445; --nz-bg: #F2F5F9; --nz-fg: #121821; --z-bg: #1C2530; --z-fg: #5B6676;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
@@ -194,6 +194,12 @@ details.plv { margin: 6px 0; }
 details.plv > summary { cursor: pointer; font-size: 14px; }
 details.plv > summary b { font-family: var(--math); font-weight: 600; }
 .legend-z { display: inline-block; padding: 0 8px; border-radius: 3px; }
+table.mat td.elim { box-shadow: inset 0 0 0 2px var(--elim); }
+.elim-key { box-shadow: inset 0 0 0 2px var(--elim); padding: 0 6px; border-radius: 3px; }
+.rels { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.rel-eq { display: inline-flex; flex-direction: column; padding: 4px 10px; border-radius: 4px; background: var(--nz-bg); color: var(--nz-fg); box-shadow: inset 0 0 0 2px var(--elim); }
+.rel-eq .math { font-family: var(--math); font-size: 15px; }
+.rel-pos { font: 11px var(--ui); opacity: .6; }
 .pvec { display: flex; flex-wrap: wrap; align-items: center; row-gap: 5px; margin: 6px 0 2px; font-family: var(--math); font-size: 15px; line-height: 1.5; }
 .pvec > .z, .pvec > .nz { padding: 1px 6px; border-radius: 3px; }
 .pvec .col { color: var(--graphite); padding: 0 3px; }
@@ -1632,13 +1638,33 @@ function productMatrix(M, i) {
 }
 const texExpr = s => String(s).trim().replace(/\*\*(\d+)/g, '^{$1}').replace(/\*\*\(([^)]*)\)/g, '^{$1}').replace(/\*/g, ' ').replace(/([a-zA-Z])(\d+)/g, '$1_{$2}');
 const texMatrix = A => '\\begin{pmatrix}\n' + A.map(r => r.map(x => texExpr(x)).join(' & ')).join(' \\\\\n') + '\n\\end{pmatrix}';
-function matHtml(A, ones = false) {
+/* The Schubert cell matrix before the flag condition: as in fill_symbolic, the zero entries with
+   no 1 to their left in the row and none above in the column get a1, a2, … in reading order.
+   An eliminated variable a_k equals whatever sits in its position once the relations are imposed. */
+function genericMatrix(M, i) {
+  const c = M.cells[i]; if (c._G) return c._G;
+  const n = M.n, w = c.word, P = Array.from({ length: n }, () => new Array(n).fill(0));
+  w.forEach((v, col) => { P[v - 1][col] = 1; });
+  const G = P.map(r => r.map(x => String(x))), pos = [];
+  let k = 1;
+  for (let r = 0; r < n; r++) for (let col = 0; col < n; col++) {
+    if (P[r][col] !== 0) continue;
+    let left = false, above = false;
+    for (let cc = 0; cc < col; cc++) if (P[r][cc] === 1) left = true;
+    for (let rr = 0; rr < r; rr++) if (P[rr][col] === 1) above = true;
+    if (!left && !above) { const nm = 'a' + k++; G[r][col] = nm; pos.push({ name: nm, r, c: col }); }
+  }
+  const C = schubertMatrix(M, i), free = new Set(c.free);
+  const rel = pos.filter(x => !free.has(x.name)).map(x => ({ ...x, val: C[x.r][x.c] }));
+  return (c._G = { G, pos, rel, mark: new Set(rel.map(x => x.r * n + x.c)) });
+}
+function matHtml(A, ones = false, mark = null) {
   const n = A.length;
   let h = `<span class="mat-brk"><table class="mat"><thead><tr><th></th>${A[0].map((_, j) => `<th>${j + 1}</th>`).join('')}</tr></thead><tbody>`;
   A.forEach((row, i) => {
-    h += `<tr><th>${i + 1}</th>` + row.map(x => {
-      const z = String(x).trim() === '0';
-      return `<td class="${z ? 'z' : ones && String(x) === '1' ? 'one' : 'nz'}">${z ? '0' : fmtExpr(String(x))}</td>`;
+    h += `<tr><th>${i + 1}</th>` + row.map((x, j) => {
+      const z = String(x).trim() === '0', m = mark && mark.has(i * n + j) ? ' elim' : '';
+      return `<td class="${z ? 'z' : ones && String(x) === '1' ? 'one' : 'nz'}${m}">${z ? '0' : fmtExpr(String(x))}</td>`;
     }).join('') + `</tr>`;
   });
   return h + `</tbody></table></span>`;
@@ -1661,8 +1687,13 @@ function renderCoordView() {
     el.innerHTML = h; return;
   }
   const c = M.cells[i], C = schubertMatrix(M, i), XC = productMatrix(M, i);
-  h += `<h4>Schubert cell matrix <i>C</i> of ${cellName(c)}</h4><p class="note">Column <i>j</i> has its pivot 1 in row <i>w<sub>j</sub></i> (${esc(wordText(c.word))}) and free entries above it; the relations that keep <i>X</i>·<i>V<sub>j</sub></i> ⊆ <i>V<sub>j</sub></i> are already substituted, so only ${c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'constants'} remain. <i>V<sub>r</sub></i> is the span of the first <i>r</i> columns.</p>
-    <div class="mat-row"><div class="mwrap">${matHtml(C, true)}</div><button class="icon-btn" data-tex="C">Copy LaTeX</button></div>`;
+  const Gm = genericMatrix(M, i);
+  h += `<h4>Schubert cell matrix of ${cellName(c)} before the flag condition</h4><p class="note">Column <i>j</i> has its pivot 1 in row <i>w<sub>j</sub></i> (${esc(wordText(c.word))}). Every entry with no 1 to its left in its row and none above it in its column is a variable, named <i>a</i><sub>1</sub>, <i>a</i><sub>2</sub>, … row by row: ${Gm.pos.length} in all.${Gm.rel.length ? ' <span class="elim-key">Outlined</span> entries are the ones the flag condition eliminates.' : ''}</p>
+    <div class="mat-row"><div class="mwrap">${matHtml(Gm.G, true, Gm.mark)}</div><button class="icon-btn" data-tex="G">Copy LaTeX</button></div>`;
+  h += `<h4>Relations from the spanning checks</h4><p class="note">Check <i>j</i> asks whether column <i>j</i> of <i>X</i>·<i>C</i> lies in the span of columns 1, …, <i>j</i> of <i>C</i>, so that <i>X</i>·<i>V<sub>j</sub></i> ⊆ <i>V<sub>j</sub></i>. ${Gm.rel.length ? `Imposing all ${n} checks eliminates ${Gm.rel.length} of the ${Gm.pos.length} variables` : `All ${n} checks hold for every value of the ${Gm.pos.length} variables, so none is eliminated`}; the ${c.free.length} that remain, ${c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'none'}, give the dimension ${c.dim}.</p>`;
+  if (Gm.rel.length) h += `<div class="rels">${Gm.rel.map(x => `<span class="rel-eq"><span class="math">${fmtExpr(x.name)} = ${x.val === '0' ? '0' : fmtExpr(x.val)}</span><span class="rel-pos">row ${x.r + 1}, col ${x.c + 1}</span></span>`).join('')}</div>`;
+  h += `<h4>Schubert cell matrix <i>C</i> of ${cellName(c)} after the flag condition</h4><p class="note">The relations substituted: the outlined entries now hold what the eliminated variables became, and only ${c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'constants'} remain. <i>V<sub>r</sub></i> is the span of the first <i>r</i> columns.</p>
+    <div class="mat-row"><div class="mwrap">${matHtml(C, true, Gm.mark)}</div><button class="icon-btn" data-tex="C">Copy LaTeX</button></div>`;
   h += `<h4>Product <i>X</i>·<i>C</i></h4><p class="note">Row <i>i</i> of <i>X</i>·<i>C</i> is the row of <i>C</i> for the box right of box <i>i</i>, or zero when box <i>i</i> ends its row. Each column of <i>X</i>·<i>C</i> lies in the span of the columns of <i>C</i> up to it.</p>
     <div class="mat-row"><div class="mwrap">${matHtml(XC, true)}</div><button class="icon-btn" data-tex="XC">Copy LaTeX</button></div>`;
   let total = 0, totalNz = 0;
@@ -1718,7 +1749,7 @@ $('#coordview').addEventListener('click', async e => {
     setTimeout(() => { pc.textContent = 'Copy'; }, 1400); return; }
   const tx = e.target.closest('[data-tex]');
   if (tx) {
-    const k = tx.dataset.tex, A = k === 'X' ? nilMatrix(M).X : k === 'C' ? schubertMatrix(M, S.sel) : productMatrix(M, S.sel);
+    const k = tx.dataset.tex, A = k === 'X' ? nilMatrix(M).X : k === 'G' ? genericMatrix(M, S.sel).G : k === 'C' ? schubertMatrix(M, S.sel) : productMatrix(M, S.sel);
     try { await navigator.clipboard.writeText(texMatrix(A)); tx.textContent = 'Copied'; } catch (err) { tx.textContent = 'Copy failed'; }
     setTimeout(() => { tx.textContent = 'Copy LaTeX'; }, 1400);
   }
