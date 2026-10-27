@@ -336,8 +336,8 @@ table.chk td.y { color: var(--green); }
 </header>
 
 <main id="home">
-  <p class="lede" id="lede">Choose a Jordan type to see its cells, which cells lie in which closures, and the curve that witnesses each relation.</p>
-  <div id="catalog"><p class="lede">Loading the list of computed partitions…</p></div>
+  <p class="lede" id="lede">Pick a configuration to see its cells, which cells each closure meets, and the curve that proves each relation.</p>
+  <div id="catalog"><p class="lede">Loading the configurations…</p></div>
 </main>
 
 <main id="part">
@@ -352,7 +352,7 @@ table.chk td.y { color: var(--green); }
       <div class="dimscale" id="dimscale"></div>
       <p class="legend-sub">After you select a cell</p>
       <ul class="legend">
-        <li><span class="sw" style="background:var(--graphite);box-shadow:0 0 0 3px var(--paper),0 0 0 4.5px var(--ink)"></span>large ring: selected cell; numbers: the nesting chain</li>
+        <li><span class="sw" style="background:var(--graphite);box-shadow:0 0 0 3px var(--paper),0 0 0 4.5px var(--ink)"></span>large ring is the selected cell, and the numbers show the nesting chain</li>
         <li><span class="sw sq" style="background:var(--graphite);height:2px"></span>full color, solid line: met by its closure (by every closure in the chain)</li>
         <li><span class="sw" style="background:var(--faint);opacity:.35"></span>faded: unrelated</li>
         <li><span class="sw" style="background:var(--graphite);box-shadow:0 0 0 2px var(--paper),0 0 0 3.5px var(--ink)"></span>ringed, dashed line: its closure meets the selected cell</li>
@@ -602,7 +602,7 @@ function smoothness(rowsIn) {
 }
 function theoremHtml(M) {
   const t = smoothness(M.rows);
-  if (t.all) return `<div class="theorem yes"><b>Every component is smooth</b>, since the Jordan type ${t.shape} is ${t.kind} (<a href="${REF_FM}" target="_blank" rel="noopener">Fresse–Melnikov</a>). So every top-dimensional cell has a palindromic Poincaré polynomial.</div>`;
+  if (t.all) return `<div class="theorem yes"><b>Every component is smooth</b>, since the configuration ${t.shape} is ${t.kind} (<a href="${REF_FM}" target="_blank" rel="noopener">Fresse–Melnikov</a>). So every top-dimensional cell has a palindromic Poincaré polynomial.</div>`;
   return `<div class="theorem no"><b>Some component is singular.</b> ${t.shape} is not a hook, two rows, two rows plus one box, or (2,2,2), so by <a href="${REF_FM}" target="_blank" rel="noopener">Fresse–Melnikov</a> it has a singular component, and by <a href="${REF_F}" target="_blank" rel="noopener">Fresse</a> at least one component has a Poincaré polynomial that is not palindromic.${t.twoColumn ? ' For two columns, as here, a component is singular exactly when its Poincaré polynomial is not palindromic.' : ''}</div>`;
 }
 
@@ -781,7 +781,7 @@ function repoName() {
 async function readJson(r) {
   const buf = new Uint8Array(await r.arrayBuffer());
   if (buf.length > 2 && buf[0] === 0x1f && buf[1] === 0x8b) {
-    if (typeof DecompressionStream === 'undefined') throw new Error('this browser cannot read .gz files; try a current Chrome, Firefox or Safari');
+    if (typeof DecompressionStream === 'undefined') throw new Error('this browser cannot read .gz files, so try a current Chrome, Firefox or Safari');
     const text = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
     return JSON.parse(text);
   }
@@ -872,11 +872,11 @@ function showHome() {
     byN.get(e.n).push(e);
   }
   const total = S.manifest.every(e => e.cells != null) ? S.manifest.reduce((a, e) => a + e.cells, 0) : null;
-  $('#lede').innerHTML = `<strong>${S.manifest.length} Jordan types</strong> computed${total != null ? `, ${total.toLocaleString()} cells in all` : ''}. Rows are listed top to bottom as the boxes are labeled, so (1,2) and (2,1) are separate entries; each shape sits directly above its reverse. Choose one to see its cells, which cells each closure meets, the curve that witnesses each relation, and the closure polynomials. Types marked “certified” also have an intersection report with exact Poincaré polynomials.`;
+  $('#lede').innerHTML = `<strong>${S.manifest.length} configurations</strong> computed${total != null ? `, ${total.toLocaleString()} cells in all` : ''}. Rows go top to bottom the way we label the boxes, so (1,2) and (2,1) count as different configurations, and each one sits right above its reverse. Pick one to see its cells, which cells each closure meets, the curve behind each relation, and the closure polynomials. Configurations marked “certified” also have an intersection report with exact Poincaré polynomials.`;
   let html = '';
   for (const [k, byN] of [...fam.entries()].sort((a, b) => a[0] - b[0])) {
     const count = [...byN.values()].reduce((a, l) => a + l.length, 0);
-    html += `<section class="family"><h2>${familyName(k)}</h2><p class="count">${count} Jordan types</p>`;
+    html += `<section class="family"><h2>${familyName(k)}</h2><p class="count">${count} configurations</p>`;
     for (const [n, list] of [...byN.entries()].sort((a, b) => a[0] - b[0])) {
       html += `<div class="nrow"><div class="nlab"><i>n</i> = ${n}</div><div class="parts">`;
       // pair each shape with its reverse (rows read bottom to top): the lexicographically
@@ -907,7 +907,7 @@ async function showPartition(p, cellLabel) {
   $('#home').style.display = 'none'; $('#part').style.display = 'block';
   const entry = S.byKey.get(p);
   if (!entry) { history.replaceState(null, '', '#/'); showHome(); return; }
-  $('#crumbs').innerHTML = `<a href="#/">All Jordan types</a><span class="sep">/</span><span>${familyName(entry.rows.length)}</span><span class="sep">/</span><span><i>n</i> = ${entry.n}</span><span class="sep">/</span><span class="here">${shapeText(entry.rows)}</span>`;
+  $('#crumbs').innerHTML = `<a href="#/">All configurations</a><span class="sep">/</span><span>${familyName(entry.rows.length)}</span><span class="sep">/</span><span><i>n</i> = ${entry.n}</span><span class="sep">/</span><span class="here">${shapeText(entry.rows)}</span>`;
   document.title = `${shapeText(entry.rows)} Springer fiber`;
   renderJordan(entry.rows);
   if (!S.M || S.M.entry !== entry) {
@@ -989,13 +989,13 @@ function renderJordan(rows) {
       const one = t.some(row => row.some((v, k) => k > 0 && row[k - 1] === i + 1 && v === j + 1));
       d += one ? `<rect x="${j * c + 1.5}" y="${i * c + 1.5}" width="${c - 3}" height="${c - 3}" fill="var(--blue)"/>` : `<circle cx="${j * c + c / 2}" cy="${i * c + c / 2}" r="0.9" fill="var(--faint)"/>`;
     }
-    xmat = `<div class="xmat"><p>The matrix of <i class="v">X</i> (rows <i class="v">i</i>, columns <i class="v">j</i>; a square means <i class="v">Xe<sub>j</sub></i> = <i class="v">e<sub>i</sub></i>):</p><svg width="${w + 2}" height="${w + 2}" viewBox="-1 -1 ${w + 2} ${w + 2}" role="img" aria-label="nilpotent matrix"><rect x="-0.5" y="-0.5" width="${w + 1}" height="${w + 1}" fill="none" stroke="var(--rule)"/>${d}</svg></div>`;
+    xmat = `<div class="xmat"><p>The matrix of <i class="v">X</i>. A square in row <i class="v">i</i>, column <i class="v">j</i> means <i class="v">Xe<sub>j</sub></i> = <i class="v">e<sub>i</sub></i>.</p><svg width="${w + 2}" height="${w + 2}" viewBox="-1 -1 ${w + 2} ${w + 2}" role="img" aria-label="nilpotent matrix"><rect x="-0.5" y="-0.5" width="${w + 1}" height="${w + 1}" fill="none" stroke="var(--rule)"/>${d}</svg></div>`;
   }
   $('#jcard').innerHTML = `<h2>Jordan blocks</h2><p class="shape">Shape ${shapeText(rows)} acting on <span class="math">ℂ<sup>${n}</sup></span></p>
     <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="labeled tableau">${defs}${s}</svg>
     <div class="blocks">${blocks}</div>
-    <p>Boxes are numbered down each column, leftmost column first. <i class="v">X</i> sends each box to the box on its left; the first column goes to 0.</p>
-    <p>Cells are indexed by permutations of 1,…,${n} in which each row's numbers appear in increasing order.</p>${xmat}`;
+    <p>We number the boxes down each column, starting with the leftmost column. <i class="v">X</i> sends each box to the box on its left, and the first column goes to 0.</p>
+    <p>Each cell is a permutation of 1,…,${n} where every row's numbers show up in increasing order.</p>${xmat}`;
 }
 
 function renderDimScale() {
@@ -1438,7 +1438,7 @@ function setTab(t) {
   $('#find').style.display = t === 'matrix' ? 'none' : '';
   $('#polyview').hidden = t !== 'poly';
   $('#coordview').hidden = t !== 'coords';
-  $('#hint').textContent = t === 'hasse' ? (S.mode3d ? 'Drag to turn, scroll to zoom. Click a cell, then a cell in its closure to nest' : 'Click a cell, then click inside its closure to nest') : t === 'matrix' ? 'Hover to read a square; click it, or type two cells, to see the answer' : t === 'coords' ? 'Type a cell above or pick one from the list' : 'Click a cell to open it';
+  $('#hint').textContent = t === 'hasse' ? (S.mode3d ? 'Drag to turn, scroll to zoom. Click a cell, then a cell in its closure to nest' : 'Click a cell, then click inside its closure to nest') : t === 'matrix' ? 'Hover to read a square. Click it or type two cells to see the answer' : t === 'coords' ? 'Type a cell above or pick one from the list' : 'Click a cell to open it';
   if (t === 'poly') renderPolyView(); else if (t === 'coords') renderCoordView(); else fitView();
 }
 /* Routes tab: for every cell, the route the 128 → … → 2 rule takes down to one cell. */
@@ -1464,11 +1464,11 @@ function renderPolyView() {
     <label><input type="checkbox" id="rt-top"${topOnly ? ' checked' : ''}> top-dimensional cells only</label>
     <label>Route <select id="rt-pref"><option value="gradual"${pref === 'gradual' ? ' selected' : ''}>gradual: halve unless forced</option><option value="short"${pref === 'short' ? ' selected' : ''}>fewest steps</option></select></label>
     <button class="icon-btn" id="rt-csv" type="button">Download CSV</button></div>`;
-  h += `<p class="note">Start from the cells the closure meets, counting the cell itself. Each step picks a cell in the current set and keeps only what its closure also meets, dividing the count by 128, 64, 32, 16, 8, 4 or 2, rounded either way, never going back up to a larger divisor. The route ends at one cell. Click a cell to open it; ▶ plays the route in the diagram.</p>`;
+  h += `<p class="note">We start from every cell the closure meets, counting the cell itself. Each step picks a cell in the current set and keeps only the cells its closure also meets, dividing the count by 128, 64, 32, 16, 8, 4 or 2 (rounded either way). We never go back up to a bigger divisor, and the route ends at one cell. Click a cell to open it, and ▶ plays the route in the diagram.</p>`;
   h += `<div class="pv-sum"><span>${shown.length - none.length} of ${shown.length} cells have a route</span>${none.length ? `<span class="bad">no route: ${none.length}</span>` : ''}${[...lens.entries()].sort((a, b) => a[0] - b[0]).map(([k, v]) => `<span>${k} step${k > 1 ? 's' : ''} ×${v}</span>`).join('')}${[...divs.entries()].sort((a, b) => b[0] - a[0]).map(([d, v]) => `<span>÷${d} used ${v}×</span>`).join('')}</div>`;
   const cubes = shown.map(i => cubeOf(M, i)).filter(q => q && !q.none);
   if (cubes.length) h += `<div class="pv-sum"><span>closure = 2<sup>dim</sup> cells, drawn as a cube: ${cubes.length}</span><span>every sub-closure a face: ${cubes.filter(q => q.perfect).length}</span><span>tower routes exist: ${cubes.filter(q => q.towers > 0).length}</span></div>`;
-  h += `<p class="note">⧉ opens a cell's closure as a cube when it meets exactly 2<sup>dim</sup> cells. <b>Towers</b> counts routes in which every step halves and the chosen cell drops exactly one dimension; <b>chains</b> counts all sequences of nested half-size sub-closures, which is dim! when the closure is a perfect cube.</p>`;
+  h += `<p class="note">⧉ draws a cell's closure as a cube when it meets exactly 2<sup>dim</sup> cells. <b>Towers</b> counts the routes where every step halves and the chosen cell drops exactly one dimension. <b>Chains</b> counts every sequence of nested half-size sub-closures, which is dim! when the closure is a perfect cube.</p>`;
   h += `<table class="ptable rtable"><thead><tr><th>Cell</th><th>dim</th><th>cells</th><th>steps</th><th>Cube</th><th>towers</th><th>chains</th><th>Route</th><th></th></tr></thead><tbody>`;
   for (const i of shown) {
     const c = M.cells[i], r = R[i], Q = cubeOf(M, i), cube = Q && !Q.none;
@@ -1598,7 +1598,7 @@ function cubeDetail(M, a, avail) {
     <button class="icon-btn" data-cstep="${k + 1}" ${k < L ? '' : 'disabled'}>▶</button>
     <span class="seg" role="group" aria-label="Cube layout"><button class="icon-btn" data-clayout="level" aria-pressed="${(S.cubeLayout || 'level') === 'level'}">by level</button><button class="icon-btn" data-clayout="box" aria-pressed="${S.cubeLayout === 'box'}">box</button></span></div>`;
   h += cubeSvg(M, a, k, avail);
-  h += `<p class="note">Axis <i>i</i> = 1 when a cell lies outside the closure of ${Q.gens.map((g, i) => `${cellName(M.cells[g])}<sub style="font-family:var(--ui)">(${i + 1})</sub>`).join(', ')} (the ${Q.d} half-size sub-closures, read right to left in the code). ${S.cubeLayout === 'box' ? (Q.d >= 4 ? 'Box layout: axes 1–3 draw a cube, axis 4 is the inner cube (a tesseract), axis 5 a second copy beside it.' : 'Box layout: axis 1 runs across, axis 2 up, axis 3 into the page.') : 'Rows are cube levels: the number of 1s.'} Colour is the cell's dimension; a dashed ring marks a cell whose dimension differs from its level (${Q.dimOff} of ${1 << Q.d}). The ring shows the cell chosen at this step; faded cells have been cut away. ${Q.perfect ? 'Every sub-closure here is a face of the cube.' : '<span class="bad">Some sub-closures here are not faces of the cube.</span>'}</p></div>`;
+  h += `<p class="note">Axis <i>i</i> is 1 when a cell sits outside the closure of ${Q.gens.map((g, i) => `${cellName(M.cells[g])}<sub style="font-family:var(--ui)">(${i + 1})</sub>`).join(', ')} (the ${Q.d} half-size sub-closures, read right to left in the code). ${S.cubeLayout === 'box' ? (Q.d >= 4 ? 'Box layout: axes 1–3 draw a cube, axis 4 is the inner cube (a tesseract), axis 5 a second copy beside it.' : 'Box layout: axis 1 runs across, axis 2 up, axis 3 into the page.') : 'Rows are cube levels: the number of 1s.'} Color is the cell's dimension, and a dashed ring marks a cell whose dimension is different from its level (${Q.dimOff} of ${1 << Q.d}). The solid ring shows the cell picked at this step, and faded cells have been cut away. ${Q.perfect ? 'Every sub-closure here is a face of the cube.' : '<span class="bad">Some sub-closures here are not faces of the cube.</span>'}</p></div>`;
   return h;
 }
 
@@ -1695,29 +1695,29 @@ function renderCoordView() {
     ${S.cvForm === 'grid' ? `<label><input type="checkbox" id="cv-hidez"${S.cvHideZero ? ' checked' : ''}> hide zero coordinates</label>` : ''}
     <button class="icon-btn" id="cv-csv-all" type="button" title="Every Plücker coordinate of every cell, zeros included">Download all cells (CSV)</button></div>`;
   const { X } = nilMatrix(M);
-  h += `<h4>Nilpotent operator <i>X</i></h4><p class="note">Boxes labeled column-first; <i>X</i> sends each box to the box on its left and the first column to 0, so <i>X</i><sub><i>ij</i></sub> = 1 when box <i>j</i> sits directly right of box <i>i</i> (<i>Xe<sub>j</sub></i> = <i>e<sub>i</sub></i>).</p>
+  h += `<h4>Nilpotent operator <i>X</i></h4><p class="note">We label the boxes column-first. <i>X</i> sends each box to the box on its left and the first column to 0, so <i>X</i><sub><i>ij</i></sub> = 1 when box <i>j</i> sits directly to the right of box <i>i</i> (<i>Xe<sub>j</sub></i> = <i>e<sub>i</sub></i>).</p>
     <div class="mat-row"><div class="mwrap">${matHtml(X, true)}</div><button class="icon-btn" data-tex="X">Copy LaTeX</button></div>`;
   if (i < 0) {
-    h += `<p class="note" style="margin-top:18px">Choose a cell above (or type its permutation in the box at the top) to see its Schubert cell matrix, the product <i>X</i>·<i>C</i>, the relations and its Plücker coordinates.</p>`;
+    h += `<p class="note" style="margin-top:18px">Pick a cell above (or type its permutation in the box at the top) to see its Schubert cell matrix, the product <i>X</i>·<i>C</i>, the relations and its Plücker coordinates.</p>`;
     el.innerHTML = h; return;
   }
   const c = M.cells[i], C = schubertMatrix(M, i), XC = productMatrix(M, i);
   const Gm = genericMatrix(M, i);
-  h += `<h4>Schubert cell matrix of ${cellName(c)} before the flag condition</h4><p class="note">Column <i>j</i> has its pivot 1 in row <i>w<sub>j</sub></i> (${esc(wordText(c.word))}). Every entry with no 1 to its left in its row and none above it in its column is a variable, named <i>a</i><sub>1</sub>, <i>a</i><sub>2</sub>, … row by row: ${Gm.pos.length} in all.${Gm.rel.length ? ' <span class="elim-key">Outlined</span> entries are the ones the flag condition eliminates.' : ''}</p>
+  h += `<h4>Schubert cell matrix of ${cellName(c)} before imposing the flag</h4><p class="note">Column <i>j</i> has its pivot 1 in row <i>w<sub>j</sub></i> (${esc(wordText(c.word))}). Every entry with no 1 to its left and no 1 above it is a free variable, and we name them <i>a</i><sub>1</sub>, <i>a</i><sub>2</sub>, … going row by row (${Gm.pos.length} in all).${Gm.rel.length ? ' <span class="elim-key">Outlined</span> entries are the ones that go away once we impose the flag.' : ''}</p>
     <div class="mat-row"><div class="mwrap">${matHtml(Gm.G, true, Gm.mark)}</div><button class="icon-btn" data-tex="G">Copy LaTeX</button></div>`;
   {
     const { right } = nilMatrix(M), XG = Gm.G.map((_, r) => right[r] >= 0 ? Gm.G[right[r]].slice() : new Array(n).fill('0'));
     const markXG = new Set(); Gm.mark.forEach(k => { const r = Math.floor(k / n), col = k % n; right.forEach((src, row) => { if (src === r) markXG.add(row * n + col); }); });
-    h += `<h4>Product <i>X</i>·<i>C</i> before the flag condition</h4><p class="note">Row <i>i</i> of <i>X</i>·<i>C</i> is the row of <i>C</i> for the box right of box <i>i</i>, or zero when box <i>i</i> ends its row. The checks below compare each column of this matrix with the columns of <i>C</i> up to it.</p>
+    h += `<h4>Product <i>X</i>·<i>C</i> before imposing the flag</h4><p class="note">Row <i>i</i> of <i>X</i>·<i>C</i> is the row of <i>C</i> for the box right of box <i>i</i>, or zero when box <i>i</i> is at the end of its row. The spanning check compares each column of this matrix with the columns of <i>C</i> up to it.</p>
     <div class="mat-row"><div class="mwrap">${matHtml(XG, true, markXG)}</div><button class="icon-btn" data-tex="XG">Copy LaTeX</button></div>`;
   }
-  h += `<h4>Relations from the spanning checks</h4><p class="note">Check <i>j</i> asks whether column <i>j</i> of <i>X</i>·<i>C</i> lies in the span of columns 1, …, <i>j</i> of <i>C</i>, so that <i>X</i>·<i>V<sub>j</sub></i> ⊆ <i>V<sub>j</sub></i>. ${Gm.rel.length ? `Imposing all ${n} checks eliminates ${Gm.rel.length} of the ${Gm.pos.length} variables` : `All ${n} checks hold for every value of the ${Gm.pos.length} variables, so none is eliminated`}; the ${c.free.length} that remain, ${c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'none'}, give the dimension ${c.dim}.</p>`;
+  h += `<h4>Relations from the spanning check</h4><p class="note">Check <i>j</i> asks if column <i>j</i> of <i>X</i>·<i>C</i> is in the span of columns 1, …, <i>j</i> of <i>C</i>, which is the same as <i>X</i>·<i>V<sub>j</sub></i> ⊆ <i>V<sub>j</sub></i>. ${Gm.rel.length ? `Imposing all ${n} checks solves for ${Gm.rel.length} of the ${Gm.pos.length} variables in terms of the rest` : `All ${n} checks pass for every value of the ${Gm.pos.length} variables, so nothing gets solved for`}. The ${c.free.length} left over (${c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'none'}) give the dimension ${c.dim}.</p>`;
   if (Gm.rel.length) h += `<div class="rels">${Gm.rel.map(x => `<span class="rel-eq"><span class="math">${fmtExpr(x.name)} = ${x.val === '0' ? '0' : fmtExpr(x.val)}</span><span class="rel-pos">row ${x.r + 1}, col ${x.c + 1}</span></span>`).join('')}</div>`;
-  h += `<h4>Schubert cell matrix <i>C</i> of ${cellName(c)} after the flag condition</h4><p class="note">The relations substituted: the outlined entries now hold what the eliminated variables became, and only ${c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'constants'} remain. <i>V<sub>r</sub></i> is the span of the first <i>r</i> columns.</p>
+  h += `<h4>Schubert cell matrix <i>C</i> of ${cellName(c)} after imposing the flag</h4><p class="note">Here the relations are plugged in. The outlined entries show what each solved variable became, and only ${c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'constants'} are left free. <i>V<sub>r</sub></i> is the span of the first <i>r</i> columns.</p>
     <div class="mat-row"><div class="mwrap">${matHtml(C, true, Gm.mark)}</div><button class="icon-btn" data-tex="C">Copy LaTeX</button></div>`;
   let total = 0, totalNz = 0;
   const lv = c.plucker.map((vec, k) => { const vals = splitVec(vec).map(x => x.trim()); const nz = vals.filter(x => x !== '0').length; total += vals.length; totalNz += nz; return { r: k + 1, vals, nz }; });
-  h += `<h4>Plücker coordinates of ${cellName(c)}</h4><p class="note">For each <i>r</i>, the <i>r</i> × <i>r</i> minors of the first <i>r</i> columns of <i>C</i>, one for every row set {<i>i</i><sub>1</sub> &lt; … &lt; <i>i<sub>r</sub></i>}, in lexicographic order. <span class="legend-z" style="box-shadow:inset 0 0 0 1px var(--rule);background:var(--nz-bg);color:var(--nz-fg)">nonzero</span> <span class="legend-z" style="background:var(--z-bg);color:var(--z-fg)">zero</span> · ${totalNz} of ${total} nonzero.
+  h += `<h4>Plücker coordinates of ${cellName(c)}</h4><p class="note">For each <i>r</i>, these are the <i>r</i> × <i>r</i> minors of the first <i>r</i> columns of <i>C</i>, one for every row set {<i>i</i><sub>1</sub> &lt; … &lt; <i>i<sub>r</sub></i>}, in lexicographic order. <span class="legend-z" style="box-shadow:inset 0 0 0 1px var(--rule);background:var(--nz-bg);color:var(--nz-fg)">nonzero</span> <span class="legend-z" style="background:var(--z-bg);color:var(--z-fg)">zero</span> · ${totalNz} of ${total} nonzero.
     <button class="icon-btn" id="cv-csv" type="button">Download this cell (CSV)</button></p>`;
   const longest = Math.max(...lv.flatMap(l => l.vals.map(x => x.length)), 1);
   const pw = Math.min(420, Math.max(110, 40 + n * 9 + longest * 7.5));
@@ -2062,7 +2062,7 @@ function exactPanelHtml(M, a) {
   let h = `<h3>Closure polynomial<span class="n">${cert ? 'certified' : 'not certified'}</span></h3>`;
   h += `<p class="math" style="margin:4px 0 2px">${polyHtml(r.poly)}</p>`;
   h += `<p class="verdict-line ${cert ? v.cls : ''}">${cert ? (v.cls === 'ok' ? 'Factors as ' + v.text + '.' : v.cls === 'bad' ? 'Not palindromic, so this closure is singular.' : 'Palindromic, not a product of q-integers.') : 'Some pieces are not shown to be affine spaces, so this counts pieces by dimension but may not be a Poincaré polynomial.'}</p>`;
-  h += `<p class="note">One term q<sup>k</sup> for each cell the closure meets, with k the dimension of the piece it meets: ${full.length} whole cell${full.length === 1 ? '' : 's'} and ${part.length} partial piece${part.length === 1 ? '' : 's'}. A partial piece is that cell's own free parameters with some of them solved in terms of the others; k is the number left free.</p>`;
+  h += `<p class="note">One q<sup>k</sup> term for each cell the closure meets, where k is the dimension of the piece it meets: ${full.length} whole cell${full.length === 1 ? '' : 's'} and ${part.length} partial piece${part.length === 1 ? '' : 's'}. A partial piece is that cell's own free variables with some of them solved in terms of the others, and k counts the ones left free.</p>`;
   if (part.length) {
     const byDrop = part.slice().sort((x, y) => (y.cellDim - y.dim) - (x.cellDim - x.dim) || y.dim - x.dim);
     h += `<details class="lvl"><summary><b>Partial pieces</b> ${part.length}</summary><div class="pieces">${byDrop.map(p => { const t = M.idx.get(p.cell);
@@ -2072,11 +2072,11 @@ function exactPanelHtml(M, a) {
 }
 function routePanelHtml(M, a) {
   const R = halvingRoute(M, a);
-  let h = `<h3>Route to one cell<span class="n">128 → 64 → … → 4 → 2</span></h3>`;
+  let h = `<h3>Halving algorithm<span class="n">128 → 64 → … → 4 → 2</span></h3>`;
   if (R.start.length === 1) return h + `<p class="note">Its closure meets no other cell, so there is nothing to halve.</p>`;
   if (!R.steps) return h + `<p class="note">No 128 → 64 → … → 4 → 2 route from this cell with the current data.</p>`;
   h += `<div class="route-seq">${routeSeqHtml(R, -1)}</div>`;
-  h += `<p class="note">Counts include the cell itself. Each step intersects with the closure of a chosen cell, dividing the count by a power of 2 from 128 down to 2, never going back up (rounded either way); it ends at <span class="math">${cellName(M.cells[R.final])}</span>.</p>`;
+  h += `<p class="note">Counts include the cell itself. Each step intersects with the closure of a chosen cell, dividing the count by a power of 2 from 128 down to 2 (rounded either way) and never going back up. It ends at <span class="math">${cellName(M.cells[R.final])}</span>.</p>`;
   h += `<button class="icon-btn" data-route="${a}">${S.anim && S.anim.R.a === a ? 'Replay the route' : 'Animate the route'}</button>`;
   { const Q = cubeOf(S.M, a); if (Q && !Q.none) h += ` <button class="icon-btn" data-cubeview="${a}" title="Open the Routes tab with this closure drawn as a ${Q.d}-cube">View closure as a cube</button>`; }
   return h;
@@ -2141,13 +2141,13 @@ function renderPanel() {
   if (S.tab === 'poly') renderPolyView();
   if (S.tab === 'coords') renderCoordView();
   if (S.sel < 0) {
-    P.innerHTML = `<p class="empty">Click a cell in the diagram, or type its permutation in the box above, to see which cells its closure meets. Click one of those to look at it from inside the first closure: the list narrows to the cells met by both closures, and you can keep nesting.</p>`;
+    P.innerHTML = `<p class="empty">Click a cell in the diagram, or type its permutation in the box above, to see which cells its closure meets. Click one of those to look at it from inside the first closure. The list narrows to the cells both closures meet, and you can keep nesting.</p>`;
     return;
   }
   const c = M.cells[S.sel], rep = M.reportFor(S.sel), chain = S.chain, depth = chain.length;
   const nested = [...nestedSet(chain)].sort((a, b) => M.cells[b].dim - M.cells[a].dim || a - b);
   const freeTxt = c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'none';
-  let h = `<h2>${cellName(c)}</h2><p class="sub">Dimension ${c.dim}${c.dim === M.maxDim ? ' (its closure is an irreducible component)' : ''}. Free parameters: <span class="math">${freeTxt}</span></p>`;
+  let h = `<h2>${cellName(c)}</h2><p class="sub">Dimension ${c.dim}${c.dim === M.maxDim ? ' (its closure is an irreducible component)' : ''}. Free variables: <span class="math">${freeTxt}</span></p>`;
   h += `<div class="fill">${fillingSvg(c, M.rows)}</div>`;
   if (depth === 1) h += exactPanelHtml(M, S.sel) + routePanelHtml(M, S.sel);
 
@@ -2156,25 +2156,25 @@ function renderPanel() {
   h += `<div class="nest-formula">${chain.map((v, k) => `<button class="nf-cell${k === depth - 1 ? ' cur' : ''}" data-pop="${k}" title="${k === depth - 1 ? 'Current cell' : 'Step back out to here'}">${cellName(M.cells[v])}</button>`).join('<span class="cap">∩</span>')}</div>`;
   if (depth > 1) h += `<div class="nest-actions"><button class="icon-btn" data-pop="${depth - 2}">Step out</button><button class="icon-btn" data-go="${S.sel}">Start over from ${cellName(c)}</button></div>`;
   if (!nested.length) {
-    h += `<p class="note">${depth > 1 ? `No cell is met by all ${depth} of these closures: the nested intersection is empty.` : 'None: this cell is closed (its closure meets no other cell).'}</p>`;
+    h += `<p class="note">${depth > 1 ? `No cell is met by all ${depth} of these closures, so the nested intersection is empty.` : 'None. This cell is closed (its closure meets no other cell).'}</p>`;
   } else {
     h += `<p class="note">${depth > 1
-      ? `Cells met by the closure of every cell in the chain at once. Click one to nest further${M.rep ? '' : '; solid outline means a curve from the search reaches it from ' + cellName(c)}.`
-      : `Click one to look at it from inside this closure: the list then narrows to the cells met by both closures. Solid: a curve from the search reaches it.${rep ? ' Green outline: nonempty in the intersection report only.' : ''}`}</p>`;
+      ? `Cells met by the closure of every cell in the chain at once. Click one to keep nesting${M.rep ? '' : '. A solid outline means a curve from the search reaches it from ' + cellName(c)}.`
+      : `Click one to look at it from inside this closure. The list then narrows to the cells both closures meet. Solid means a curve from the search reaches it.${rep ? ' A green outline means it only shows up in the intersection report.' : ''}`}</p>`;
     h += chips(nested, v => M.edge.has(S.sel * M.N + v) ? 'direct' : 'up', M).replace(/data-c="/g, 'data-nest="');
   }
   h += `<div id="relbox"></div>`;
 
   if (depth === 1) {
     const chainOnly = M.chainOnly(S.sel), miss = M.missing(S.sel), up = M.above(S.sel);
-    if (chainOnly.length) h += `<h3>Reached only through chains<span class="n">${chainOnly.length}</span></h3><p class="note">No curve goes there directly, but a chain of curves does. Closure relations need not compose, so treat these as likely, not proven. Click one to see the chain.</p>${chips(chainOnly, 'implied', M)}`;
+    if (chainOnly.length) h += `<h3>Reached only through chains<span class="n">${chainOnly.length}</span></h3><p class="note">No curve goes there directly, but a chain of curves does. Closure relations don't have to compose, so treat these as likely but not proven. Click one to see the chain.</p>${chips(chainOnly, 'implied', M)}`;
     if (miss.length) h += `<h3>Below in Bruhat order, unresolved<span class="n">${miss.length}</span></h3><p class="note">Its closure could meet these, but no curve or chain from the search reaches them, and no intersection report settles it.</p>${chips(miss, 'missing', M)}`;
     h += `<h3>Closures that meet it<span class="n">${up.length}</span></h3>${up.length ? chips(up, 'up', M) : `<p class="note">None.</p>`}`;
   }
 
   // secondary material, collapsed
   h += `<h3>More about ${cellName(c)}</h3>`;
-  h += `<p class="note">The nilpotent operator <i>X</i>, the Schubert cell matrix, the product <i>X</i>·<i>C</i> and every Plücker coordinate (zeros included) are in the Coordinates tab.</p><button class="icon-btn" data-coords="${S.sel}">Open coordinates of ${cellName(c)}</button>`;
+  h += `<p class="note">The nilpotent operator <i>X</i>, the matrix before and after imposing the flag, the product <i>X</i>·<i>C</i>, the relations and every Plücker coordinate (zeros included) are in the Coordinates tab.</p><button class="icon-btn" data-coords="${S.sel}">Open coordinates of ${cellName(c)}</button>`;
   P.innerHTML = h;
   if (depth > 1) showStep(chain[depth - 2], chain[depth - 1], false);
 }
@@ -2185,7 +2185,7 @@ function showStep(a, b, scroll = true) {
   const r = M.reportFor(a), pc = r ? (r.pieces || []).find(x => x.cell === M.cells[b].label) : null;
   let h = `<div class="rel"><h4>Last step: the closure of ${cellName(M.cells[a])} meets ${cellName(M.cells[b])}</h4>`;
   if (pc) h += `<p class="note">Intersection report: ${pc.kind === 'full' ? `the whole cell (dimension ${pc.dim}) lies in the closure.` : `a piece of dimension ${pc.dim} of this ${pc.cellDim}-dimensional cell, cut out by <span class="math">${fmtExpr(idealInA(M, b, pc.ideal))}</span> in its free parameters.`}</p>`;
-  h += M.edge.has(a * M.N + b) ? `<div id="witness"></div>` : `<p class="note">No curve in the search grid reaches it; the report settles it.</p>`;
+  h += M.edge.has(a * M.N + b) ? `<div id="witness"></div>` : `<p class="note">No curve in the search grid reaches it, but the report settles it.</p>`;
   box.innerHTML = h + `</div>`;
   if (M.edge.has(a * M.N + b)) renderWitness(a, b, $('#witness'));
   if (scroll) box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -2224,7 +2224,7 @@ function openRelation(t) {
     const pc = piece(a, b);
     if (pc) h += `<p class="note">Intersection report: ${pc.kind === 'full' ? `the whole cell (dimension ${pc.dim}) lies in the closure.` : `a piece of dimension ${pc.dim} of this ${pc.cellDim}-dimensional cell, cut out by <span class="math">${fmtExpr(idealInA(M, b, pc.ideal))}</span> in its free parameters.`}</p>`;
     if (M.edge.has(a * M.N + b)) h += `<div id="witness"></div>`;
-    else h += `<p class="note">No curve in the search grid reaches it; the report settles it.</p>`;
+    else h += `<p class="note">No curve in the search grid reaches it, but the report settles it.</p>`;
     return h + `</div>`;
   };
   if (M.closureOf[s].includes(t)) { box.innerHTML = describe(s, t); if (M.edge.has(s * M.N + t)) renderWitness(s, t, $('#witness')); }
