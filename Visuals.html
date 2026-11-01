@@ -194,6 +194,14 @@ details.plv { margin: 6px 0; }
 details.plv > summary { cursor: pointer; font-size: 14px; }
 details.plv > summary b { font-family: var(--math); font-weight: 600; }
 .legend-z { display: inline-block; padding: 0 8px; border-radius: 3px; }
+table.mat td.casc { background: color-mix(in srgb, var(--tint) 24%, var(--nz-bg)); }
+table.mat td.casc.z { background: color-mix(in srgb, var(--tint) 16%, var(--z-bg)); color: var(--graphite); }
+.casc-list { list-style: none; padding: 0; margin: 4px 0 10px; font-size: 13.5px; }
+.casc-list li { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; }
+.casc-list .cg { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.casc-list b { font-family: var(--math); font-weight: 600; min-width: 52px; }
+.casc-list .cs { color: var(--graphite); }
+svg.arcs { display: block; margin: 4px 0; }
 table.mat td.elim { box-shadow: inset 0 0 0 2px var(--elim); }
 .elim-key { box-shadow: inset 0 0 0 2px var(--elim); padding: 0 6px; border-radius: 3px; }
 .rels { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
@@ -1733,16 +1741,82 @@ function genericMatrix(M, i) {
   const rel = pos.filter(x => !free.has(x.name)).map(x => ({ ...x, val: C[x.r][x.c] }));
   return (c._G = { G, pos, rel, mark: new Set(rel.map(x => x.r * n + x.c)) });
 }
-function matHtml(A, ones = false, mark = null) {
+function matHtml(A, ones = false, mark = null, tint = null) {
   const n = A.length;
   let h = `<span class="mat-brk"><table class="mat"><thead><tr><th></th>${A[0].map((_, j) => `<th>${j + 1}</th>`).join('')}</tr></thead><tbody>`;
   A.forEach((row, i) => {
     h += `<tr><th>${i + 1}</th>` + row.map((x, j) => {
-      const z = String(x).trim() === '0', m = mark && mark.has(i * n + j) ? ' elim' : '';
-      return `<td class="${z ? 'z' : ones && String(x) === '1' ? 'one' : 'nz'}${m}">${z ? '0' : fmtExpr(String(x))}</td>`;
+      const z = String(x).trim() === '0', m = mark && mark.has(i * n + j) ? ' elim' : '', tc = tint && tint.get(i * n + j);
+      return `<td class="${z ? 'z' : ones && String(x) === '1' ? 'one' : 'nz'}${m}${tc ? ' casc' : ''}"${tc ? ` style="--tint:${tc}"` : ''}>${z ? '0' : fmtExpr(String(x))}</td>`;
     }).join('') + `</tr>`;
   });
   return h + `</tbody></table></span>`;
+}
+/* Cascades. X sends each box q to the box on its left, so for the box q and its right neighbour q'
+   (same group = same row of the tableau) in columns k' and k:  X·C_k = C_k' + (combination of the
+   other columns left of k). The stack above the 1 of column k' carries over exactly (it reappears
+   in column k, shifted down to end right above its 1) when that combination is zero. For adjacent
+   columns it is blocked exactly when an arc b -> b' from a box before the pair reaches past it and
+   column k is nonzero in row b'. */
+const GROUP_HUES = () => DIM_HUES[isDark() ? 'dark' : 'light'];
+function cascadeInfo(M, i) {
+  const c = M.cells[i]; if (c._casc) return c._casc;
+  const n = M.n, C = schubertMatrix(M, i), w = c.word, { right } = nilMatrix(M);
+  const grp = new Array(n).fill(0); labeledTableau(M.rows).forEach((row, g) => row.forEach(v => { grp[v - 1] = g; }));
+  const colOf = new Array(n); w.forEach((v, k) => { colOf[v - 1] = k; });
+  // exact equality of polynomial entries, tested at two random integer points
+  const vars = [...new Set((c.free || []).concat(...C.flat().map(x => (String(x).match(/\ba\d+\b/g) || []))))];
+  const envs = [0, 1].map(t => { const e = {}; vars.forEach((v, j) => { e[v] = pconst([2 + ((j * 37 + t * 53 + 11) % 61), 1]); }); return e; });
+  const memo = new Map();
+  const val = (x, t) => { x = String(x).trim(); const key = t + '|' + x; if (!memo.has(key)) memo.set(key, x === '0' ? [] : evalExpr(x, envs[t])); return memo.get(key); };
+  const same = (a, b) => [0, 1].every(t => { const u = val(a, t), v = val(b, t); return u.length === v.length && u.every((f, j) => feq(f, v[j])); });
+  const pairs = [];
+  for (let q = 0; q < n; q++) {
+    if (right[q] < 0) continue;
+    const kp = colOf[q], k = colOf[right[q]];
+    const XCk = r => right[r] >= 0 ? C[right[r]][k] : '0';
+    let exact = true; for (let r = 0; r < n && exact; r++) if (!same(XCk(r), C[r][kp])) exact = false;
+    const stack = []; for (let r = 0; r < q; r++) stack.push(r);
+    const hasEntries = stack.some(r => String(C[r][kp]).trim() !== '0');
+    const adjacent = k === kp + 1, blockers = [];
+    if (adjacent && !exact) for (let cc = 0; cc < kp; cc++) { const b = w[cc] - 1; if (right[b] >= 0 && colOf[right[b]] > k && String(C[right[b]][k]).trim() !== '0') blockers.push([b + 1, right[b] + 1]); }
+    const status = exact ? (hasEntries ? 'carries' : 'bare') : adjacent ? 'blocked' : 'apart';
+    pairs.push({ q: q + 1, q2: right[q] + 1, kp, k, adjacent, exact, status, blockers, group: grp[q], stack, carried: stack.filter(r => String(C[r][kp]).trim() !== '0').map(r => C[r][kp]) });
+  }
+  const tint = new Map();
+  for (const P of pairs) if (P.status === 'carries') {
+    const col = GROUP_HUES()[P.group % GROUP_HUES().length];
+    for (const r of P.stack) { tint.set(r * n + P.kp, col); if (right[r] >= 0) tint.set(right[r] * n + P.k, col); }
+  }
+  return (c._casc = { pairs, tint, grp, colOf });
+}
+function cascadeHtml(M, i) {
+  const c = M.cells[i], n = M.n, A = cascadeInfo(M, i), hues = GROUP_HUES();
+  const groups = labeledTableau(M.rows).map(r => '(' + r.join('') + ')').join('');
+  const W = Math.max(320, 46 * n + 40), x = k => 30 + 46 * k + 8, H = 30 + 22 * Math.max(1, ...A.pairs.map(P => P.k - P.kp)) + 40;
+  let svg = `<svg class="arcs" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="arcs from each box to its right neighbour">`;
+  const base = H - 26;
+  for (const P of A.pairs) {
+    const x1 = x(P.kp), x2 = x(P.k), h = 16 + 22 * (P.k - P.kp), col = hues[P.group % hues.length];
+    const dash = P.status === 'blocked' ? '6 4' : P.status === 'apart' ? '1.5 4' : '';
+    const sw = P.status === 'carries' ? 2.6 : P.status === 'bare' ? 1.2 : 1.6, op = P.status === 'apart' ? 0.55 : 1;
+    svg += `<path d="M${x1} ${base - 12} C ${x1} ${base - 12 - h}, ${x2} ${base - 12 - h}, ${x2} ${base - 12}" fill="none" style="stroke:${col};stroke-width:${sw};opacity:${op}"${dash ? ` stroke-dasharray="${dash}"` : ''} stroke-linecap="round"><title>${P.q} → ${P.q2}: ${P.status === 'carries' ? 'carries over' : P.status === 'bare' ? 'carries over, nothing above the 1' : P.status === 'blocked' ? 'adjacent but blocked' : 'not adjacent, does not carry over'}</title></path>`;
+  }
+  c.word.forEach((v, k) => { const g = A.grp[v - 1], col = hues[g % hues.length];
+    svg += `<text x="${x(k)}" y="${base + 4}" text-anchor="middle" style="font:600 15px var(--math);fill:${col}">${v}</text><text x="${x(k)}" y="${base + 20}" text-anchor="middle" style="font:10px var(--ui);fill:var(--faint)">col ${k + 1}</text>`; });
+  svg += `</svg>`;
+  const word = st => ({ carries: 'carries over', bare: 'carries over (nothing above the 1)', blocked: 'adjacent but blocked', apart: 'not adjacent, does not carry over' })[st];
+  const rows = A.pairs.map(P => {
+    const col = hues[P.group % hues.length];
+    let extra = '';
+    if (P.status === 'carries') extra = `: ${P.carried.map(x => fmtExpr(vn(M, i, x))).join(', ')} ${P.carried.length === 1 ? 'moves' : 'move'} from column ${P.kp + 1} to column ${P.k + 1}, 3 rows down`.replace(', 3 rows down', M.rows.every(r => r === M.rows[0]) ? `, ${M.rows.length} rows down` : ', down to its 1');
+    if (P.status === 'blocked') extra = P.blockers.length ? `: the arc ${P.blockers.map(b => b.join(' → ')).join(', ')} reaches past it` : '';
+    if (P.status === 'apart' && P.exact) extra = '';
+    return `<li><span class="cg" style="background:${col}"></span><b>${P.q} → ${P.q2}</b> <span class="cs">columns ${P.kp + 1}, ${P.k + 1} · ${word(P.status)}${extra}</span></li>`;
+  }).join('');
+  const nCarry = A.pairs.filter(P => P.status === 'carries').length;
+  return `<h4>Cascades in ${cellName(c)}</h4><p class="note">The groups are the rows of the tableau, ${groups}, and each arc joins a box to its right neighbour in the same group, the box that <i>X</i> sends back onto it. When the two boxes sit in adjacent columns and no arc from an earlier box reaches past them, everything above the 1 in the first column carries over into the second, shifted down to end right above its 1. A solid arc carries over, a thin one carries over with nothing above the 1, a dashed one is adjacent but blocked, and a dotted one joins boxes that are not adjacent. Carried stacks are tinted in the matrix above with their group's color${nCarry ? '' : ' (none in this cell)'}.</p>
+    <div class="mwrap">${svg}</div><ul class="casc-list">${rows}</ul>`;
 }
 function renderCoordView() {
   const M = S.M, el = $('#coordview'); if (!M || !el) return;
@@ -1775,7 +1849,8 @@ function renderCoordView() {
   h += `<h4>Relations from the spanning check</h4><p class="note">Check <i>j</i> asks if column <i>j</i> of <i>X</i>·<i>C</i> is in the span of columns 1, …, <i>j</i> of <i>C</i>, which is the same as <i>X</i>·<i>V<sub>j</sub></i> ⊆ <i>V<sub>j</sub></i>. ${Gm.rel.length ? `Imposing all ${n} checks solves for ${Gm.rel.length} of the ${Gm.pos.length} variables in terms of the rest` : `All ${n} checks pass for every value of the ${Gm.pos.length} variables, so nothing gets solved for`}. The ${c.free.length} left over (${c.free.length ? c.free.map(v => fmtExpr(vn(M, i, v))).join(', ') : 'none'}) give the dimension ${c.dim}.</p>`;
   if (Gm.rel.length) h += `<div class="rels">${Gm.rel.map(x => `<span class="rel-eq"><span class="math">${fmtExpr(vn(M, i, x.name))} = ${x.val === '0' ? '0' : fmtExpr(vn(M, i, x.val))}</span><span class="rel-pos">row ${x.r + 1}, col ${x.c + 1}</span></span>`).join('')}</div>`;
   h += `<h4>Schubert cell matrix <i>C</i> of ${cellName(c)} after imposing the flag</h4><p class="note">Here the relations are plugged in. The outlined entries show what each solved variable became, and only ${c.free.length ? c.free.map(v => fmtExpr(vn(M, i, v))).join(', ') : 'constants'} are left free. <i>V<sub>r</sub></i> is the span of the first <i>r</i> columns.</p>
-    <div class="mat-row"><div class="mwrap">${matHtml(vnMat(M, i, C), true, Gm.mark)}</div><button class="icon-btn" data-tex="C">Copy LaTeX</button></div>`;
+    <div class="mat-row"><div class="mwrap">${matHtml(vnMat(M, i, C), true, Gm.mark, cascadeInfo(M, i).tint)}</div><button class="icon-btn" data-tex="C">Copy LaTeX</button></div>`;
+  h += cascadeHtml(M, i);
   let total = 0, totalNz = 0;
   const lv = c.plucker.map((vec, k) => { const vals = splitVec(vec).map(x => x.trim()); const nz = vals.filter(x => x !== '0').length; total += vals.length; totalNz += nz; return { r: k + 1, vals, nz }; });
   h += `<h4>Plücker coordinates of ${cellName(c)}</h4><p class="note">For each <i>r</i>, these are the <i>r</i> × <i>r</i> minors of the first <i>r</i> columns of <i>C</i>, one for every row set {<i>i</i><sub>1</sub> &lt; … &lt; <i>i<sub>r</sub></i>}, in lexicographic order. <span class="legend-z" style="box-shadow:inset 0 0 0 1px var(--rule);background:var(--nz-bg);color:var(--nz-fg)">nonzero</span> <span class="legend-z" style="background:var(--z-bg);color:var(--z-fg)">zero</span> · ${totalNz} of ${total} nonzero.
