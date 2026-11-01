@@ -23,7 +23,7 @@
   --red: #C2412D;
   --red-soft: #F2C4BB;
   --focus: #2B59C3;
-  --elim: #D08A1E; --nz-bg: #FFFFFF; --nz-fg: #1C2533; --z-bg: #E6EBF1; --z-fg: #A3ACB8;
+  --violet: #7B4FD0; --elim: #D08A1E; --nz-bg: #FFFFFF; --nz-fg: #1C2533; --z-bg: #E6EBF1; --z-fg: #A3ACB8;
   --math: "STIX Two Text", "STIX Two Math", Cambria, Georgia, serif;
   --ui: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: light;
@@ -32,13 +32,13 @@
   :root:not([data-theme="light"]) {
     --paper: #121821; --surface: #19212C; --ink: #E6EAF0; --graphite: #A3ADBA; --faint: #6B7685;
     --rule: #2C3644; --grid: #1C2530; --blue: #7FA2F0; --blue-soft: #34508A; --green: #5DBB8E;
-    --green-soft: #2A5A45; --red: #E7735F; --red-soft: #6E3027; --focus: #7FA2F0; color-scheme: dark; --elim: #E2A445; --nz-bg: #F2F5F9; --nz-fg: #121821; --z-bg: #1C2530; --z-fg: #5B6676;
+    --green-soft: #2A5A45; --red: #E7735F; --red-soft: #6E3027; --focus: #7FA2F0; color-scheme: dark; --violet: #A98BF0; --elim: #E2A445; --nz-bg: #F2F5F9; --nz-fg: #121821; --z-bg: #1C2530; --z-fg: #5B6676;
   }
 }
 :root[data-theme="dark"] {
   --paper: #121821; --surface: #19212C; --ink: #E6EAF0; --graphite: #A3ADBA; --faint: #6B7685;
   --rule: #2C3644; --grid: #1C2530; --blue: #7FA2F0; --blue-soft: #34508A; --green: #5DBB8E;
-  --green-soft: #2A5A45; --red: #E7735F; --red-soft: #6E3027; --focus: #7FA2F0; color-scheme: dark; --elim: #E2A445; --nz-bg: #F2F5F9; --nz-fg: #121821; --z-bg: #1C2530; --z-fg: #5B6676;
+  --green-soft: #2A5A45; --red: #E7735F; --red-soft: #6E3027; --focus: #7FA2F0; color-scheme: dark; --violet: #A98BF0; --elim: #E2A445; --nz-bg: #F2F5F9; --nz-fg: #121821; --z-bg: #1C2530; --z-fg: #5B6676;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
@@ -276,6 +276,9 @@ table.mat td.elim { box-shadow: inset 0 0 0 2px var(--elim); }
 .chip.implied { border-style: dashed; border-color: var(--blue-soft); color: var(--blue); }
 .chip.up { border-color: var(--green); color: var(--green); }
 .chip.missing { border-color: var(--red); color: var(--red); }
+.chip.predicted { border-color: var(--violet); color: var(--violet); border-style: dashed; }
+.chip.ruled { border-color: var(--rule); color: var(--graphite); text-decoration: line-through; }
+dd.violet { color: var(--violet); }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 details.lvl { margin: 4px 0; }
 details.lvl summary { cursor: pointer; color: var(--graphite); font-size: 13.5px; }
@@ -357,7 +360,8 @@ table.chk td.y { color: var(--green); }
         <li><span class="sw" style="background:var(--faint);opacity:.35"></span>faded: unrelated</li>
         <li><span class="sw" style="background:var(--graphite);box-shadow:0 0 0 2px var(--paper),0 0 0 3.5px var(--ink)"></span>ringed, dashed line: its closure meets the selected cell</li>
         <li><span class="sw" style="border:2px dashed var(--ink)"></span>dashed ring: reached only through a chain (unproven)</li>
-        <li><span class="sw" style="border:2px solid var(--red);background:var(--surface)"></span>hollow, red ring: below in Bruhat order, unresolved</li>
+        <li><span class="sw" style="border:2px solid var(--violet);background:var(--surface)"></span>hollow, violet ring: predicted by the rank test, no curve yet</li>
+        <li><span class="sw" style="border:2px solid var(--red);background:var(--surface)"></span>hollow, red ring: below in Bruhat order, unresolved (only without a rank file)</li>
         <li><span class="sw sq" style="background:var(--faint);height:2px"></span>grey lines: a simplified sketch of the relations</li>
       </ul>
     </aside>
@@ -446,6 +450,7 @@ const splitVec = s => s.replace(/^\[|\]$/g, '').split(' : ');
 /* sympy string -> readable math */
 function fmtExpr(s) {
   let h = esc(s.trim());
+  h = h.replace(/([a-zA-Z])\{(\d+),(\d+)\}/g, '<i>$1</i><sub>$2,$3</sub>');
   h = h.replace(/([a-zA-Z])(\d+)/g, '<i>$1</i><sub>$2</sub>');
   h = h.replace(/\*\*(\d+)/g, '<sup>$1</sup>').replace(/\^(\d+)/g, '<sup>$1</sup>');
   h = h.replace(/\*/g, '');
@@ -661,26 +666,43 @@ function buildModel(entry, data) {
   const buildContainers = () => { M.containers = cells.map(() => []); M.closureOf.forEach((ts, s) => ts.forEach(t => M.containers[t].push(s))); };
   buildContainers();
   M.reportFor = s => (M.rep && M.rep.cells && M.rep.cells[cells[s].label]) || null;
+  /* Rank test (rank_<p>.json): closure(C_s) can meet C_t only if t <= s in Bruhat order and
+     dim(X^k V_j + V_i) at the permutation flag of t is at most its generic value on C_s, for all i, j, k.
+     The file lists the pairs it allows that the search has no curve for; every other pair is ruled out. */
+  M.rankPred = null;
+  M.attachRank = (rk, nEdges) => {
+    if (!rk || !rk.extra || (rk.summary && rk.summary.found !== nEdges)) return;   // made for a different version of the data
+    M.rankPred = cells.map(() => new Set());
+    for (const [src, ts] of Object.entries(rk.extra)) { const a = idx.get(src); if (a === undefined) continue; ts.forEach(l => { const b = idx.get(l); if (b !== undefined) M.rankPred[a].add(b); }); }
+    M.rankInfo = rk.summary || {}; M.status = null;
+  };
+  M.rankAllows = (s, t) => !M.rankPred || edge.has(s * N + t) || M.rankPred[s].has(t);
   M.reachList = s => { const out = []; for (let t = 0; t < N; t++) if (t !== s && has(reach[s], t)) out.push(t); return out; };
   // chains of witnessed curves: likely but unproven (closure relations need not compose)
-  M.chainOnly = s => { if (M.reportFor(s)) return []; const inC = new Set(M.closureOf[s]); return M.reachList(s).filter(t => !inC.has(t)); };
+  M.chainOnly = s => { if (M.reportFor(s)) return []; const inC = new Set(M.closureOf[s]); return M.reachList(s).filter(t => !inC.has(t) && M.rankAllows(s, t)); };
+  // reached by a chain of curves but forbidden by the rank test: the relations do not compose here
+  M.chainRuledOut = s => { if (M.reportFor(s) || !M.rankPred) return []; const inC = new Set(M.closureOf[s]); return M.reachList(s).filter(t => !inC.has(t) && !M.rankAllows(s, t)); };
+  // allowed by the rank test, no curve yet (and not already reached through a chain)
+  M.predicted = s => { if (!M.rankPred || M.reportFor(s)) return []; const inC = new Set(M.closureOf[s]); return [...M.rankPred[s]].filter(t => !inC.has(t) && !has(reach[s], t)).sort((a, b) => a - b); };
+  M.ruledOut = s => { if (!M.rankPred || M.reportFor(s)) return 0; const inC = new Set(M.closureOf[s]); let k = 0; for (let t = 0; t < N; t++) if (t !== s && !inC.has(t) && !has(reach[s], t) && bruhatLE(t, s) && !M.rankPred[s].has(t)) k++; return k; };
   M.meetPoly = s => { const c = new Array(cells[s].dim + 1).fill(0); c[cells[s].dim]++; M.reachList(s).forEach(t => { if (cells[t].dim <= cells[s].dim) c[cells[t].dim]++; }); return c; };
   M.below = s => M.closureOf[s].slice();
   M.above = t => M.containers[t].slice();
   // Bruhat-below cells with no witness; settled (not missing) when the report covers this closure
-  M.missing = s => { if (M.reportFor(s)) return []; const inC = new Set(M.closureOf[s]); const out = []; for (let t = 0; t < N; t++) if (t !== s && cells[t].dim <= cells[s].dim && !inC.has(t) && !has(reach[s], t) && bruhatLE(t, s)) out.push(t); return out; };
+  M.missing = s => { if (M.reportFor(s) || M.rankPred) return []; const inC = new Set(M.closureOf[s]); const out = []; for (let t = 0; t < N; t++) if (t !== s && cells[t].dim <= cells[s].dim && !inC.has(t) && !has(reach[s], t) && bruhatLE(t, s)) out.push(t); return out; };
   M.status = null;   // N*N grid, computed on demand
   M.computeStatus = () => {
     if (M.status) return M.status;
     const st = new Uint8Array(N * N);
-    let missing = 0; M.nChain = 0;
+    let missing = 0; M.nChain = 0; M.nPred = 0; M.nRuled = 0;
     for (let s = 0; s < N; s++) {
       const settled = !!M.reportFor(s);
       for (let t = 0; t < N; t++) {
         if (s === t) continue;
         if (edge.has(s * N + t)) st[s * N + t] = 1;
         else if (M.inReport.has(s * N + t)) st[s * N + t] = 2;
-        else if (!settled && has(reach[s], t)) { st[s * N + t] = 4; M.nChain++; }
+        else if (!settled && has(reach[s], t)) { if (M.rankAllows(s, t)) { st[s * N + t] = 4; M.nChain++; } else M.nRuled++; }
+        else if (!settled && M.rankPred) { if (M.rankPred[s].has(t)) { st[s * N + t] = 5; M.nPred++; } else if (bruhatLE(t, s)) M.nRuled++; }
         else if (!settled && cells[t].dim <= cells[s].dim && bruhatLE(t, s)) { st[s * N + t] = 3; missing++; }
       }
     }
@@ -766,7 +788,7 @@ function projectXYZ(x0, y0, z0, w, h) {
 }
 
 /* ═════════════ app state, routing ═════════════ */
-const S = { mode3d: true, view3: { yaw: 0.6, pitch: 0.26, zoom: 1, auto: !matchMedia('(prefers-reduced-motion: reduce)').matches }, chain: [], focus: false, L: null, manifest: null, byKey: new Map(), M: null, sel: -1, rel: -1, tab: 'hasse', view: { s: 1, tx: 0, ty: 0 }, hover: -1, cache: new Map() };
+const S = { varStyle: (() => { try { return localStorage.getItem('varStyle') || 'pos'; } catch (e) { return 'pos'; } })(), mode3d: true, view3: { yaw: 0.6, pitch: 0.26, zoom: 1, auto: !matchMedia('(prefers-reduced-motion: reduce)').matches }, chain: [], focus: false, L: null, manifest: null, byKey: new Map(), M: null, sel: -1, rel: -1, tab: 'hasse', view: { s: 1, tx: 0, ty: 0 }, hover: -1, cache: new Map() };
 
 /* Partitions come from manifest.json when it exists; otherwise the page asks
    GitHub for the repository's file list and finds every data_*.json itself. */
@@ -807,10 +829,12 @@ async function discoverFromGitHub() {
   const r = await fetch(`https://api.github.com/repos/${repo}/git/trees/HEAD?recursive=1`);
   if (!r.ok) throw new Error(`GitHub listing for ${repo} returned ${r.status}`);
   const tree = (await r.json()).tree || [];
-  const reports = new Map(), out = [];
+  const reports = new Map(), ranks = new Map(), out = [];
   for (const f of tree) {
     const m = f.type === 'blob' && f.path.match(/(?:^|\/)closure_([^/]+)\.json(\.gz)?$/);
     if (m && (m[2] || !reports.has(m[1]))) reports.set(m[1], f.path);
+    const k = f.type === 'blob' && f.path.match(/(?:^|\/)rank_([^/]+)\.json(\.gz)?$/);
+    if (k && (k[2] || !ranks.has(k[1]))) ranks.set(k[1], f.path);
   }
   const seen = new Map();
   for (const f of tree) {
@@ -823,6 +847,7 @@ async function discoverFromGitHub() {
     if (!rows.length || rows.some(x => !(x > 0))) continue;
     const e = { partition: m[1], rows, n: rows.reduce((a, b) => a + b, 0), path: f.path, bytes: f.size || 0, cells: null, edges: null, maxDim: null, dimProfile: null };
     if (reports.has(m[1])) e.report = reports.get(m[1]);
+    if (ranks.has(m[1])) e.rank = ranks.get(m[1]);
     out.push(e); seen.set(m[1], e);
   }
   out.sort((a, b) => a.rows.length - b.rows.length || a.n - b.n || a.rows.join(',').localeCompare(b.rows.join(','), undefined, { numeric: true }));
@@ -938,6 +963,12 @@ async function showPartition(p, cellLabel) {
           if (rr.ok) S.M.attachReport(await readJson(rr));
         } catch (e) { /* the viewer works without the report */ }
       }
+      if (entry.rank) {
+        try {
+          const rr = await fetchRepoFile(entry.rank);
+          if (rr.ok) S.M.attachRank(await readJson(rr), data.edges.length);
+        } catch (e) { /* the viewer works without the rank test */ }
+      }
     } catch (err) {
       $('#status').textContent = `Could not load ${entry.path}: ${err.message}`;
       return;
@@ -1024,8 +1055,9 @@ function renderStats() {
       <dt>Meetings with no curve found</dt><dd>${extra.toLocaleString()}</dd>`;
   }
   {
-    h += `<dt>Pairs reached only through chains</dt><dd>${M.nChain.toLocaleString()}</dd>
-      <dt>Bruhat-below, unresolved</dt><dd class="${M.nMissing ? 'red' : ''}">${M.nMissing.toLocaleString()}</dd>`;
+    h += `<dt>Pairs reached only through chains</dt><dd>${M.nChain.toLocaleString()}</dd>`;
+    h += M.rankPred ? `<dt>Predicted by the rank test</dt><dd class="violet">${M.nPred.toLocaleString()}</dd><dt>Ruled out by the rank test</dt><dd>${M.nRuled.toLocaleString()}</dd>`
+      : `<dt>Bruhat-below, unresolved</dt><dd class="${M.nMissing ? 'red' : ''}">${M.nMissing.toLocaleString()}</dd>`;
   }
   $('#stats').innerHTML = h;
   let th = $('#theorem');
@@ -1080,6 +1112,7 @@ function selectionSets() {
     M.chainOnly(s).forEach(v => { via[v] = 1; });
     M.above(s).forEach(v => { up[v] = 1; });
     M.missing(s).forEach(v => { miss[v] = 1; });
+    M.predicted(s).forEach(v => { miss[v] = 2; });
   }
   return { down, up, miss, via, inChain };
 }
@@ -1128,7 +1161,7 @@ function drawHasse(w, h) {
       if (v === S.sel || sets.inChain[v] || sets.down[v]) { /* full color */ }
       else if (sets.up[v]) ring = ink;
       else if (sets.via[v]) { ring = ink; dash = [2, 2]; }
-      else if (sets.miss[v]) { ring = red; fill = css('--surface'); }
+      else if (sets.miss[v]) { ring = sets.miss[v] === 2 ? css('--violet') : red; fill = css('--surface'); }
       else alpha = 0.14;
     }
     let sc = 1;
@@ -1202,7 +1235,7 @@ function drawHasse3D(w, h) {
       if (v === S.sel || sets.inChain[v] || sets.down[v]) { /* full color */ }
       else if (sets.up[v]) ring = ink;
       else if (sets.via[v]) { ring = ink; dash = [2, 2]; }
-      else if (sets.miss[v]) { ring = red; fill = surface; }
+      else if (sets.miss[v]) { ring = sets.miss[v] === 2 ? css('--violet') : red; fill = surface; }
       else alpha = 0.12;
     }
     let sc = 1;
@@ -1269,7 +1302,7 @@ function drawMatrix(w, h) {
   if (!S._matCache || S._matCache.key !== key || S._matCache.M !== M) {
     const img = new ImageData(K, K);
     const hex = c => { c = c.replace('#', ''); return [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)]; };
-    const col = [hex(surface), hex(css('--blue')), hex(css('--green')), hex(css('--red')), hex(css('--blue-soft'))], diag = hex(css('--rule'));
+    const col = [hex(surface), hex(css('--blue')), hex(css('--green')), hex(css('--red')), hex(css('--blue-soft')), hex(css('--violet'))], diag = hex(css('--rule'));
     for (let a = 0; a < K; a++) for (let b = 0; b < K; b++) {
       const c = a === b ? diag : col[st[order[a] * N + order[b]]], q = 4 * (a * K + b);
       img.data[q] = c[0]; img.data[q + 1] = c[1]; img.data[q + 2] = c[2]; img.data[q + 3] = 255;
@@ -1330,7 +1363,7 @@ function drawMatrix(w, h) {
   // key
   const ky = Math.min(padT + size + 24, h - 8);
   let kx = padL;
-  [['--blue', 'curve found'], ['--blue-soft', 'only through a chain of curves'], ['--green', 'nonempty in report only'], ['--red', 'Bruhat-below, unresolved']].forEach(([c, t]) => {
+  [['--blue', 'curve found'], ['--blue-soft', 'only through a chain of curves'], ['--green', 'nonempty in report only'], ...(M.rankPred ? [['--violet', 'rank test predicts']] : [['--red', 'Bruhat-below, unresolved']])].forEach(([c, t]) => {
     ctx.fillStyle = css(c); ctx.fillRect(kx, ky - 9, 10, 10);
     ctx.fillStyle = graphite; ctx.font = '13px "Public Sans", sans-serif'; ctx.fillText(t, kx + 15, ky);
     kx += 22 + ctx.measureText(t).width + 14;
@@ -1377,7 +1410,7 @@ cv.addEventListener('pointermove', e => {
   } else if (hit && hit !== -1) {
     if (!S.mHover || S.mHover.a !== hit.a || S.mHover.b !== hit.b) { S.mHover = { a: hit.a, b: hit.b, key: S._matCache && S._matCache.key }; draw(); }
     const st = M.computeStatus()[hit.s * M.N + hit.t];
-    const what = hit.s === hit.t ? 'the same cell' : ['no: the closure does not meet it', 'yes: a curve was found', 'yes: nonempty in the intersection report', 'unresolved: below in Bruhat order, no curve found', 'probably: reached only through a chain of curves'][st];
+    const what = hit.s === hit.t ? 'the same cell' : ['no: the closure does not meet it' + (M.rankPred && M.bruhatLE(hit.t, hit.s) ? ' (ruled out by the rank test)' : ''), 'yes: a curve was found', 'yes: nonempty in the intersection report', 'unresolved: below in Bruhat order, no curve found', 'probably: reached only through a chain of curves', 'predicted: the rank test allows it, but no curve has been found yet'][st];
     tip.innerHTML = `Does the closure of <span class="math">${cellName(M.cells[hit.s])}</span> meet <span class="math">${cellName(M.cells[hit.t])}</span>? ${what}`; showTip(e);
   } else { tip.style.display = 'none'; if (S.mHover) { S.mHover = null; draw(); } }
 });
@@ -1651,11 +1684,38 @@ function productMatrix(M, i) {
   const { right } = nilMatrix(M), C = schubertMatrix(M, i), n = M.n;
   return Array.from({ length: n }, (_, r) => right[r] >= 0 ? C[right[r]].slice() : new Array(n).fill('0'));
 }
-const texExpr = s => String(s).trim().replace(/\*\*(\d+)/g, '^{$1}').replace(/\*\*\(([^)]*)\)/g, '^{$1}').replace(/\*/g, ' ').replace(/([a-zA-Z])(\d+)/g, '$1_{$2}');
+const texExpr = s => String(s).trim().replace(/([a-zA-Z])\{(\d+),(\d+)\}/g, '$1_{$2,$3}').replace(/\*\*(\d+)/g, '^{$1}').replace(/\*\*\(([^)]*)\)/g, '^{$1}').replace(/\*/g, ' ').replace(/([a-zA-Z])(\d+)/g, '$1_{$2}');
 const texMatrix = A => '\\begin{pmatrix}\n' + A.map(r => r.map(x => texExpr(x)).join(' & ')).join(' \\\\\n') + '\n\\end{pmatrix}';
 /* The Schubert cell matrix before the flag condition: as in fill_symbolic, the zero entries with
    no 1 to their left in the row and none above in the column get a1, a2, … in reading order.
    An eliminated variable a_k equals whatever sits in its position once the relations are imposed. */
+/* Variable names. a_k is the k-th free entry of the cell's Schubert matrix before imposing the flag,
+   read row by row, so it can be written by its position a_{row,col} instead. This only changes
+   what is displayed: the data files and every computation keep a1, a2, ... */
+function varPos(M, i) {
+  const c = M.cells[i]; if (c._vp) return c._vp;
+  const n = M.n, w = c.word, P = Array.from({ length: n }, () => new Array(n).fill(0));
+  w.forEach((v, col) => { P[v - 1][col] = 1; });
+  const vp = new Map(); let k = 1;
+  for (let r = 0; r < n; r++) for (let col = 0; col < n; col++) {
+    if (P[r][col] !== 0) continue;
+    let left = false, above = false;
+    for (let cc = 0; cc < col; cc++) if (P[r][cc] === 1) left = true;
+    for (let rr = 0; rr < r; rr++) if (P[rr][col] === 1) above = true;
+    if (!left && !above) vp.set('a' + k++, [r + 1, col + 1]);
+  }
+  return (c._vp = vp);
+}
+const varStyle = () => S.varStyle || 'pos';
+/* rename the variables of cell i inside a sympy string: a5 -> a{2,3} (rendered a_{2,3}) */
+function vn(M, i, str) {
+  str = String(str);
+  if (varStyle() !== 'pos' || i == null || i < 0) return str;
+  const vp = varPos(M, i);
+  return str.replace(/\ba(\d+)\b/g, (m, k) => { const p = vp.get('a' + k); return p ? `a{${p[0]},${p[1]}}` : m; });
+}
+const vnPlain = (M, i, str) => vn(M, i, str).replace(/([a-zA-Z])\{(\d+),(\d+)\}/g, '$1_{$2,$3}');
+const vnMat = (M, i, A) => A.map(r => r.map(x => vn(M, i, x)));
 function genericMatrix(M, i) {
   const c = M.cells[i]; if (c._G) return c._G;
   const n = M.n, w = c.word, P = Array.from({ length: n }, () => new Array(n).fill(0));
@@ -1691,6 +1751,7 @@ function renderCoordView() {
   let h = `<div class="pv-head cv-head"><h3>Coordinates</h3>
     <label>Cell <select id="cv-cell"><option value="-1"${i < 0 ? ' selected' : ''}>choose a cell…</option>${opts}</select></label>
     <button class="icon-btn" data-cvmove="-1" ${i > 0 ? '' : 'disabled'} title="Previous cell">◀</button><button class="icon-btn" data-cvmove="1" ${i >= 0 && i < M.cells.length - 1 ? '' : 'disabled'} title="Next cell">▶</button>
+    <label>Variables <select id="cv-vars"><option value="pos"${varStyle() === 'pos' ? ' selected' : ''}>by position a<sub>row,col</sub></option><option value="idx"${varStyle() === 'idx' ? ' selected' : ''}>by order a<sub>k</sub></option></select></label>
     <label>Plücker <select id="cv-pform"><option value="vec"${(S.cvForm || 'vec') === 'vec' ? ' selected' : ''}>[ x : y : … ] vectors</option><option value="grid"${S.cvForm === 'grid' ? ' selected' : ''}>labelled table</option></select></label>
     ${S.cvForm === 'grid' ? `<label><input type="checkbox" id="cv-hidez"${S.cvHideZero ? ' checked' : ''}> hide zero coordinates</label>` : ''}
     <button class="icon-btn" id="cv-csv-all" type="button" title="Every Plücker coordinate of every cell, zeros included">Download all cells (CSV)</button></div>`;
@@ -1703,18 +1764,18 @@ function renderCoordView() {
   }
   const c = M.cells[i], C = schubertMatrix(M, i), XC = productMatrix(M, i);
   const Gm = genericMatrix(M, i);
-  h += `<h4>Schubert cell matrix of ${cellName(c)} before imposing the flag</h4><p class="note">Column <i>j</i> has its pivot 1 in row <i>w<sub>j</sub></i> (${esc(wordText(c.word))}). Every entry with no 1 to its left and no 1 above it is a free variable, and we name them <i>a</i><sub>1</sub>, <i>a</i><sub>2</sub>, … going row by row (${Gm.pos.length} in all).${Gm.rel.length ? ' <span class="elim-key">Outlined</span> entries are the ones that go away once we impose the flag.' : ''}</p>
-    <div class="mat-row"><div class="mwrap">${matHtml(Gm.G, true, Gm.mark)}</div><button class="icon-btn" data-tex="G">Copy LaTeX</button></div>`;
+  h += `<h4>Schubert cell matrix of ${cellName(c)} before imposing the flag</h4><p class="note">Column <i>j</i> has its pivot 1 in row <i>w<sub>j</sub></i> (${esc(wordText(c.word))}). Every entry with no 1 to its left and no 1 above it is a free variable, ${varStyle() === 'pos' ? 'and we name each one by where it sits, so <i>a</i><sub>5,2</sub> is the entry in row 5, column 2' : 'and we name them <i>a</i><sub>1</sub>, <i>a</i><sub>2</sub>, … going row by row'} (${Gm.pos.length} in all).${Gm.rel.length ? ' <span class="elim-key">Outlined</span> entries are the ones that go away once we impose the flag.' : ''}</p>
+    <div class="mat-row"><div class="mwrap">${matHtml(vnMat(M, i, Gm.G), true, Gm.mark)}</div><button class="icon-btn" data-tex="G">Copy LaTeX</button></div>`;
   {
     const { right } = nilMatrix(M), XG = Gm.G.map((_, r) => right[r] >= 0 ? Gm.G[right[r]].slice() : new Array(n).fill('0'));
     const markXG = new Set(); Gm.mark.forEach(k => { const r = Math.floor(k / n), col = k % n; right.forEach((src, row) => { if (src === r) markXG.add(row * n + col); }); });
     h += `<h4>Product <i>X</i>·<i>C</i> before imposing the flag</h4><p class="note">Row <i>i</i> of <i>X</i>·<i>C</i> is the row of <i>C</i> for the box right of box <i>i</i>, or zero when box <i>i</i> is at the end of its row. The spanning check compares each column of this matrix with the columns of <i>C</i> up to it.</p>
-    <div class="mat-row"><div class="mwrap">${matHtml(XG, true, markXG)}</div><button class="icon-btn" data-tex="XG">Copy LaTeX</button></div>`;
+    <div class="mat-row"><div class="mwrap">${matHtml(vnMat(M, i, XG), true, markXG)}</div><button class="icon-btn" data-tex="XG">Copy LaTeX</button></div>`;
   }
-  h += `<h4>Relations from the spanning check</h4><p class="note">Check <i>j</i> asks if column <i>j</i> of <i>X</i>·<i>C</i> is in the span of columns 1, …, <i>j</i> of <i>C</i>, which is the same as <i>X</i>·<i>V<sub>j</sub></i> ⊆ <i>V<sub>j</sub></i>. ${Gm.rel.length ? `Imposing all ${n} checks solves for ${Gm.rel.length} of the ${Gm.pos.length} variables in terms of the rest` : `All ${n} checks pass for every value of the ${Gm.pos.length} variables, so nothing gets solved for`}. The ${c.free.length} left over (${c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'none'}) give the dimension ${c.dim}.</p>`;
-  if (Gm.rel.length) h += `<div class="rels">${Gm.rel.map(x => `<span class="rel-eq"><span class="math">${fmtExpr(x.name)} = ${x.val === '0' ? '0' : fmtExpr(x.val)}</span><span class="rel-pos">row ${x.r + 1}, col ${x.c + 1}</span></span>`).join('')}</div>`;
-  h += `<h4>Schubert cell matrix <i>C</i> of ${cellName(c)} after imposing the flag</h4><p class="note">Here the relations are plugged in. The outlined entries show what each solved variable became, and only ${c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'constants'} are left free. <i>V<sub>r</sub></i> is the span of the first <i>r</i> columns.</p>
-    <div class="mat-row"><div class="mwrap">${matHtml(C, true, Gm.mark)}</div><button class="icon-btn" data-tex="C">Copy LaTeX</button></div>`;
+  h += `<h4>Relations from the spanning check</h4><p class="note">Check <i>j</i> asks if column <i>j</i> of <i>X</i>·<i>C</i> is in the span of columns 1, …, <i>j</i> of <i>C</i>, which is the same as <i>X</i>·<i>V<sub>j</sub></i> ⊆ <i>V<sub>j</sub></i>. ${Gm.rel.length ? `Imposing all ${n} checks solves for ${Gm.rel.length} of the ${Gm.pos.length} variables in terms of the rest` : `All ${n} checks pass for every value of the ${Gm.pos.length} variables, so nothing gets solved for`}. The ${c.free.length} left over (${c.free.length ? c.free.map(v => fmtExpr(vn(M, i, v))).join(', ') : 'none'}) give the dimension ${c.dim}.</p>`;
+  if (Gm.rel.length) h += `<div class="rels">${Gm.rel.map(x => `<span class="rel-eq"><span class="math">${fmtExpr(vn(M, i, x.name))} = ${x.val === '0' ? '0' : fmtExpr(vn(M, i, x.val))}</span><span class="rel-pos">row ${x.r + 1}, col ${x.c + 1}</span></span>`).join('')}</div>`;
+  h += `<h4>Schubert cell matrix <i>C</i> of ${cellName(c)} after imposing the flag</h4><p class="note">Here the relations are plugged in. The outlined entries show what each solved variable became, and only ${c.free.length ? c.free.map(v => fmtExpr(vn(M, i, v))).join(', ') : 'constants'} are left free. <i>V<sub>r</sub></i> is the span of the first <i>r</i> columns.</p>
+    <div class="mat-row"><div class="mwrap">${matHtml(vnMat(M, i, C), true, Gm.mark)}</div><button class="icon-btn" data-tex="C">Copy LaTeX</button></div>`;
   let total = 0, totalNz = 0;
   const lv = c.plucker.map((vec, k) => { const vals = splitVec(vec).map(x => x.trim()); const nz = vals.filter(x => x !== '0').length; total += vals.length; totalNz += nz; return { r: k + 1, vals, nz }; });
   h += `<h4>Plücker coordinates of ${cellName(c)}</h4><p class="note">For each <i>r</i>, these are the <i>r</i> × <i>r</i> minors of the first <i>r</i> columns of <i>C</i>, one for every row set {<i>i</i><sub>1</sub> &lt; … &lt; <i>i<sub>r</sub></i>}, in lexicographic order. <span class="legend-z" style="box-shadow:inset 0 0 0 1px var(--rule);background:var(--nz-bg);color:var(--nz-fg)">nonzero</span> <span class="legend-z" style="background:var(--z-bg);color:var(--z-fg)">zero</span> · ${totalNz} of ${total} nonzero.
@@ -1727,11 +1788,11 @@ function renderCoordView() {
     if ((S.cvForm || 'vec') === 'vec') {
       // one projective vector, coordinates in lexicographic order of the index sets; hover for the index
       h += `<div class="pvec"><span class="br">[</span>` + vals.map((x, j) => { const z = x === '0', nm = 'p' + I[j].join(n > 9 ? ',' : '');
-        return `<span class="${z ? 'z' : 'nz'}" title="${nm}${z ? ' = 0' : ''}">${z ? '0' : fmtExpr(x)}</span>`; }).join('<span class="col">:</span>') + `<span class="br">]</span></div>`;
+        return `<span class="${z ? 'z' : 'nz'}" title="${nm}${z ? ' = 0' : ''}">${z ? '0' : fmtExpr(vn(M, i, x))}</span>`; }).join('<span class="col">:</span>') + `<span class="br">]</span></div>`;
       h += `<p class="pidx">order: ${I.map(x => x.join(n > 9 ? ',' : '')).join(', ')}</p>`;
     } else {
       h += `<div class="pgrid${S.cvHideZero ? ' hidez' : ''}" style="--pw:${pw}px">`;
-      vals.forEach((x, j) => { const z = x === '0'; h += `<div class="${z ? 'z' : 'nz'}"><span class="k">${pName(I[j], n)}</span><span>${z ? '0' : fmtExpr(x)}</span></div>`; });
+      vals.forEach((x, j) => { const z = x === '0'; h += `<div class="${z ? 'z' : 'nz'}"><span class="k">${pName(I[j], n)}</span><span>${z ? '0' : fmtExpr(vn(M, i, x))}</span></div>`; });
       h += `</div>`;
     }
     h += `</details>`;
@@ -1752,6 +1813,7 @@ function pluckerCsv(cells) {
 }
 $('#coordview').addEventListener('change', e => {
   if (e.target.id === 'cv-cell') { const i = Number(e.target.value); select(i); if (i < 0) renderCoordView(); }
+  if (e.target.id === 'cv-vars') { S.varStyle = e.target.value; try { localStorage.setItem('varStyle', S.varStyle); } catch (err) {} renderCoordView(); renderPanel(); return; }
   if (e.target.id === 'cv-pform') { S.cvForm = e.target.value; renderCoordView(); return; }
   if (e.target.id === 'cv-hidez') { S.cvHideZero = e.target.checked; $('#coordview').querySelectorAll('.pgrid').forEach(g => g.classList.toggle('hidez', S.cvHideZero)); }
 });
@@ -1763,13 +1825,13 @@ $('#coordview').addEventListener('click', async e => {
   if (e.target.closest('#cv-csv-all')) { downloadText(`plucker_${M.entry.partition}_all.csv`, pluckerCsv(M.cells.map(c => c.i))); return; }
   const pc = e.target.closest('[data-pcopy]');
   if (pc && S.sel >= 0) { e.preventDefault(); const r = Number(pc.dataset.pcopy);
-    const txt = '[' + splitVec(M.cells[S.sel].plucker[r - 1]).map(x => x.trim()).join(' : ') + ']';
+    const txt = '[' + splitVec(M.cells[S.sel].plucker[r - 1]).map(x => vnPlain(M, S.sel, x.trim())).join(' : ') + ']';
     try { await navigator.clipboard.writeText(txt); pc.textContent = 'Copied'; } catch (err) { pc.textContent = 'Copy failed'; }
     setTimeout(() => { pc.textContent = 'Copy'; }, 1400); return; }
   const tx = e.target.closest('[data-tex]');
   if (tx) {
     const genXC = () => { const G = genericMatrix(M, S.sel).G, { right } = nilMatrix(M); return G.map((_, r) => right[r] >= 0 ? G[right[r]].slice() : new Array(M.n).fill('0')); };
-    const k = tx.dataset.tex, A = k === 'X' ? nilMatrix(M).X : k === 'G' ? genericMatrix(M, S.sel).G : k === 'XG' ? genXC() : k === 'C' ? schubertMatrix(M, S.sel) : productMatrix(M, S.sel);
+    const k = tx.dataset.tex, A0 = k === 'X' ? nilMatrix(M).X : k === 'G' ? genericMatrix(M, S.sel).G : k === 'XG' ? genXC() : k === 'C' ? schubertMatrix(M, S.sel) : productMatrix(M, S.sel), A = k === 'X' ? A0 : vnMat(M, S.sel, A0);
     try { await navigator.clipboard.writeText(texMatrix(A)); tx.textContent = 'Copied'; } catch (err) { tx.textContent = 'Copy failed'; }
     setTimeout(() => { tx.textContent = 'Copy LaTeX'; }, 1400);
   }
@@ -2066,7 +2128,7 @@ function exactPanelHtml(M, a) {
   if (part.length) {
     const byDrop = part.slice().sort((x, y) => (y.cellDim - y.dim) - (x.cellDim - x.dim) || y.dim - x.dim);
     h += `<details class="lvl"><summary><b>Partial pieces</b> ${part.length}</summary><div class="pieces">${byDrop.map(p => { const t = M.idx.get(p.cell);
-      return `<div class="piece"><button class="chip direct" data-c="${t}">${dimDot(M.cells[t].dim)}${cellName(M.cells[t])}</button> <span class="pd">dim ${p.dim} of ${p.cellDim ?? M.cells[t].dim}</span> <span class="math">${fmtExpr(idealInA(M, t, p.ideal))}</span></div>`; }).join('')}</div></details>`;
+      return `<div class="piece"><button class="chip direct" data-c="${t}">${dimDot(M.cells[t].dim)}${cellName(M.cells[t])}</button> <span class="pd">dim ${p.dim} of ${p.cellDim ?? M.cells[t].dim}</span> <span class="math">${fmtExpr(vn(M, t, idealInA(M, t, p.ideal)))}</span></div>`; }).join('')}</div></details>`;
   }
   return h;
 }
@@ -2146,7 +2208,7 @@ function renderPanel() {
   }
   const c = M.cells[S.sel], rep = M.reportFor(S.sel), chain = S.chain, depth = chain.length;
   const nested = [...nestedSet(chain)].sort((a, b) => M.cells[b].dim - M.cells[a].dim || a - b);
-  const freeTxt = c.free.length ? c.free.map(v => fmtExpr(v)).join(', ') : 'none';
+  const freeTxt = c.free.length ? c.free.map(v => fmtExpr(vn(M, S.sel, v))).join(', ') : 'none';
   let h = `<h2>${cellName(c)}</h2><p class="sub">Dimension ${c.dim}${c.dim === M.maxDim ? ' (its closure is an irreducible component)' : ''}. Free variables: <span class="math">${freeTxt}</span></p>`;
   h += `<div class="fill">${fillingSvg(c, M.rows)}</div>`;
   if (depth === 1) h += exactPanelHtml(M, S.sel) + routePanelHtml(M, S.sel);
@@ -2166,8 +2228,11 @@ function renderPanel() {
   h += `<div id="relbox"></div>`;
 
   if (depth === 1) {
-    const chainOnly = M.chainOnly(S.sel), miss = M.missing(S.sel), up = M.above(S.sel);
+    const chainOnly = M.chainOnly(S.sel), miss = M.missing(S.sel), up = M.above(S.sel), pred = M.predicted(S.sel), chainNo = M.chainRuledOut(S.sel), ruled = M.ruledOut(S.sel);
     if (chainOnly.length) h += `<h3>Reached only through chains<span class="n">${chainOnly.length}</span></h3><p class="note">No curve goes there directly, but a chain of curves does. Closure relations don't have to compose, so treat these as likely but not proven. Click one to see the chain.</p>${chips(chainOnly, 'implied', M)}`;
+    if (pred.length) h += `<h3>Predicted by the rank test<span class="n">${pred.length}</span></h3><p class="note">No curve reaches these yet, but the rank test allows them. In each one the ranks of <i>X</i><sup>k</sup> between the flag spaces at the cell's permutation flag are at most their generic values on this cell. For two rows the test gives exactly 2<sup>dim</sup> cells in every closure, so these are most likely relations the search missed. Click one to see the pair.</p>${chips(pred, 'predicted', M)}`;
+    if (chainNo.length) h += `<h3>Reached through chains, ruled out<span class="n">${chainNo.length}</span></h3><p class="note">A chain of curves reaches these, but the rank test rules them out, so the closure relations do not compose here.</p>${chips(chainNo, 'ruled', M)}`;
+    if (M.rankPred && ruled) h += `<p class="note">${ruled.toLocaleString()} other cell${ruled === 1 ? '' : 's'} below in Bruhat order ${ruled === 1 ? 'is' : 'are'} ruled out by the rank test.</p>`;
     if (miss.length) h += `<h3>Below in Bruhat order, unresolved<span class="n">${miss.length}</span></h3><p class="note">Its closure could meet these, but no curve or chain from the search reaches them, and no intersection report settles it.</p>${chips(miss, 'missing', M)}`;
     h += `<h3>Closures that meet it<span class="n">${up.length}</span></h3>${up.length ? chips(up, 'up', M) : `<p class="note">None.</p>`}`;
   }
@@ -2184,7 +2249,7 @@ function showStep(a, b, scroll = true) {
   const M = S.M, box = $('#relbox'); if (!box) return;
   const r = M.reportFor(a), pc = r ? (r.pieces || []).find(x => x.cell === M.cells[b].label) : null;
   let h = `<div class="rel"><h4>Last step: the closure of ${cellName(M.cells[a])} meets ${cellName(M.cells[b])}</h4>`;
-  if (pc) h += `<p class="note">Intersection report: ${pc.kind === 'full' ? `the whole cell (dimension ${pc.dim}) lies in the closure.` : `a piece of dimension ${pc.dim} of this ${pc.cellDim}-dimensional cell, cut out by <span class="math">${fmtExpr(idealInA(M, b, pc.ideal))}</span> in its free parameters.`}</p>`;
+  if (pc) h += `<p class="note">Intersection report: ${pc.kind === 'full' ? `the whole cell (dimension ${pc.dim}) lies in the closure.` : `a piece of dimension ${pc.dim} of this ${pc.cellDim}-dimensional cell, cut out by <span class="math">${fmtExpr(vn(M, b, idealInA(M, b, pc.ideal)))}</span> in its free parameters.`}</p>`;
   h += M.edge.has(a * M.N + b) ? `<div id="witness"></div>` : `<p class="note">No curve in the search grid reaches it, but the report settles it.</p>`;
   box.innerHTML = h + `</div>`;
   if (M.edge.has(a * M.N + b)) renderWitness(a, b, $('#witness'));
@@ -2222,7 +2287,7 @@ function openRelation(t) {
   const describe = (a, b) => {   // closure of a meets cell b
     let h = `<div class="rel"><h4>The closure of ${cellName(M.cells[a])} meets ${cellName(M.cells[b])}</h4>${go}`;
     const pc = piece(a, b);
-    if (pc) h += `<p class="note">Intersection report: ${pc.kind === 'full' ? `the whole cell (dimension ${pc.dim}) lies in the closure.` : `a piece of dimension ${pc.dim} of this ${pc.cellDim}-dimensional cell, cut out by <span class="math">${fmtExpr(idealInA(M, b, pc.ideal))}</span> in its free parameters.`}</p>`;
+    if (pc) h += `<p class="note">Intersection report: ${pc.kind === 'full' ? `the whole cell (dimension ${pc.dim}) lies in the closure.` : `a piece of dimension ${pc.dim} of this ${pc.cellDim}-dimensional cell, cut out by <span class="math">${fmtExpr(vn(M, b, idealInA(M, b, pc.ideal)))}</span> in its free parameters.`}</p>`;
     if (M.edge.has(a * M.N + b)) h += `<div id="witness"></div>`;
     else h += `<p class="note">No curve in the search grid reaches it, but the report settles it.</p>`;
     return h + `</div>`;
@@ -2237,6 +2302,14 @@ function openRelation(t) {
     box.innerHTML = h + `</div><div id="witness"></div></div>`;
     renderWitness(path[0], path[1], $('#witness'));
   }
+  else if (M.rankPred && (M.rankPred[s].has(t) || M.rankPred[t].has(s))) {
+    const [a, b] = M.rankPred[s].has(t) ? [s, t] : [t, s];
+    box.innerHTML = `<div class="rel"><h4>${cellName(M.cells[b])}: predicted by the rank test</h4>${go}<p class="note">The search found no curve from ${cellName(M.cells[a])} reaching ${cellName(M.cells[b])}, but nothing rules it out either. ${cellName(M.cells[b])} is below ${cellName(M.cells[a])} in Bruhat order, and every rank dim(<i>X</i><sup>k</sup><i>V<sub>j</sub></i> + <i>V<sub>i</sub></i>) at the permutation flag of ${cellName(M.cells[b])} is at most its generic value on ${cellName(M.cells[a])}. A curve for it probably needs a substitution outside the search grid.</p></div>`;
+  }
+  else if (M.rankPred && (M.bruhatLE(t, s) || M.bruhatLE(s, t))) {
+    const [a, b] = M.bruhatLE(t, s) ? [s, t] : [t, s];
+    box.innerHTML = `<div class="rel"><h4>${cellName(M.cells[b])}: ruled out by the rank test</h4>${go}<p class="note">${cellName(M.cells[b])} is below ${cellName(M.cells[a])} in Bruhat order, but some rank dim(<i>X</i><sup>k</sup><i>V<sub>j</sub></i> + <i>V<sub>i</sub></i>) is bigger at the permutation flag of ${cellName(M.cells[b])} than anywhere on ${cellName(M.cells[a])}. Ranks can only drop in a limit, so the closure of ${cellName(M.cells[a])} does not meet ${cellName(M.cells[b])}.</p></div>`;
+  }
   else {
     box.innerHTML = `<div class="rel"><h4>${cellName(M.cells[t])} and ${cellName(M.cells[s])}</h4>${go}<p class="note">${cellName(M.cells[t])} is below ${cellName(M.cells[s])} in Bruhat order, but the search found no curve from ${cellName(M.cells[s])} reaching it, and no intersection report covers this pair. Substitutions tried: 0, ±1, ±<i class="v">t</i>, ±<i class="v">t</i><sup>2</sup>, ±<i class="v">t</i><sup>3</sup>, one parameter as <i class="v">t</i> → ∞.</p></div>`;
   }
@@ -2248,12 +2321,12 @@ function renderWitness(s, t, el) {
   const M = S.M, e = M.edge.get(s * M.N + t), src = M.cells[s], tgt = M.cells[t];
   if (!e || !el) return;
   const lv = e.limit;
-  const asT = v => (lv ? fmtExpr(v.replace(new RegExp('\\b' + lv + '\\b', 'g'), 't')).replace(/\bt\b/g, '<i>t</i>') : fmtExpr(v));
-  const sub = (o) => Object.entries(o).map(([k, v]) => `${fmtExpr(k)} ↦ ${asT(v)}`).join(',&ensp;') || 'none';
+  const asT = (v, i) => (lv ? fmtExpr(vn(M, i, v.replace(new RegExp('\\b' + lv + '\\b', 'g'), 't'))).replace(/\bt\b/g, '<i>t</i>') : fmtExpr(vn(M, i, v)));
+  const sub = (o, i) => Object.entries(o).map(([k, v]) => `${fmtExpr(vn(M, i, k))} ↦ ${asT(v, i)}`).join(',&ensp;') || 'none';
   let h = `<p class="note">Curve from ${cellName(src)} to ${cellName(tgt)}:</p><dl>
-    <dt>Parameter sent to ∞</dt><dd>${lv ? `${fmtExpr(lv)} = <i>t</i>, <i>t</i> → ∞` : 'none (a constant point)'}</dd>
-    <dt>Other source parameters</dt><dd>${sub(e.srcSubs)}</dd>
-    <dt>Target point</dt><dd>${sub(e.tgtSubs)}</dd></dl>`;
+    <dt>Parameter sent to ∞</dt><dd>${lv ? `${fmtExpr(vn(M, s, lv))} = <i>t</i>, <i>t</i> → ∞` : 'none (a constant point)'}</dd>
+    <dt>Other source parameters</dt><dd>${sub(e.srcSubs, s)}</dd>
+    <dt>Target point</dt><dd>${sub(e.tgtSubs, t)}</dd></dl>`;
   // exact check
   try {
     const envS = {}, envT = {};
