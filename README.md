@@ -236,7 +236,7 @@ This matches all 35,614 cells. A write-up with proofs is in progress.
 
 ### Halving algorithm
 
-Pick a cell in the closure, intersect with its closure, and divide the count by a power of 2 (128 down to 2, rounding either way) until one cell is left.
+Pick a cell in the closure, intersect with its closure, and divide the count by a power of 2 (2¹⁰ = 1024 down to 2, rounding either way) until one cell is left.
 
 - Every one of the 35,498 cells with more than one cell in its closure has a route.
 - For two rows each step peels off one ℙ¹ layer, so the closure looks like a cube {0,1}^dim.
