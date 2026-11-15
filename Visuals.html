@@ -196,6 +196,25 @@ details.plv > summary b { font-family: var(--math); font-weight: 600; }
 .legend-z { display: inline-block; padding: 0 8px; border-radius: 3px; }
 table.mat td.casc { background: color-mix(in srgb, var(--tint) 24%, var(--nz-bg)); }
 table.mat td.casc.z { background: color-mix(in srgb, var(--tint) 16%, var(--z-bg)); color: var(--graphite); }
+table.mat.xe-mat td { cursor: pointer; }
+table.mat td.xe-free, .xe-key.xe-free { color: var(--nz-fg); background: var(--nz-bg); box-shadow: inset 0 0 0 2px var(--green); font-weight: 500; }
+table.mat td.xe-copy, .xe-key.xe-copy { color: var(--nz-fg); background: color-mix(in srgb, var(--green) 16%, var(--nz-bg)); font-weight: 500; }
+table.mat td.xe-corr, .xe-key.xe-corr { color: var(--nz-fg); background: color-mix(in srgb, var(--violet) 14%, var(--nz-bg)); box-shadow: inset 0 0 0 2px var(--violet); font-weight: 500; }
+.xe-key { padding: 0 6px; border-radius: 3px; }
+table.mat td.xe-sel { outline: 3px solid var(--focus); outline-offset: 1px; }
+table.mat td.xe-fam { background: color-mix(in srgb, var(--green) 42%, var(--nz-bg)); }
+table.mat td.xe-src { outline: 2px dashed var(--green); outline-offset: 1px; }
+table.mat td.xe-blk { outline: 2px dashed var(--violet); outline-offset: 1px; }
+table.mat.xe-mat td:focus-visible { outline: 3px solid var(--focus); }
+.xe-detail { font-size: 14px; margin: 6px 0 14px; max-width: 780px; }
+.xe-detail p { margin: 6px 0; }
+.xe-lab { color: var(--graphite); font-size: 13px; }
+.xe-path { font-family: var(--math); font-size: 15px; }
+table.xe-tab { border-collapse: collapse; font-size: 13.5px; margin: 6px 0; }
+table.xe-tab th, table.xe-tab td { padding: 3px 10px; border-bottom: 1px solid var(--rule); text-align: left; white-space: nowrap; }
+table.xe-tab th { font-weight: 500; color: var(--graphite); }
+table.xe-tab td { font-family: var(--math); }
+table.xe-tab tr.xe-off td { color: var(--faint); }
 .casc-list { list-style: none; padding: 0; margin: 4px 0 10px; font-size: 13.5px; }
 .casc-list li { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; }
 .casc-list .cg { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
@@ -347,7 +366,7 @@ table.chk td.y { color: var(--green); }
 </header>
 
 <main id="home">
-  <p class="lede" id="lede">Pick a configuration to see its cells, which cells each closure meets, and the curve that proves each relation.</p>
+  <p class="lede" id="lede">Consider a configuration below. For each one, we list its cells, the cells each closure meets, and the curve that proves each relation.</p>
   <div id="catalog"><p class="lede">Loading the configurations…</p></div>
 </main>
 
@@ -387,7 +406,7 @@ table.chk td.y { color: var(--green); }
         <button class="icon-btn" id="spinbtn" type="button" aria-pressed="true" title="Rotate the 3D diagram">Pause rotation</button>
         <button class="icon-btn" id="flat" type="button" title="Switch between the rotating 3D diagram and the flat layered diagram">Flat view</button>
         <button class="icon-btn" id="fit" type="button">Fit</button>
-        <button class="icon-btn" id="routebtn" type="button" title="Animate the 128 → 64 → … → 4 → 2 route from the selected cell down to one cell" disabled>Halving route</button>
+        <button class="icon-btn" id="routebtn" type="button" title="Animate the 1024 → 512 → … → 4 → 2 route from the selected cell down to one cell" disabled>Halving route</button>
         <span class="pairq" id="pairq" hidden>Does the closure of <input id="pair-s" list="labels" placeholder="cell" autocomplete="off" aria-label="Closure of"> meet <input id="pair-t" list="labels" placeholder="cell" autocomplete="off" aria-label="Meets"> ?</span>
         <span class="hint" id="hint">Drag to turn, scroll to zoom. Click a cell, then a cell in its closure to nest</span>
       </div>
@@ -905,7 +924,7 @@ function showHome() {
     byN.get(e.n).push(e);
   }
   const total = S.manifest.every(e => e.cells != null) ? S.manifest.reduce((a, e) => a + e.cells, 0) : null;
-  $('#lede').innerHTML = `<strong>${S.manifest.length} configurations</strong> computed${total != null ? `, ${total.toLocaleString()} cells in all` : ''}. Each one sits above its reverse. Pick one to explore its cells and closures.`;
+  $('#lede').innerHTML = `<strong>${S.manifest.length} configurations</strong> computed${total != null ? `, ${total.toLocaleString()} cells in all` : ''}. Each configuration sits above its reverse. Select one to explore its cells and closures.`;
   let html = '';
   for (const [k, byN] of [...fam.entries()].sort((a, b) => a[0] - b[0])) {
     const count = [...byN.values()].reduce((a, l) => a + l.length, 0);
@@ -1028,13 +1047,13 @@ function renderJordan(rows) {
       const one = t.some(row => row.some((v, k) => k > 0 && row[k - 1] === i + 1 && v === j + 1));
       d += one ? `<rect x="${j * c + 1.5}" y="${i * c + 1.5}" width="${c - 3}" height="${c - 3}" fill="var(--blue)"/>` : `<circle cx="${j * c + c / 2}" cy="${i * c + c / 2}" r="0.9" fill="var(--faint)"/>`;
     }
-    xmat = `<div class="xmat"><p>The matrix of <i class="v">X</i>. A square in row <i class="v">i</i>, column <i class="v">j</i> means <i class="v">Xe<sub>j</sub></i> = <i class="v">e<sub>i</sub></i>.</p><svg width="${w + 2}" height="${w + 2}" viewBox="-1 -1 ${w + 2} ${w + 2}" role="img" aria-label="nilpotent matrix"><rect x="-0.5" y="-0.5" width="${w + 1}" height="${w + 1}" fill="none" stroke="var(--rule)"/>${d}</svg></div>`;
+    xmat = `<div class="xmat"><p>The matrix of <i class="v">X</i>, where a square in row <i class="v">i</i>, column <i class="v">j</i> means <i class="v">Xe<sub>j</sub></i> = <i class="v">e<sub>i</sub></i>.</p><svg width="${w + 2}" height="${w + 2}" viewBox="-1 -1 ${w + 2} ${w + 2}" role="img" aria-label="nilpotent matrix"><rect x="-0.5" y="-0.5" width="${w + 1}" height="${w + 1}" fill="none" stroke="var(--rule)"/>${d}</svg></div>`;
   }
   $('#jcard').innerHTML = `<h2>Jordan blocks</h2><p class="shape">Shape ${shapeText(rows)} acting on <span class="math">ℂ<sup>${n}</sup></span></p>
     <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="labeled tableau">${defs}${s}</svg>
     <div class="blocks">${blocks}</div>
-    <p>Boxes are numbered down each column. <i class="v">X</i> sends each box to the box on its left.</p>
-    <p>A cell is a permutation where each row's numbers stay in order.</p>${xmat}`;
+    <p>The boxes are numbered down each column. Here, <i class="v">X</i> sends each box to the box on its left.</p>
+    <p>Each cell corresponds to a permutation in which the numbers of every row remain in increasing order.</p>${xmat}`;
 }
 
 function renderDimScale() {
@@ -1418,7 +1437,7 @@ cv.addEventListener('pointermove', e => {
   } else if (hit && hit !== -1) {
     if (!S.mHover || S.mHover.a !== hit.a || S.mHover.b !== hit.b) { S.mHover = { a: hit.a, b: hit.b, key: S._matCache && S._matCache.key }; draw(); }
     const st = M.computeStatus()[hit.s * M.N + hit.t];
-    const what = hit.s === hit.t ? 'the same cell' : ['no: the closure does not meet it' + (M.rankPred && M.bruhatLE(hit.t, hit.s) ? ' (ruled out by the rank test)' : ''), 'yes: a curve was found', 'yes: nonempty in the intersection report', 'unresolved: below in Bruhat order, no curve found', 'probably: reached only through a chain of curves', 'predicted: the rank test allows it, but we haven\'t found a curve yet'][st];
+    const what = hit.s === hit.t ? 'the same cell' : ['no: the closure does not meet it' + (M.rankPred && M.bruhatLE(hit.t, hit.s) ? ' (ruled out by the rank test)' : ''), 'yes: a curve was found', 'yes: nonempty in the intersection report', 'unresolved: below in Bruhat order, no curve found', 'probably: reached only through a chain of curves', 'predicted: the rank test allows it, but we have not found a curve yet'][st];
     tip.innerHTML = `Does the closure of <span class="math">${cellName(M.cells[hit.s])}</span> meet <span class="math">${cellName(M.cells[hit.t])}</span>? ${what}`; showTip(e);
   } else { tip.style.display = 'none'; if (S.mHover) { S.mHover = null; draw(); } }
 });
@@ -1482,7 +1501,7 @@ function setTab(t) {
   $('#hint').textContent = t === 'hasse' ? (S.mode3d ? 'Drag to turn, scroll to zoom. Click a cell, then a cell in its closure to nest' : 'Click a cell, then click inside its closure to nest') : t === 'matrix' ? 'Hover to read a square. Click it or type two cells to see the answer' : t === 'coords' ? 'Type a cell above or pick one from the list' : 'Click a cell to open it';
   if (t === 'poly') renderPolyView(); else if (t === 'coords') renderCoordView(); else fitView();
 }
-/* Routes tab: for every cell, the route the 128 → … → 2 rule takes down to one cell. */
+/* Routes tab: for every cell, the route the 1024 → … → 2 rule takes down to one cell. */
 function allRoutes(M) {
   const pref = S.routePref || 'gradual';
   if (M._allRoutes && M._allRoutes.pref === pref) return M._allRoutes.list;
@@ -1505,11 +1524,11 @@ function renderPolyView() {
     <label><input type="checkbox" id="rt-top"${topOnly ? ' checked' : ''}> top-dimensional cells only</label>
     <label>Route <select id="rt-pref"><option value="gradual"${pref === 'gradual' ? ' selected' : ''}>gradual: halve unless forced</option><option value="short"${pref === 'short' ? ' selected' : ''}>fewest steps</option></select></label>
     <button class="icon-btn" id="rt-csv" type="button">Download CSV</button></div>`;
-  h += `<p class="note">Each step intersects with one cell's closure and divides the count by a power of 2, from 128 down, until one cell is left. ▶ plays the route.</p>`;
+  h += `<p class="note">At each step, we intersect with the closure of a chosen cell and divide the count by a power of 2, from 1024 = 2<sup>10</sup> down to 2, until a single cell remains. ▶ plays the route.</p>`;
   h += `<div class="pv-sum"><span>${shown.length - none.length} of ${shown.length} cells have a route</span>${none.length ? `<span class="bad">no route: ${none.length}</span>` : ''}${[...lens.entries()].sort((a, b) => a[0] - b[0]).map(([k, v]) => `<span>${k} step${k > 1 ? 's' : ''} ×${v}</span>`).join('')}${[...divs.entries()].sort((a, b) => b[0] - a[0]).map(([d, v]) => `<span>÷${d} used ${v}×</span>`).join('')}</div>`;
   const cubes = shown.map(i => cubeOf(M, i)).filter(q => q && !q.none);
   if (cubes.length) h += `<div class="pv-sum"><span>closure = 2<sup>dim</sup> cells, drawn as a cube: ${cubes.length}</span><span>every sub-closure a face: ${cubes.filter(q => q.perfect).length}</span><span>tower routes exist: ${cubes.filter(q => q.towers > 0).length}</span></div>`;
-  h += `<p class="note">⧉ draws the closure as a cube when it meets 2<sup>dim</sup> cells. <b>Towers</b>: routes that drop one dimension per step. <b>Chains</b>: all halving sequences (dim! for a perfect cube).</p>`;
+  h += `<p class="note">When a closure meets exactly 2<sup>dim</sup> cells, ⧉ draws it as a cube. Here, <b>towers</b> are routes that drop one dimension per step, and <b>chains</b> are all halving sequences, of which a perfect cube has dim!.</p>`;
   h += `<table class="ptable rtable"><thead><tr><th>Cell</th><th>dim</th><th>cells</th><th>steps</th><th>Cube</th><th>towers</th><th>chains</th><th>Route</th><th></th></tr></thead><tbody>`;
   for (const i of shown) {
     const c = M.cells[i], r = R[i], Q = cubeOf(M, i), cube = Q && !Q.none;
@@ -1639,7 +1658,7 @@ function cubeDetail(M, a, avail) {
     <button class="icon-btn" data-cstep="${k + 1}" ${k < L ? '' : 'disabled'}>▶</button>
     <span class="seg" role="group" aria-label="Cube layout"><button class="icon-btn" data-clayout="level" aria-pressed="${(S.cubeLayout || 'level') === 'level'}">by level</button><button class="icon-btn" data-clayout="box" aria-pressed="${S.cubeLayout === 'box'}">box</button></span></div>`;
   h += cubeSvg(M, a, k, avail);
-  h += `<p class="note">Axis <i>i</i> is 1 when a cell sits outside the closure of ${Q.gens.map((g, i) => `${cellName(M.cells[g])}<sub style="font-family:var(--ui)">(${i + 1})</sub>`).join(', ')}. ${S.cubeLayout === 'box' ? '' : 'Rows are the number of 1s. '}Color is dimension, a dashed ring means dimension ≠ level (${Q.dimOff} of ${1 << Q.d}). ${Q.perfect ? '' : '<span class="bad">Some sub-closures are not faces.</span>'}</p></div>`;
+  h += `<p class="note">Axis <i>i</i> is 1 when a cell sits outside the closure of ${Q.gens.map((g, i) => `${cellName(M.cells[g])}<sub style="font-family:var(--ui)">(${i + 1})</sub>`).join(', ')}. ${S.cubeLayout === 'box' ? '' : 'Each row collects the codes with the same number of 1s. '}Color represents dimension, and a dashed ring marks a cell whose dimension differs from its level (${Q.dimOff} of ${1 << Q.d}). ${Q.perfect ? '' : '<span class="bad">In particular, some sub-closures are not faces.</span>'}</p></div>`;
   return h;
 }
 
@@ -1815,8 +1834,147 @@ function cascadeHtml(M, i) {
     return `<li><span class="cg" style="background:${col}"></span><b>${P.q} → ${P.q2}</b> <span class="cs">columns ${P.kp + 1}, ${P.k + 1} · ${word(P.status)}${extra}</span></li>`;
   }).join('');
   const nCarry = A.pairs.filter(P => P.status === 'carries').length;
-  return `<h4>Cascades in ${cellName(c)}</h4><p class="note">Arcs join each box to its right neighbor in the same grouping ${groups}. Solid: the stack above the 1 carries over (tinted above${nCarry ? '' : ', none here'}). Thin: nothing above the 1. Dashed: next to each other but blocked. Dotted: not next to each other.</p>
+  return `<h4>Cascades in ${cellName(c)}</h4><p class="note">Consider an arc joining each box to its right neighbor in the same grouping ${groups}. A solid arc means the stack above the 1 carries over (tinted above${nCarry ? '' : ', none in this cell'}). A thin arc means there is nothing above the 1, a dashed arc means the boxes are adjacent but blocked, and a dotted arc means they are not adjacent.</p>
     <div class="mwrap">${svg}</div><ul class="casc-list">${rows}</ul>`;
+}
+/* ═════════════ Reading C off the permutation (cascade note, Section 6) ═════════════
+   Entries are indexed by labels: E(r,q) = C[r][col(q)], the entry in row r of the column whose 1 is in row q.
+   From w alone each pair r < q is a zero (r before q in w), free (q before r, and q ends its row or
+   r before R(q)) or dependent (R(q) before r). A dependent entry is its slide E(R r, R q) plus a correction
+   from the blockers b in A = {r < b < q : b before R(q)} (Theorem 14):
+       E(r,q) = E(R r, R q) + Σ_b y_b D(b),   y_b = −E(r,b) − Σ_{c<b} y_c E(c,b),   D(b) = E(R b, R q) − E(b,q).
+   Polynomials are Maps from a monomial ('a3*a3*a7', sorted) to an integer coefficient. */
+const XP = {
+  zero: () => new Map(),
+  one: () => new Map([['', 1]]),
+  v: nm => new Map([[nm, 1]]),
+  add(a, b, s = 1) { const r = new Map(a); b.forEach((c, k) => { const t = (r.get(k) || 0) + s * c; if (t) r.set(k, t); else r.delete(k); }); return r; },
+  mul(a, b) {
+    const r = new Map();
+    a.forEach((x, ka) => b.forEach((y, kb) => {
+      const k = [...(ka ? ka.split('*') : []), ...(kb ? kb.split('*') : [])].sort((s, t) => Number(s.slice(1)) - Number(t.slice(1))).join('*');
+      const v = (r.get(k) || 0) + x * y; if (v) r.set(k, v); else r.delete(k);
+    }));
+    return r;
+  },
+  isZero: a => a.size === 0,
+  str(a) {                                   // sympy-style text, read by fmtExpr and vn
+    if (!a.size) return '0';
+    const mono = k => { const f = new Map(); k.split('*').forEach(x => f.set(x, (f.get(x) || 0) + 1)); return [...f].map(([x, e]) => e > 1 ? `${x}**${e}` : x).join('*'); };
+    const terms = [...a].sort((p, q) => q[0].split('*').length - p[0].split('*').length || (p[0] < q[0] ? -1 : 1));
+    return terms.map(([k, c], j) => {
+      const body = !k ? String(Math.abs(c)) : (Math.abs(c) === 1 ? '' : Math.abs(c) + '*') + mono(k);
+      return (c < 0 ? (j ? ' - ' : '-') : (j ? ' + ' : '')) + body;
+    }).join('');
+  },
+  val(a, env) { let s = 0; a.forEach((c, k) => { let t = c; if (k) k.split('*').forEach(x => { t *= env[x]; }); s += t; }); return s; }
+};
+function explicitCell(M, i) {
+  const c = M.cells[i]; if (c._xe) return c._xe;
+  const n = M.n, w = c.word, { right } = nilMatrix(M);
+  const R = q => (q > 0 && right[q - 1] >= 0) ? right[q - 1] + 1 : 0;      // labels are 1..n, 0 = no box
+  const pos = new Array(n + 1); w.forEach((v, k) => { pos[v] = k; });
+  const grp = new Array(n + 1); labeledTableau(M.rows).forEach((row, g) => row.forEach(v => { grp[v] = g; }));
+  const nameAt = new Map(); varPos(M, i).forEach(([r, cc], nm) => nameAt.set(r + ',' + cc, nm));
+  const kind = (r, q) => r > q || pos[r] < pos[q] ? 'zero' : r === q ? 'one' : (!R(q) || pos[r] < pos[R(q)]) ? 'free' : 'dep';
+  const memo = new Map(), why = new Map(), key = (r, q) => r * (n + 1) + q;
+  function E(r, q) {
+    if (!r || !q || r > q) return XP.zero();
+    if (r === q) return XP.one();
+    const kk = key(r, q); if (memo.has(kk)) return memo.get(kk);
+    const t = kind(r, q); let v;
+    if (t === 'zero') v = XP.zero();
+    else if (t === 'free') v = XP.v(nameAt.get(r + ',' + (pos[q] + 1)));
+    else {
+      const Rq = R(q), slide = E(R(r), Rq), A = [];
+      for (let b = r + 1; b < q; b++) if (pos[b] < pos[Rq]) A.push(b);
+      const y = new Map(), blockers = []; let corr = XP.zero();
+      for (const b of A) {
+        let yb = XP.add(XP.zero(), E(r, b), -1);
+        for (const cc of A) { if (cc >= b) break; if (!XP.isZero(y.get(cc))) yb = XP.add(yb, XP.mul(y.get(cc), E(cc, b)), -1); }
+        y.set(b, yb);
+        const D = XP.add(E(R(b), Rq), E(b, q), -1), contrib = XP.mul(yb, D);
+        blockers.push({ b, y: yb, D, contrib, sameRowAsQ: grp[b] === grp[q] });
+        corr = XP.add(corr, contrib);
+      }
+      v = XP.add(slide, corr);
+      why.set(kk, { slide, blockers, corr });
+    }
+    memo.set(kk, v); return v;
+  }
+  const cellOf = new Map();                 // matrix index r*n+col -> {r, q, kind, val, src}
+  for (let r = 1; r <= n; r++) for (let q = 1; q <= n; q++) {
+    let t = kind(r, q); const v = E(r, q);
+    const W = why.get(key(r, q));
+    if (t === 'dep') t = XP.isZero(W.corr) ? 'copy' : 'corr';
+    cellOf.set((r - 1) * n + pos[q], { r, q, kind: t, val: v, info: W });
+  }
+  // a copy is the value at the end of its slide path; record that path and its source
+  const path = (r, q) => { const p = [[r, q]]; while (r && q && cellOf.get((r - 1) * n + pos[q]).kind === 'copy') { r = R(r); q = R(q); if (!r) break; p.push([r, q]); } return p; };
+  cellOf.forEach(x => { if (x.kind === 'copy') { x.path = path(x.r, x.q); const [a, b] = x.path[x.path.length - 1]; x.src = a ? [a, b] : null; } });
+  // check against the stored matrix (Plücker data) at two random points
+  const C = schubertMatrix(M, i), vars = [...nameAt.values()];
+  let bad = 0;
+  for (let t = 0; t < 2 && !bad; t++) {
+    const env = {}, envP = {}; vars.forEach((v, j) => { env[v] = 2 + ((j * 37 + t * 53 + 11) % 61); envP[v] = pconst([env[v], 1]); });
+    cellOf.forEach((x, idx) => {
+      const s = String(C[Math.floor(idx / n)][idx % n]).trim(); let d;
+      try { d = s === '0' ? [] : evalExpr(s, envP); } catch (e) { bad++; return; }
+      const mine = XP.val(x.val, env), theirs = d.length ? d[0][0] / d[0][1] : 0;
+      if (mine !== theirs) bad++;
+    });
+  }
+  return (c._xe = { cellOf, R, pos, grp, bad, at: (r, q) => (r - 1) * n + pos[q] });
+}
+function explicitHtml(M, i) {
+  const c = M.cells[i], n = M.n, X = explicitCell(M, i), sel = S.xeSel && S.xeSel.i === i ? S.xeSel.key : null;
+  const P = s => fmtExpr(vn(M, i, XP.str(s)));
+  const where = (r, q) => `row ${r}, column ${X.pos[q] + 1}`;
+  const count = { free: 0, copy: 0, corr: 0 }; X.cellOf.forEach(x => { if (x.kind in count) count[x.kind]++; });
+  const hl = new Map();                      // matrix index -> extra class
+  let detail = `<p class="note xe-hint">Click an entry to see where it comes from.</p>`;
+  if (sel != null && X.cellOf.has(sel)) {
+    const x = X.cellOf.get(sel), r = x.r, q = x.q, Rq = X.R(q);
+    hl.set(sel, 'xe-sel');
+    const lab = `<b>${where(r, q)}</b> <span class="xe-lab">(labels <i>r</i> = ${r}, <i>q</i> = ${q})</span>`;
+    if (x.kind === 'one') detail = `<p>${lab}: the pivot of this column.</p>`;
+    else if (x.kind === 'zero') detail = `<p>${lab}: zero, since ${r > q ? `it lies below the 1 of this column` : `${r} comes before ${q} in <i>w</i>, so a 1 sits to its left in row ${r}`}.</p>`;
+    else if (x.kind === 'free') {
+      const fam = []; X.cellOf.forEach((y, idx) => { if (y.kind === 'copy' && y.src && y.src[0] === r && y.src[1] === q) { fam.push(y); hl.set(idx, 'xe-fam'); } });
+      detail = `<p>${lab}: the free variable ${P(x.val)}, since ${Rq ? `${r} comes before ${Rq} = <i>R</i>(${q}) in <i>w</i>` : `${q} ends its row`}.</p>
+        <p>${fam.length ? `Its streak copies it to ${fam.map(y => where(y.r, y.q)).join(', ')} (highlighted).` : 'It is not copied anywhere else.'}</p>`;
+    } else if (x.kind === 'copy') {
+      const steps = x.path.map(([a, b]) => { const y = X.cellOf.get(X.at(a, b)); return `${where(a, b)}${y.kind === 'copy' ? '' : y.kind === 'free' ? ' (free)' : y.kind === 'corr' ? ' (corrected)' : ''}`; });
+      x.path.slice(1).forEach(([a, b]) => hl.set(X.at(a, b), 'xe-fam'));
+      const blk = x.info.blockers.length;
+      detail = `<p>${lab}: dependent, since ${Rq} = <i>R</i>(${q}) comes before ${r} in <i>w</i>. ${blk ? `Its blockers ${x.info.blockers.map(b => b.b).join(', ')} contribute nothing, so it` : 'It has no blockers, so it'} equals the entry one box right in both labels.</p>
+        <p class="xe-path">${steps.join(' → ')}${x.src ? '' : ' → 0'}${XP.isZero(x.val) ? '' : ` = ${P(x.val)}`}</p>`;
+    } else {
+      const W = x.info, Rr = X.R(r);
+      if (Rr) hl.set(X.at(Rr, Rq), 'xe-src');
+      W.blockers.forEach(b => { if (!XP.isZero(b.contrib)) hl.set(X.at(r, b.b), 'xe-blk'); });
+      const rows = W.blockers.map(b => `<tr class="${XP.isZero(b.contrib) ? 'xe-off' : ''}"><td>${b.b}</td><td>${b.sameRowAsQ ? `${X.grp[b.b] + 1}, same as ${q}` : X.grp[b.b] + 1}</td><td>${P(b.y)}</td><td>${P(b.D)}</td><td>${P(b.contrib)}</td></tr>`).join('');
+      detail = `<p>${lab}: dependent, since ${Rq} = <i>R</i>(${q}) comes before ${r} in <i>w</i>. Its slide is ${Rr ? `${where(Rr, Rq)}, which is ${P(W.slide)}` : `zero, since ${r} ends its row`}.</p>
+        <p>The blockers are the labels between ${r} and ${q} that come before ${Rq} in <i>w</i>. Each contributes <i>y<sub>b</sub></i>·<i>D</i>(<i>b</i>), where <i>D</i>(<i>b</i>) = <i>E</i>(<i>R</i>(<i>b</i>), ${Rq}) − <i>E</i>(<i>b</i>, ${q}) and <i>y<sub>b</sub></i> = −<i>E</i>(${r}, <i>b</i>) − Σ<sub><i>c</i>&lt;<i>b</i></sub> <i>y<sub>c</sub></i> <i>E</i>(<i>c</i>, <i>b</i>). A blocker in the row of ${q} always gives <i>D</i>(<i>b</i>) = 0.</p>
+        <div class="mwrap"><table class="xe-tab"><thead><tr><th>blocker <i>b</i></th><th>grouping</th><th><i>y<sub>b</sub></i></th><th><i>D</i>(<i>b</i>)</th><th>contribution</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <p class="xe-path">${Rr ? P(W.slide) : '0'} ${(t => t.startsWith('−') ? '− ' + t.slice(1) : '+ ' + t)(P(W.corr))} = ${P(x.val)}</p>`;
+    }
+  }
+  let h = `<span class="mat-brk"><table class="mat xe-mat"><thead><tr><th></th>${Array.from({ length: n }, (_, j) => `<th>${j + 1}</th>`).join('')}</tr></thead><tbody>`;
+  for (let r = 0; r < n; r++) {
+    h += `<tr><th>${r + 1}</th>`;
+    for (let k = 0; k < n; k++) {
+      const idx = r * n + k, x = X.cellOf.get(idx), cls = { zero: 'z', one: 'one', free: 'xe-free', copy: 'xe-copy', corr: 'xe-corr' }[x.kind];
+      const txt = x.kind === 'zero' ? '0' : x.kind === 'one' ? '1' : fmtExpr(vn(M, i, XP.str(x.val)));
+      h += `<td class="${cls}${hl.has(idx) ? ' ' + hl.get(idx) : ''}" data-xe="${idx}" tabindex="0">${txt}</td>`;
+    }
+    h += `</tr>`;
+  }
+  h += `</tbody></table></span>`;
+  const two = M.rows.length === 2;
+  return `<h4>Reading <i>C</i> off the permutation</h4>
+    <p class="note">Here, every entry is computed from <i>w</i> alone, with no relations solved. A <span class="xe-key xe-free">free</span> entry is a free variable. A <span class="xe-key xe-copy">copy</span> equals the entry one box right in both labels, so each free variable is copied diagonally along its streak. A <span class="xe-key xe-corr">corrected</span> entry is its slide plus a correction from blockers in a third row of the tableau${two ? ', which cannot happen with two rows' : ''}. This cell has ${count.free} free, ${count.copy} copied and ${count.corr} corrected entries. ${X.bad ? `<span class="bad">${X.bad} entries differ from the stored matrix.</span>` : 'It agrees with the stored matrix entry for entry.'}</p>
+    <div class="mat-row"><div class="mwrap">${h}</div></div><div class="xe-detail">${detail}</div>`;
 }
 function renderCoordView() {
   const M = S.M, el = $('#coordview'); if (!M || !el) return;
@@ -1830,30 +1988,31 @@ function renderCoordView() {
     ${S.cvForm === 'grid' ? `<label><input type="checkbox" id="cv-hidez"${S.cvHideZero ? ' checked' : ''}> hide zero coordinates</label>` : ''}
     <button class="icon-btn" id="cv-csv-all" type="button" title="Every Plücker coordinate of every cell, zeros included">Download all cells (CSV)</button></div>`;
   const { X } = nilMatrix(M);
-  h += `<h4>Nilpotent operator <i>X</i></h4><p class="note"><i>X</i><sub><i>ij</i></sub> = 1 when box <i>j</i> sits right of box <i>i</i>.</p>
+  h += `<h4>Nilpotent operator <i>X</i></h4><p class="note">Here, <i>X</i><sub><i>ij</i></sub> = 1 when box <i>j</i> sits directly right of box <i>i</i>, that is, <i>Xe<sub>j</sub></i> = <i>e<sub>i</sub></i>.</p>
     <div class="mat-row"><div class="mwrap">${matHtml(X, true)}</div><button class="icon-btn" data-tex="X">Copy LaTeX</button></div>`;
   if (i < 0) {
-    h += `<p class="note" style="margin-top:18px">Pick a cell above (or type its permutation in the box at the top) to see its Schubert cell matrix, the product <i>X</i>·<i>C</i>, the relations and its Plücker coordinates.</p>`;
+    h += `<p class="note" style="margin-top:18px">Select a cell above to see its Schubert cell matrix, the product <i>X</i>·<i>C</i>, the relations and its Plücker coordinates.</p>`;
     el.innerHTML = h; return;
   }
   const c = M.cells[i], C = schubertMatrix(M, i), XC = productMatrix(M, i);
   const Gm = genericMatrix(M, i);
-  h += `<h4>Schubert cell matrix of ${cellName(c)} before imposing the flag</h4><p class="note">${Gm.pos.length} free variables, ${varStyle() === 'pos' ? 'named by position (<i>a</i><sub>5,2</sub> sits in row 5, column 2)' : 'named in reading order'}.${Gm.rel.length ? ' <span class="elim-key">Outlined</span> ones get solved for.' : ''}</p>
+  h += `<h4>Schubert cell matrix of ${cellName(c)} before imposing the flag</h4><p class="note">This matrix has ${Gm.pos.length} free variables, named ${varStyle() === 'pos' ? 'by position, so <i>a</i><sub>5,2</sub> sits in row 5, column 2' : 'in reading order'}.${Gm.rel.length ? ' The <span class="elim-key">outlined</span> entries are solved for once we impose the flag.' : ''}</p>
     <div class="mat-row"><div class="mwrap">${matHtml(vnMat(M, i, Gm.G), true, Gm.mark)}</div><button class="icon-btn" data-tex="G">Copy LaTeX</button></div>`;
   {
     const { right } = nilMatrix(M), XG = Gm.G.map((_, r) => right[r] >= 0 ? Gm.G[right[r]].slice() : new Array(n).fill('0'));
     const markXG = new Set(); Gm.mark.forEach(k => { const r = Math.floor(k / n), col = k % n; right.forEach((src, row) => { if (src === r) markXG.add(row * n + col); }); });
-    h += `<h4>Product <i>X</i>·<i>C</i> before imposing the flag</h4><p class="note">Row <i>i</i> is the row of <i>C</i> for the box right of box <i>i</i> (zero at the end of a row).</p>
+    h += `<h4>Product <i>X</i>·<i>C</i> before imposing the flag</h4><p class="note">Row <i>i</i> is the row of <i>C</i> belonging to the box right of box <i>i</i>, or zero when box <i>i</i> ends its row.</p>
     <div class="mat-row"><div class="mwrap">${matHtml(vnMat(M, i, XG), true, markXG)}</div><button class="icon-btn" data-tex="XG">Copy LaTeX</button></div>`;
   }
-  h += `<h4>Relations from the spanning check</h4><p class="note">Column <i>j</i> of <i>X</i>·<i>C</i> must lie in the span of columns 1, …, <i>j</i> of <i>C</i>. ${Gm.rel.length ? `This solves for ${Gm.rel.length} of the ${Gm.pos.length} variables` : `Nothing gets solved for`}, leaving ${c.free.length} free (the dimension).</p>`;
+  h += `<h4>Relations from the spanning check</h4><p class="note">The spanning check requires column <i>j</i> of <i>X</i>·<i>C</i> to lie in the span of columns 1, …, <i>j</i> of <i>C</i>. ${Gm.rel.length ? `As such, ${Gm.rel.length} of the ${Gm.pos.length} variables are solved for` : `In this cell, no variable is solved for`}, leaving ${c.free.length} free variables, which is the dimension.</p>`;
   if (Gm.rel.length) h += `<div class="rels">${Gm.rel.map(x => `<span class="rel-eq"><span class="math">${fmtExpr(vn(M, i, x.name))} = ${x.val === '0' ? '0' : fmtExpr(vn(M, i, x.val))}</span><span class="rel-pos">row ${x.r + 1}, col ${x.c + 1}</span></span>`).join('')}</div>`;
-  h += `<h4>Schubert cell matrix <i>C</i> of ${cellName(c)} after imposing the flag</h4><p class="note">Relations plugged in. Outlined entries show what each solved variable became.</p>
+  h += `<h4>Schubert cell matrix <i>C</i> of ${cellName(c)} after imposing the flag</h4><p class="note">Here, the relations are substituted. In other words, each outlined entry shows what its variable became.</p>
     <div class="mat-row"><div class="mwrap">${matHtml(vnMat(M, i, C), true, Gm.mark, cascadeInfo(M, i).tint)}</div><button class="icon-btn" data-tex="C">Copy LaTeX</button></div>`;
+  h += `<div id="xe-sec">${explicitHtml(M, i)}</div>`;
   h += cascadeHtml(M, i);
   let total = 0, totalNz = 0;
   const lv = c.plucker.map((vec, k) => { const vals = splitVec(vec).map(x => x.trim()); const nz = vals.filter(x => x !== '0').length; total += vals.length; totalNz += nz; return { r: k + 1, vals, nz }; });
-  h += `<h4>Plücker coordinates of ${cellName(c)}</h4><p class="note">The <i>r</i> × <i>r</i> minors of the first <i>r</i> columns, in lexicographic order. <span class="legend-z" style="box-shadow:inset 0 0 0 1px var(--rule);background:var(--nz-bg);color:var(--nz-fg)">nonzero</span> <span class="legend-z" style="background:var(--z-bg);color:var(--z-fg)">zero</span> · ${totalNz} of ${total} nonzero.
+  h += `<h4>Plücker coordinates of ${cellName(c)}</h4><p class="note">For each <i>r</i>, these are the <i>r</i> × <i>r</i> minors of the first <i>r</i> columns, listed in lexicographic order. <span class="legend-z" style="box-shadow:inset 0 0 0 1px var(--rule);background:var(--nz-bg);color:var(--nz-fg)">nonzero</span> <span class="legend-z" style="background:var(--z-bg);color:var(--z-fg)">zero</span> · ${totalNz} of ${total} nonzero.
     <button class="icon-btn" id="cv-csv" type="button">Download this cell (CSV)</button></p>`;
   const longest = Math.max(...lv.flatMap(l => l.vals.map(x => x.length)), 1);
   const pw = Math.min(420, Math.max(110, 40 + n * 9 + longest * 7.5));
@@ -1894,6 +2053,14 @@ $('#coordview').addEventListener('change', e => {
 });
 $('#coordview').addEventListener('click', async e => {
   const M = S.M; if (!M) return;
+  const xe = e.target.closest('[data-xe]');
+  if (xe && S.sel >= 0) {
+    const k = Number(xe.dataset.xe);
+    S.xeSel = S.xeSel && S.xeSel.i === S.sel && S.xeSel.key === k ? null : { i: S.sel, key: k };
+    $('#xe-sec').innerHTML = explicitHtml(M, S.sel);
+    const again = $('#xe-sec').querySelector(`[data-xe="${k}"]`); if (again) again.focus({ preventScroll: true });
+    return;
+  }
   const mv = e.target.closest('[data-cvmove]');
   if (mv) { select(Math.max(0, Math.min(M.cells.length - 1, S.sel + Number(mv.dataset.cvmove)))); return; }
   if (e.target.closest('#cv-csv') && S.sel >= 0) { downloadText(`plucker_${M.entry.partition}_${M.cells[S.sel].label}.csv`, pluckerCsv([S.sel])); return; }
@@ -1957,12 +2124,12 @@ function centerOn(i) {
   v.tx = w / 2 - L.xy[2 * i] * v.s; v.ty = h / 2 - L.xy[2 * i + 1] * v.s; draw();
 }
 
-/* ═════════════ halving route: 128 → 64 → … → 4 → 2 ═════════════ */
+/* ═════════════ halving route: 1024 → 512 → … → 4 → 2 ═════════════ */
 /* Start from S = {A} ∪ (cells the closure of A meets). One step picks a cell B in S and
    keeps S ∩ ({B} ∪ cells the closure of B meets). Divisors are used in the fixed order
-   128, 64, 32, 16, 8, 4, 2 (each may repeat or be skipped, never revisited); dividing by d needs at least
+   1024, 512, …, 4, 2 (each may repeat or be skipped, never revisited); dividing by d needs at least
    d cells and must land on ⌊n/d⌋ or ⌈n/d⌉. The route ends at one cell: the last B chosen. */
-const ROUTE_DIVS = [128, 64, 32, 16, 8, 4, 2];
+const ROUTE_DIVS = [1024, 512, 256, 128, 64, 32, 16, 8, 4, 2];
 function closedSet(M, v) { (M._cs || (M._cs = []));  return M._cs[v] || (M._cs[v] = new Set([v, ...M.closureOf[v]])); }
 function halvingRoute(M, a, pref = S.routePref || 'gradual') {
   M.routes = M.routes || new Map();
@@ -2199,7 +2366,7 @@ function exactPanelHtml(M, a) {
   let h = `<h3>Closure polynomial<span class="n">${cert ? 'certified' : 'not certified'}</span></h3>`;
   h += `<p class="math" style="margin:4px 0 2px">${polyHtml(r.poly)}</p>`;
   h += `<p class="verdict-line ${cert ? v.cls : ''}">${cert ? (v.cls === 'ok' ? 'Factors as ' + v.text + '.' : v.cls === 'bad' ? 'Not palindromic, so this closure is singular.' : 'Palindromic, not a product of q-integers.') : 'Some pieces are not shown to be affine spaces, so this counts pieces by dimension but may not be a Poincaré polynomial.'}</p>`;
-  h += `<p class="note">One q<sup>k</sup> per cell met, k = dimension of the piece: ${full.length} whole cell${full.length === 1 ? '' : 's'}, ${part.length} partial piece${part.length === 1 ? '' : 's'}.</p>`;
+  h += `<p class="note">Each cell the closure meets contributes q<sup>k</sup>, where k is the dimension of the piece it meets: ${full.length} whole cell${full.length === 1 ? '' : 's'}, ${part.length} partial piece${part.length === 1 ? '' : 's'}.</p>`;
   if (part.length) {
     const byDrop = part.slice().sort((x, y) => (y.cellDim - y.dim) - (x.cellDim - x.dim) || y.dim - x.dim);
     h += `<details class="lvl"><summary><b>Partial pieces</b> ${part.length}</summary><div class="pieces">${byDrop.map(p => { const t = M.idx.get(p.cell);
@@ -2209,11 +2376,11 @@ function exactPanelHtml(M, a) {
 }
 function routePanelHtml(M, a) {
   const R = halvingRoute(M, a);
-  let h = `<h3>Halving algorithm<span class="n">128 → 64 → … → 4 → 2</span></h3>`;
+  let h = `<h3>Halving algorithm<span class="n">1024 → 512 → … → 4 → 2</span></h3>`;
   if (R.start.length === 1) return h + `<p class="note">Its closure meets no other cell, so there is nothing to halve.</p>`;
-  if (!R.steps) return h + `<p class="note">No 128 → 64 → … → 4 → 2 route from this cell with the current data.</p>`;
+  if (!R.steps) return h + `<p class="note">No 1024 → 512 → … → 4 → 2 route from this cell with the current data.</p>`;
   h += `<div class="route-seq">${routeSeqHtml(R, -1)}</div>`;
-  h += `<p class="note">Each step divides the count by a power of 2. It ends at <span class="math">${cellName(M.cells[R.final])}</span>.</p>`;
+  h += `<p class="note">Each step divides the count by a power of 2, and the route ends at <span class="math">${cellName(M.cells[R.final])}</span>.</p>`;
   h += `<button class="icon-btn" data-route="${a}">${S.anim && S.anim.R.a === a ? 'Replay the route' : 'Animate the route'}</button>`;
   { const Q = cubeOf(S.M, a); if (Q && !Q.none) h += ` <button class="icon-btn" data-cubeview="${a}" title="Open the Routes tab with this closure drawn as a ${Q.d}-cube">View closure as a cube</button>`; }
   return h;
@@ -2278,7 +2445,7 @@ function renderPanel() {
   if (S.tab === 'poly') renderPolyView();
   if (S.tab === 'coords') renderCoordView();
   if (S.sel < 0) {
-    P.innerHTML = `<p class="empty">Click a cell to see which cells its closure meets. Click one of those to nest.</p>`;
+    P.innerHTML = `<p class="empty">Select a cell to see which cells its closure meets. Selecting one of those nests the two closures.</p>`;
     return;
   }
   const c = M.cells[S.sel], rep = M.reportFor(S.sel), chain = S.chain, depth = chain.length;
@@ -2293,20 +2460,20 @@ function renderPanel() {
   h += `<div class="nest-formula">${chain.map((v, k) => `<button class="nf-cell${k === depth - 1 ? ' cur' : ''}" data-pop="${k}" title="${k === depth - 1 ? 'Current cell' : 'Step back out to here'}">${cellName(M.cells[v])}</button>`).join('<span class="cap">∩</span>')}</div>`;
   if (depth > 1) h += `<div class="nest-actions"><button class="icon-btn" data-pop="${depth - 2}">Step out</button><button class="icon-btn" data-go="${S.sel}">Start over from ${cellName(c)}</button></div>`;
   if (!nested.length) {
-    h += `<p class="note">${depth > 1 ? `No cell is met by all ${depth} of these closures, so the nested intersection is empty.` : 'None. This cell is closed (its closure meets no other cell).'}</p>`;
+    h += `<p class="note">${depth > 1 ? `No cell is met by all ${depth} of these closures, so the nested intersection is empty.` : 'None, since this cell is closed (its closure meets no other cell).'}</p>`;
   } else {
     h += `<p class="note">${depth > 1
-      ? `Cells met by every closure in the chain. Click one to keep nesting.`
-      : `Click one to nest. Solid: a curve reaches it.${rep ? ' Green: report only.' : ''}`}</p>`;
+      ? `These are the cells met by every closure in the chain. Select one to keep nesting.`
+      : `Select one to nest the two closures. A solid outline means a curve reaches it${rep ? ', and a green outline means only the report lists it' : ''}.`}</p>`;
     h += chips(nested, v => M.edge.has(S.sel * M.N + v) ? 'direct' : 'up', M).replace(/data-c="/g, 'data-nest="');
   }
   h += `<div id="relbox"></div>`;
 
   if (depth === 1) {
     const chainOnly = M.chainOnly(S.sel), miss = M.missing(S.sel), up = M.above(S.sel), pred = M.predicted(S.sel), chainNo = M.chainRuledOut(S.sel), ruled = M.ruledOut(S.sel);
-    if (chainOnly.length) h += `<h3>Reached only through chains<span class="n">${chainOnly.length}</span></h3><p class="note">Only a chain of curves reaches these, so they're likely but not proven.</p>${chips(chainOnly, 'implied', M)}`;
-    if (pred.length) h += `<h3>Predicted by the rank test<span class="n">${pred.length}</span></h3><p class="note">No curve yet, but the rank test allows them. Likely missed by the search.</p>${chips(pred, 'predicted', M)}`;
-    if (chainNo.length) h += `<h3>Reached through chains, ruled out<span class="n">${chainNo.length}</span></h3><p class="note">A chain reaches these, but the rank test rules them out.</p>${chips(chainNo, 'ruled', M)}`;
+    if (chainOnly.length) h += `<h3>Reached only through chains<span class="n">${chainOnly.length}</span></h3><p class="note">Only a chain of curves reaches these. As such, they are likely but not proven, since closure relations need not compose.</p>${chips(chainOnly, 'implied', M)}`;
+    if (pred.length) h += `<h3>Predicted by the rank test<span class="n">${pred.length}</span></h3><p class="note">No curve reaches these yet, but the rank test allows them. In other words, the search most likely missed them.</p>${chips(pred, 'predicted', M)}`;
+    if (chainNo.length) h += `<h3>Reached through chains, ruled out<span class="n">${chainNo.length}</span></h3><p class="note">A chain of curves reaches these, but the rank test rules them out. This is where closure relations fail to compose.</p>${chips(chainNo, 'ruled', M)}`;
     if (M.rankPred && ruled) h += `<p class="note">${ruled.toLocaleString()} other cell${ruled === 1 ? '' : 's'} below in Bruhat order ${ruled === 1 ? 'is' : 'are'} ruled out by the rank test.</p>`;
     if (miss.length) h += `<h3>Below in Bruhat order, unresolved<span class="n">${miss.length}</span></h3><p class="note">No curve, chain or report settles these yet.</p>${chips(miss, 'missing', M)}`;
     h += `<h3>Closures that meet it<span class="n">${up.length}</span></h3>${up.length ? chips(up, 'up', M) : `<p class="note">None.</p>`}`;
@@ -2314,7 +2481,7 @@ function renderPanel() {
 
   // secondary material, collapsed
   h += `<h3>More about ${cellName(c)}</h3>`;
-  h += `<p class="note">Matrices, relations, cascades and Plücker coordinates are in the Coordinates tab.</p><button class="icon-btn" data-coords="${S.sel}">Open coordinates of ${cellName(c)}</button>`;
+  h += `<p class="note">The matrices, relations, cascades and Plücker coordinates are in the Coordinates tab.</p><button class="icon-btn" data-coords="${S.sel}">Open coordinates of ${cellName(c)}</button>`;
   P.innerHTML = h;
   if (depth > 1) showStep(chain[depth - 2], chain[depth - 1], false);
 }
@@ -2379,14 +2546,14 @@ function openRelation(t) {
   }
   else if (M.rankPred && (M.rankPred[s].has(t) || M.rankPred[t].has(s))) {
     const [a, b] = M.rankPred[s].has(t) ? [s, t] : [t, s];
-    box.innerHTML = `<div class="rel"><h4>${cellName(M.cells[b])}: predicted by the rank test</h4>${go}<p class="note">No curve found, but every rank dim(<i>X</i><sup>k</sup><i>V<sub>j</sub></i> + <i>V<sub>i</sub></i>) allows it. The curve likely needs a substitution outside the search grid.</p></div>`;
+    box.innerHTML = `<div class="rel"><h4>${cellName(M.cells[b])}: predicted by the rank test</h4>${go}<p class="note">The search found no curve, but every rank dim(<i>X</i><sup>k</sup><i>V<sub>j</sub></i> + <i>V<sub>i</sub></i>) allows it. Most likely, the curve needs a substitution outside the search grid.</p></div>`;
   }
   else if (M.rankPred && (M.bruhatLE(t, s) || M.bruhatLE(s, t))) {
     const [a, b] = M.bruhatLE(t, s) ? [s, t] : [t, s];
-    box.innerHTML = `<div class="rel"><h4>${cellName(M.cells[b])}: ruled out by the rank test</h4>${go}<p class="note">Some rank dim(<i>X</i><sup>k</sup><i>V<sub>j</sub></i> + <i>V<sub>i</sub></i>) is bigger at ${cellName(M.cells[b])} than anywhere on ${cellName(M.cells[a])}. Ranks only drop in a limit, so the closure can't meet it.</p></div>`;
+    box.innerHTML = `<div class="rel"><h4>${cellName(M.cells[b])}: ruled out by the rank test</h4>${go}<p class="note">Some rank dim(<i>X</i><sup>k</sup><i>V<sub>j</sub></i> + <i>V<sub>i</sub></i>) is bigger at ${cellName(M.cells[b])} than anywhere on ${cellName(M.cells[a])}. This is because ranks can only drop in a limit, so the closure cannot meet it.</p></div>`;
   }
   else {
-    box.innerHTML = `<div class="rel"><h4>${cellName(M.cells[t])} and ${cellName(M.cells[s])}</h4>${go}<p class="note">Below in Bruhat order, but no curve found and no report covers it.</p></div>`;
+    box.innerHTML = `<div class="rel"><h4>${cellName(M.cells[t])} and ${cellName(M.cells[s])}</h4>${go}<p class="note">This cell is below in Bruhat order, but the search found no curve and no report covers it.</p></div>`;
   }
   box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
