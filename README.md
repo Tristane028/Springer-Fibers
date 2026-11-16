@@ -312,7 +312,7 @@ Two notes develop a method for computing an intersection **exactly** with ideals
 
 ## References
 
-- Talia Goldwasser, Meera Nadeem, Garcia Sun, and Julianna Tymoczko. *Cell Closures for Two-Row Springer Fibers via Noncrossing Matchings.* [arXiv:2503.03941](https://arxiv.org/abs/2503.03941) · 📄 [View Paper](https://docs.google.com/viewer?url=https://raw.githubusercontent.com/Tristane028/Springer-Fibers/main/Cell_Closures_for_Two-Row_Springer_Fibers.pdf)
+- Talia Goldwasser, Meera Nadeem, Garcia Sun, and Julianna Tymoczko. *Cell Closures for Two-Row Springer Fibers via Noncrossing Matchings.* [arXiv:2503.03941](https://arxiv.org/abs/2503.03941)
 - Lucas Fresse and Anna Melnikov. *On the singularity of the irreducible components of a Springer fiber in sl(n).* [arXiv:0905.1617](https://arxiv.org/abs/0905.1617)
 - Lucas Fresse. *Some characterizations of singular components of Springer fibers in the two-column case.* [arXiv:0909.4008](https://arxiv.org/abs/0909.4008)
-- Francis Y. C. Fung. *On the topology of components of some Springer fibers and their relation to Kazhdan–Lusztig theory.* Advances in Mathematics 178 (2003).
+- Francis Y. C. Fung. *On the topology of components of some Springer fibers and their relation to Kazhdan–Lusztig theory.* Advances in Mathematics 178 (2003). [arXiv:0020.4224](https://arxiv.org/pdf/math/0204224)
