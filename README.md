@@ -13,18 +13,19 @@
 
 ---
 
-## Overview
+## 1. Introduction
 
-We study Springer fibers in type A. For each configuration we list the cells, compute their Plücker coordinates, and find which cells each closure meets. The goal is to understand the components and how their closures fit together.
+Springer fibers were introduced by Tonny Springer in 1976 as geometric objects whose cohomology carries representations of the symmetric group. Given a nilpotent matrix X, the Springer fiber is the set of complete flags V₁ ⊂ ⋯ ⊂ Vₙ with X·Vⱼ ⊆ Vⱼ for every j. Intersecting the fiber with Schubert cells breaks it into affine pieces, or cells, a result due to Spaltenstein and Shimomura. However, describing how these cells fit together is much harder. In particular, little is known about which cells the closure of a given cell meets.
 
-**116 configurations · 35,614 cells · 1,144,312 closure relations**, up to n = 11.
+For two Jordan blocks, Fung (2003) showed that every component is an iterated ℙ¹-bundle, and Goldwasser, Nadeem, Sun and Tymoczko (2025) described the cell closures completely using noncrossing matchings. Beyond two rows, no such description is known.
+
+In this project, we compute the closure relations for 116 configurations with two, three and four rows, up to n = 11, which gives 35,614 cells and 1,144,312 relations. Furthermore, we verify the data against known results, find a rank condition that predicts the closures, and prove a cascade lemma that explains the structure of each cell. As a result, every cell can be written down directly from its permutation. We also build an interactive viewer for exploring the results.
 
 ---
 
-## Conventions
+## 2. Definitions
 
-- **Configuration key.** Row lengths from top to bottom: `25` is a row of 2 over a row of 5. Dashes once a row has 10+ boxes (`1-10`).
-- **Labeling.** Boxes are numbered down each column, leftmost column first:
+Consider a configuration, written as its row lengths from top to bottom, so `25` is a row of 2 boxes over a row of 5 (with dashes once a row has 10 or more boxes, as in `1-10`). We number the boxes down each column, starting with the leftmost column:
 
 ```
 33  →  [1][3][5]        321  →  [1][4][6]
@@ -32,22 +33,15 @@ We study Springer fibers in type A. For each configuration we list the cells, co
                                [3]
 ```
 
-- **Nilpotent operator.** X sends each box to the box on its left. The first column goes to 0.
-- **Cells.** A cell is a permutation where each grouping (row of the tableau) stays in increasing order. Its dimension is the number of free variables left after imposing the flag (X·Vⱼ ⊆ Vⱼ).
+Here, the nilpotent operator X sends each box to the box on its left, and the first column goes to 0. The rows of the tableau are the **groupings**. Each cell corresponds to a permutation in which every grouping appears in increasing order, and its dimension is the number of free variables left after we impose the flag.
 
 ---
 
-## Data
+## 3. Computed data
 
-Files live in `Two-`, `Three-` and `Four-Row-Springer-Fibers/N = n/`. Large files are gzipped (`.json.gz`).
+The data files live in `Two-`, `Three-` and `Four-Row-Springer-Fibers/N = n/`, and files above GitHub's upload limit are gzipped. Each file lists every cell (its permutation, dimension, free variables and Plücker coordinates) and every relation.
 
-| Field | Meaning |
-|---|---|
-| `cells[]` | permutation, dimension, free variables, Plücker coordinates |
-| `edges[]` | one relation each, with the curve that proves it |
-| `_complete` | set once every pair has been checked |
-
-An edge `src → tgt` means the closure of C_src **meets** C_tgt. The proof is a curve in C_src whose limit lands in C_tgt. For example, in (4,4):
+A relation `src → tgt` means the closure of C_src **meets** C_tgt. That is, there is a curve in C_src whose limit lands in C_tgt. For example, in (4,4):
 
 ```
 C_12468357 → C_12354768
@@ -56,7 +50,7 @@ C_12468357 → C_12354768
   limit:   a₃ → ∞
 ```
 
-Relations don't compose, and the search only tries simple substitutions (0, ±1, ±T, ±T², ±T³), so a few relations get missed. The rank test below catches most of them.
+Two remarks are in order. First, closure relations do not compose, so a relation reached only through a chain of curves is not proven. Second, the search only tries simple substitutions (0, ±1, ±T, ±T², ±T³), so some relations are missed. The rank test in Section 5 predicts most of these.
 
 ### Two rows
 
@@ -117,7 +111,7 @@ Relations don't compose, and the search only tries simple substitutions (0, ±1,
 | 9,2 | 11 | (1,3,5,6,7,8,9,10,11) (2,4) | 55 | 142 | 2 |
 | 10,1 | 11 | (1,3,4,5,6,7,8,9,10,11) (2) | 11 | 10 | 1 |
 
-*54 configurations · 4,070 cells · 36,358 relations*
+*54 configurations, 4,070 cells and 36,358 relations.*
 
 ### Three rows
 
@@ -176,7 +170,7 @@ Relations don't compose, and the search only tries simple substitutions (0, ±1,
 | 7,2,1 | 10 | (1,4,6,7,8,9,10) (2,5) (3) | 360 | 3,370 | 4 |
 | 8,1,1 | 10 | (1,4,5,6,7,8,9,10) (2) (3) | 90 | 371 | 3 |
 
-*52 configurations · 25,604 cells · 774,938 relations*
+*52 configurations, 25,604 cells and 774,938 relations.*
 
 ### Four rows
 
@@ -193,94 +187,120 @@ Relations don't compose, and the search only tries simple substitutions (0, ±1,
 | 1,2,2,3 | 8 | (1) (2,5) (3,6) (4,7,8) | 1,680 | 122,975 | 9 |
 | 3,2,2,1 | 8 | (1,5,8) (2,6) (3,7) (4) | 1,680 | 116,585 | 9 |
 
-*10 configurations · 5,940 cells · 333,016 relations*
+*10 configurations, 5,940 cells and 333,016 relations.*
 
 ---
 
-## Checks
+## 4. Verification
 
-- **Spanning check.** Every cell satisfies X·Vⱼ ⊆ Vⱼ, and every dimension matches its free variables.
-- **Betti numbers.** Cell counts by dimension match the Kostka–Foulkes formula for every configuration.
+- **Spanning check.** For every cell, each column of X·C lies in the span of the columns of C up to it, and every dimension matches the number of free variables.
+- **Betti numbers.** The number of cells of each dimension matches the Betti numbers of the Springer fiber, computed independently from Kostka–Foulkes polynomials.
 - **Bruhat order.** No relation goes against Bruhat order.
+- **Explicit cells.** For all 35,614 cells, the explicit formula of Section 5.4 gives the same free variables and the same matrix as the spanning check.
 - **Two rows.** No closure meets more than 2^dim cells, as Fung's theorem requires.
-- **(3,2,2).** An exact intersection report agrees with every relation found.
-- **Smoothness.** By Fresse–Melnikov, all components are smooth exactly for hooks, two rows, two rows plus a box, and (2,2,2).
+- **Exact comparison.** For (3,2,2), an exact intersection report computed with Gröbner bases agrees with every relation the search found.
+- **Smoothness.** By Fresse and Melnikov, every component is smooth exactly when the configuration is a hook, two rows, two rows plus a box, or (2,2,2).
 
 ---
 
-## Results
+## 5. Results
 
-### Rank test
+### 5.1 The rank test
 
-With r_k(i, j) = dim(Xᵏ·V_j + V_i) − i:
+Define r_k(i, j) = dim(Xᵏ·V_j + V_i) − i. Since ranks can only drop in a limit,
 
 > the closure of C_w can meet C_v only if v ≤ w in Bruhat order and every r_k(i, j) at v is at most its value on C_w.
 
-- None of the 1,144,312 relations breaks it.
-- For two rows it gives exactly 2^dim cells in all 4,070 closures, so it looks like the full answer there.
-- For (3,2,2) it matches the exact report in 209 of 210 closures. The one miss is the singular component.
+None of the 1,144,312 relations breaks this condition. For two rows, it gives exactly 2^dim cells in all 4,070 closures, so it appears to be the full answer there. For (3,2,2), it matches the exact report in 209 of 210 closures, and the one exception is precisely the singular component. The predicted pairs are stored in `rank_<configuration>.json` and can be remade with `python3 rank_test.py`.
 
-`rank_<configuration>.json` lists the pairs it allows that the search hasn't proven. Remake them with `python3 rank_test.py`.
+### 5.2 Cascading free variables
 
-### Cascading free variables
+After we impose the flag, entries of C copy themselves from one column to the next column of the same grouping. This is because of the following lemma. If box q sits directly left of box p, in columns k′ and k, then
 
-If box q sits left of box p, in columns k′ and k:
+> X·C_k = C_k′ + (a combination of earlier columns whose 1 sits above row q).
 
-> X·C_k = C_k′ + (earlier columns with their 1 above row q).
+In other words, the stack above the 1 in column k′ carries over into column k, unless an earlier arc boxes it in. Counting the variables that remain free gives the dimension of every cell,
 
-So the stack above the 1 in column k′ carries over into column k unless an earlier arc boxes it in. Counting what stays free gives the dimension of every cell:
+> dim = Σ over boxes q of the smaller boxes after q and before the right neighbor of q,
 
-> dim = Σ over boxes q of the smaller boxes after q and before q's right neighbor.
+which matches all 35,614 cells. A write-up with full proofs is under review.
 
-This matches all 35,614 cells. A write-up with proofs is in progress.
+### 5.3 The halving algorithm
 
-### Halving algorithm
+Starting from a closure, we intersect with the closure of a chosen cell and divide the count by a power of 2, from 2¹⁰ = 1024 down to 2, until a single cell remains. Every one of the 35,498 cells with more than one cell in its closure has such a route. For two rows, each step peels off one ℙ¹ layer, so the closure behaves like a cube {0,1}^dim. With three or more rows, odd factors such as 3! = 6 appear, and rounding absorbs them.
 
-Pick a cell in the closure, intersect with its closure, and divide the count by a power of 2 (2¹⁰ = 1024 down to 2, rounding either way) until one cell is left.
+### 5.4 Reading each cell off its permutation
 
-- Every one of the 35,498 cells with more than one cell in its closure has a route.
-- For two rows each step peels off one ℙ¹ layer, so the closure looks like a cube {0,1}^dim.
-- With three or more rows, factors like 3! = 6 appear, and rounding absorbs them.
+Previously, the matrix of a cell came from solving the spanning check. Now it can be read directly from the permutation w, in the spirit of Section 4 of Goldwasser, Nadeem, Sun and Tymoczko. Index the entries by labels, so that E(r, q) is the entry in row r of the column whose 1 is in row q. Then each entry is one of the following.
+
+- **Zero** if r comes before q in w.
+- **Free** if q comes before r, and either q ends its row or r comes before R(q), the box to the right of q.
+- **Copied** otherwise, from the entry one box to the right in both labels, E(R(r), R(q)), plus a correction.
+
+The correction comes from the **blockers**, the labels b between r and q that come before R(q) in w. Each blocker adds y_b · D(b), where D(b) = E(R(b), R(q)) − E(b, q) is what slid in minus what is already there, and y_b is minus the entry above the 1 of b, after clearing it against the other blockers.
+
+> E(r, q) = E(R(r), R(q)) + Σ over blockers b of y_b · D(b).
+
+Nothing is solved, so each entry takes one pass. In other words, each free variable is copied diagonally along a **streak**, and a 1 in the way stops it and drags the entry above it along. Alexander Ryan found the same rule independently, as a rook that slides up and then left.
+
+Furthermore, only blockers in a third grouping, different from those of r and q, can contribute. As such, **with two rows every entry is 0, 1 or a single variable**, which is the analogue of Theorem 4.10 of Goldwasser, Nadeem, Sun and Tymoczko. Polynomials first appear with three rows. In (3,3,3), 460 of the 2,520 dependent entries carry a correction.
+
+To tell instantly whether an entry is a plain copy, list its blockers in a third grouping.
+
+- If there are none, at this step and at every later slide, the entry is a copy. This is proven.
+- If one has a nonzero entry above its 1 and a nonzero D(b), the entry is corrected. This never misses a correction, and its only false alarms are rare cancellations.
+
+The formula is checked against every dependent entry in all 116 configurations. `flag_formula.py` prints the matrix of any cell, including configurations without data:
+
+```
+python3 flag_formula.py 333 362951487
+```
+
+### 5.5 Cutting a cell into smaller ones
+
+Suppose the first m entries of w are 1, …, m in some order. Then the matrix is block-diagonal. The top block is a cell of the configuration formed by boxes 1, …, m, and the bottom block is a cell of the remaining boxes. Dimensions add, and the closure is the product of the two smaller closures. For example, (3,3,3) splits as 1 + 332, 11 + 322, 111 + 222, 211 + 221, and in reverse. In particular, the cell 326154879 is the (2,2,2) cell 326154 next to the (1,1,1) cell 213.
+
+All 809 possible cuts in the data give the correct block form. Comparing closures across these cuts also turned up 64 relations that the search missed in eight smaller configurations, namely 321, 222, 322, 331, 133, 122, 114 and 112. Each one is forced by a curve found in a larger configuration, and the rank test had flagged all of them as allowed. They are listed in `missing_relations.json`.
 
 ---
 
-## Viewer
+## 6. Interactive viewer
 
-[`Visuals.html`](https://tristane028.github.io/Springer-Fibers/Visuals.html) reads the data straight from this repository. New files show up on the next page load.
+[`Visuals.html`](https://tristane028.github.io/Springer-Fibers/Visuals.html) reads the data directly from this repository, so new files appear on the next page load.
 
-- **Catalog.** Each configuration sits above its reverse. Missing ones show as placeholders.
-- **Diagram.** The closures in 3D, with nesting and the halving algorithm animation.
-- **Matrix.** Every pair at a glance: found, through a chain, predicted by the rank test, or no.
-- **Routes.** Every cell's halving route, plus a cube view for two-row closures.
-- **Coordinates.** X, the matrix before and after imposing the flag, the relations, the cascades and every Plücker coordinate. Variables are named by position, a_{row,col}.
+- **Catalog.** Each configuration sits above its reverse, and missing ones appear as placeholders.
+- **Diagram.** The closures in 3D, with nesting and an animation of the halving algorithm.
+- **Matrix.** Every pair of cells, marked as found, reached through a chain, predicted by the rank test, or ruled out.
+- **Routes.** The halving route of every cell, with a cube view for two-row closures.
+- **Coordinates.** The operator X, the matrix before and after imposing the flag, the relations, the cascades and every Plücker coordinate, with variables named by position. The section *Reading C off the permutation* recomputes the matrix from w alone, as in Section 5.4. Each entry is marked free, copied along a streak, or corrected by blockers, and clicking an entry explains where it comes from.
 
 ---
 
-## Running the computation
+## 7. Running the computation
 
 ```
 pip install numpy sympy python-flint
 python3 "Computational Geometry.py" 333
 ```
 
-It builds the cells, skips pairs Bruhat order rules out, searches the rest, and writes `data_<configuration>.json` to your home folder. Progress saves every 30 seconds, so rerunning the same command resumes. Set `WORKERS` to limit cores.
+The script builds the cells, skips pairs that Bruhat order rules out, searches the rest, and writes `data_<configuration>.json` to the home folder. Progress is saved every 30 seconds, so rerunning the same command resumes an interrupted run. Versions of the script before November 15, 2026 could lose a relation when an interrupted run was resumed. This is now fixed, and computing a configuration again from scratch recovers anything that was lost. Two-row cases at n = 11 finish in under two minutes, while (3,3,3) runs overnight on a laptop.
 
-Two-row cases at n = 11 take under two minutes. (3,3,3) runs overnight on a laptop.
-
-| File | What it is |
+| File | Purpose |
 |---|---|
 | `Computational Geometry.py` | the closure search |
-| `rank_test.py` | makes the `rank_*.json` files |
+| `rank_test.py` | generates the `rank_*.json` files |
+| `flag_formula.py` | the matrix of any cell, read off its permutation |
+| `missing_relations.json` | the 64 relations found by cutting cells |
 | `build_manifest.py` | optional index of the data files |
 
 ---
 
-## Working notes
+## 8. Working notes
 
-Two notes work out how to compute an intersection **exactly** with ideals, not just whether it's nonempty.
+Two notes develop a method for computing an intersection **exactly** with ideals, rather than only deciding whether it is nonempty.
 
-- **Note I: saturation and the Rabinowitsch trick.** 📄 [View](https://docs.google.com/viewer?url=https://raw.githubusercontent.com/Tristane028/Springer-Fibers/main/Springer_Fiber_Closure%20%282%29.pdf) Sets up saturation, (I : f^∞) = (I + (1 − tf)) ∩ R.
-- **Note II: the N = 8 calculation.** 📄 [View](https://docs.google.com/viewer?url=https://raw.githubusercontent.com/Tristane028/Springer-Fibers/main/Springer_Fiber_Closure%20%283%29.pdf) A full (4,4) example where the intersection is a proper subvariety, {s = p}. Key lesson: impose the target-cell equations only after eliminating.
+- **Note I: saturation and the Rabinowitsch trick.** 📄 [View](https://docs.google.com/viewer?url=https://raw.githubusercontent.com/Tristane028/Springer-Fibers/main/Springer_Fiber_Closure%20%282%29.pdf) The note sets up saturation, (I : f^∞) = (I + (1 − tf)) ∩ R.
+- **Note II: the N = 8 calculation.** 📄 [View](https://docs.google.com/viewer?url=https://raw.githubusercontent.com/Tristane028/Springer-Fibers/main/Springer_Fiber_Closure%20%283%29.pdf) A full (4,4) example in which the intersection is a proper subvariety, {s = p}. In particular, the target-cell equations must be imposed only after elimination.
 
 ---
 
